@@ -14,8 +14,9 @@ Setup help, notification behaviour, privacy rules, and development details.
 | Panel | The shade-like screen: blurred backdrop, calls and media, NEW / EARLIER, collapsed Running | Exists only while open |
 | Lock-screen view | Shown over the locked keyguard when the screen turns on | Started only on screen-on |
 
-No foreground service, wakelocks or alarms. The only scheduled work is the once-a-day update
-check, and only if you turn it on.
+No foreground service, wakelocks or alarms. The only scheduled work is a check every half
+hour that Android hasn't silently dropped the notification listener (it reconnects it if so),
+and the once-a-day update check, only if you turn it on.
 
 ### What counts as a "meaningful check"
 

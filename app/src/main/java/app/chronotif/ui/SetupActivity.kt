@@ -12,7 +12,6 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
-import android.service.notification.NotificationListenerService
 import android.service.quicksettings.TileService
 import android.util.TypedValue
 import android.view.Gravity
@@ -62,6 +61,7 @@ class SetupActivity : Activity() {
     override fun onResume() {
         super.onResume()
         refreshers.forEach { it() }
+        ListenerService.ensureBound(this)
         Updater.foreground = true
     }
 
@@ -216,13 +216,6 @@ class SetupActivity : Activity() {
     }
 
     private fun openListenerSettings() {
-        // Granted but not connected (process killed and never rebound): ask for a rebind first.
-        if (ListenerService.isEnabled(this) && ListenerService.instance == null) {
-            try {
-                NotificationListenerService.requestRebind(ComponentName(this, ListenerService::class.java))
-            } catch (_: RuntimeException) {
-            }
-        }
         val detail = Intent(Settings.ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS).putExtra(
             Settings.EXTRA_NOTIFICATION_LISTENER_COMPONENT_NAME,
             ComponentName(this, ListenerService::class.java).flattenToString(),

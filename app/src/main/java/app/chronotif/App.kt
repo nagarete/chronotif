@@ -9,5 +9,7 @@ class App : Application() {
         super.onCreate()
         Prefs.init(this)
         Updater.sync(this)
+        ListenerWatchdog.schedule(this)
+        ListenerService.ensureBound(this)
     }
 }

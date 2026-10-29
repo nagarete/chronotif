@@ -8,6 +8,8 @@
     <!-- Android 16 requires it for the update job's network constraint. -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- Keeps the listener watchdog job (ListenerService.kt) scheduled across reboots. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- "Update ready" / "Updated" notifications. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
@@ -66,6 +68,19 @@
                 <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
         </service>
+
+        <!-- Never launched. ListenerService.ensureBound flips it to make the system rebind a
+             dropped listener; flipping the listener itself would revoke access. -->
+        <activity-alias
+            android:name=".RebindNudge"
+            android:enabled="false"
+            android:exported="false"
+            android:targetActivity=".ui.SetupActivity" />
+
+        <service
+            android:name=".ListenerWatchdog"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
 
         <service
             android:name=".PanelTile"

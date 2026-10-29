@@ -2,21 +2,31 @@
 
 package app.chronotif
 
+import android.app.job.JobInfo
+import android.app.job.JobParameters
+import android.app.job.JobScheduler
+import android.app.job.JobService
 import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
+import android.os.SystemClock
 import android.provider.Settings
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import app.chronotif.ui.LockActivity
+import java.util.concurrent.TimeUnit
 
 /**
  * The only long-lived component. Bound by the system while notification access is granted;
- * purely event-driven (no polling, timers, wakelocks or foreground service).
+ * event-driven (no polling, wakelocks or foreground service). [ListenerWatchdog] only checks
+ * that the system hasn't silently dropped it.
  */
 class ListenerService : NotificationListenerService() {
 
@@ -28,6 +38,48 @@ class ListenerService : NotificationListenerService() {
             val flat = Settings.Secure.getString(context.contentResolver, "enabled_notification_listeners")
             val me = ComponentName(context, ListenerService::class.java)
             return flat?.split(':')?.any { ComponentName.unflattenFromString(it) == me } == true
+        }
+
+        /** Wait before judging: a process just started to bind the listener hasn't connected yet. */
+        private const val SETTLE_MS = 5_000L
+        private const val NUDGE_GAP_MS = 60_000L
+        private val main = Handler(Looper.getMainLooper())
+        private var lastNudge = -NUDGE_GAP_MS
+
+        /**
+         * Gets the system to bind the listener again if access is granted but it isn't connected.
+         * That happens when the process is killed and the system gives up rebinding (it retries
+         * once; some ROMs kill it routinely). Otherwise the only fix is toggling access by hand.
+         *
+         * [requestRebind] can't do this: it only undoes [requestUnbind]. Any component change in
+         * our package makes the system rebind approved listeners that aren't bound, so this flips
+         * a dummy component. (Disabling the listener itself would revoke access.) A bound listener
+         * is left alone, so a false alarm costs one package-changed broadcast.
+         */
+        fun ensureBound(context: Context, done: () -> Unit = {}) {
+            val app = context.applicationContext
+            main.postDelayed({
+                try {
+                    if (instance == null && isEnabled(app)) nudge(app)
+                } finally {
+                    done()
+                }
+            }, SETTLE_MS)
+        }
+
+        private fun nudge(context: Context) {
+            val now = SystemClock.elapsedRealtime()
+            if (now - lastNudge < NUDGE_GAP_MS) return
+            lastNudge = now
+            runCatching { requestRebind(ComponentName(context, ListenerService::class.java)) }
+            val pm = context.packageManager
+            val dummy = ComponentName(context, "app.chronotif.RebindNudge")
+            val flipped = if (pm.getComponentEnabledSetting(dummy) == PackageManager.COMPONENT_ENABLED_STATE_ENABLED) {
+                PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+            } else {
+                PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+            }
+            runCatching { pm.setComponentEnabledSetting(dummy, flipped, PackageManager.DONT_KILL_APP) }
         }
     }
 
@@ -69,8 +121,8 @@ class ListenerService : NotificationListenerService() {
     override fun onListenerDisconnected() {
         teardown()
         NotifStore.disconnect()
-        // Ask to be rebound; some ROMs drop listeners after the process is killed.
-        requestRebind(ComponentName(this, ListenerService::class.java))
+        // Still granted means the system dropped us rather than the user revoking access.
+        ensureBound(this)
     }
 
     override fun onDestroy() {
@@ -126,4 +178,33 @@ class ListenerService : NotificationListenerService() {
         } catch (_: RuntimeException) {
         }
     }
+}
+
+/**
+ * Catches a listener the system dropped while our process was dead, when nothing else would
+ * start the process to notice. The check is a field read and usually a no-op.
+ */
+class ListenerWatchdog : JobService() {
+    companion object {
+        private const val JOB_ID = 2
+
+        /** Cheap; called on every app start. */
+        fun schedule(context: Context) {
+            val js = context.getSystemService(JobScheduler::class.java)
+            if (js.getPendingJob(JOB_ID) != null) return
+            val job = JobInfo.Builder(JOB_ID, ComponentName(context, ListenerWatchdog::class.java))
+                .setPeriodic(TimeUnit.MINUTES.toMillis(30))
+                .setPersisted(true)
+                .build()
+            // Runs from App.onCreate: a scheduling failure must never stop the app from starting.
+            runCatching { js.schedule(job) }
+        }
+    }
+
+    override fun onStartJob(params: JobParameters): Boolean {
+        ListenerService.ensureBound(this) { jobFinished(params, false) }
+        return true
+    }
+
+    override fun onStopJob(params: JobParameters) = false
 }

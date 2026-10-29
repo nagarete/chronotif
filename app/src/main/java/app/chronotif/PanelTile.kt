@@ -14,6 +14,7 @@ import app.chronotif.ui.PanelActivity
 class PanelTile : TileService() {
 
     override fun onStartListening() {
+        ListenerService.ensureBound(this)
         val tile = qsTile ?: return
         val fresh = if (Prefs.enabled) NotifStore.newCount() else 0
         tile.state = if (fresh > 0) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
