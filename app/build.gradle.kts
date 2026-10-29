@@ -39,6 +39,11 @@ android {
     }
 
     buildTypes {
+        // Debug installs next to stable/nightly instead of colliding with their signing key.
+        debug {
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true

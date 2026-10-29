@@ -97,6 +97,21 @@ jobs:
         if: steps.release.outputs.nightly == '' && steps.release.outputs.publish != 'true'
         run: ./gradlew --no-daemon testDebugUnitTest lintDebug assembleRelease -PnightlyBuild=1
 
+      # Testers sideload this from the PR's Checks tab; it installs next to stable/nightly.
+      - name: Build PR test APK
+        if: github.event_name == 'pull_request'
+        run: |
+          ./gradlew --no-daemon assembleDebug
+          mv app/build/outputs/apk/debug/app-debug.apk "chronotif-pr-${{ github.event.number }}-debug.apk"
+
+      - name: Upload PR test APK
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: chronotif-pr-${{ github.event.number }}-debug
+          path: chronotif-pr-${{ github.event.number }}-debug.apk
+          retention-days: 14
+
       - name: Publish release
         if: steps.release.outputs.publish == 'true'
         env:
