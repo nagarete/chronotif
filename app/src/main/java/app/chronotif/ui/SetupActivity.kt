@@ -31,6 +31,7 @@ import app.chronotif.ListenerService
 import app.chronotif.PanelTile
 import app.chronotif.Prefs
 import app.chronotif.R
+import app.chronotif.StatusBarSwipe
 import app.chronotif.Updater
 
 /** One-time setup and settings. Not needed in daily use. */
@@ -133,6 +134,10 @@ class SetupActivity : Activity() {
         }
 
         section(R.string.setup_panel)
+        permission(R.string.status_swipe_title, R.string.status_swipe_desc,
+            granted = { StatusBarSwipe.isEnabled(this) }) {
+            open(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+        }
         toggle(R.string.handle_enabled, R.string.handle_enabled_desc, { Prefs.handleEnabled }) {
             Prefs.handleEnabled = it
             applyHandle()
