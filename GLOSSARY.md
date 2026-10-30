@@ -17,7 +17,7 @@ The messages Android currently supplies for a conversation, including messages a
 One continuous period from the display waking until it sleeps. Chronotif and the stock lock screen share this period.
 
 **Off**:
-Chronotif's surfaces that appear on their own (the edge handle and the lock-screen view) are withheld. Notifications are still tracked and the panel can still be opened on purpose. The user's surface settings are kept for when Chronotif is turned back on.
+Chronotif's standing surfaces (the edge handle, the status-bar swipe and the lock-screen view) are withheld. Notifications are still tracked and the panel can still be opened on purpose, e.g. from the Quick Settings tile. The user's surface settings are kept for when Chronotif is turned back on.
 _Avoid_: Disabled, Paused
 
 **Media player**:
