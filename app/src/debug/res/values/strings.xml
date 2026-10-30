@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Chronotif debug</string>
+    <!-- Also the Quick Settings tile and panel title, so the debug tile can be told apart. -->
+    <string name="tile_label">Chronotif debug</string>
 </resources>

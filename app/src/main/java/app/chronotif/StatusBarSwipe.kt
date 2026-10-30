@@ -150,9 +150,16 @@ class StatusBarSwipe : AccessibilityService() {
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {}
 
-    /** Collapses the system shade, so the Quick Settings tile can open the panel window. */
-    fun dismissShade(): Boolean =
-        Build.VERSION.SDK_INT >= 31 && performGlobalAction(GLOBAL_ACTION_DISMISS_NOTIFICATION_SHADE)
+    /**
+     * Collapses the system shade, so the Quick Settings tile can open the panel window. MIUI 14
+     * may refuse the dedicated action; Back closes an open shade everywhere, and the tile only
+     * runs while the shade is open, so it can't reach the app underneath.
+     */
+    fun dismissShade(): Boolean {
+        if (Build.VERSION.SDK_INT >= 31 && performGlobalAction(GLOBAL_ACTION_DISMISS_NOTIFICATION_SHADE)) return true
+        Log.i(TAG, "Dismiss-shade action refused; collapsing with Back")
+        return performGlobalAction(GLOBAL_ACTION_BACK)
+    }
 
     override fun onInterrupt() {}
 

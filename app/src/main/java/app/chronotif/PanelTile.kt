@@ -7,6 +7,7 @@ import android.app.PendingIntent
 import android.content.Intent
 import android.os.Build
 import android.provider.Settings
+import android.util.Log
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
 import app.chronotif.ui.Panel
@@ -42,6 +43,7 @@ class PanelTile : TileService() {
             Panel.open(this)
             return
         }
+        Log.i("PanelTile", "Opening the panel activity (swipe service ${if (swipe == null) "unavailable" else "couldn't close the shade"})")
         val intent = Intent(this, PanelActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         if (Build.VERSION.SDK_INT >= 34) {
             startActivityAndCollapse(
