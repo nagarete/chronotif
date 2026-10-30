@@ -34,9 +34,9 @@ import kotlin.math.abs
  * Chronotif. Ordinary overlays can't sit above the status bar, hence the accessibility service.
  * It subscribes to no events and can't retrieve window content (see xml/status_bar_swipe.xml).
  *
- * Shown only while Chronotif and this feature are on, the screen is on and unlocked, in portrait,
- * and none of Chronotif's own screens are open. Touches pass through while the status bar is
- * hidden (fullscreen apps).
+ * Shown only while Chronotif and this feature are on, overlays are allowed, the screen is on and
+ * unlocked, in portrait, and none of Chronotif's own screens are open. Touches pass through while
+ * the status bar is hidden (fullscreen apps), including while it is only revealed temporarily.
  */
 class StatusBarSwipe : AccessibilityService() {
     companion object {
@@ -46,11 +46,11 @@ class StatusBarSwipe : AccessibilityService() {
         var instance: StatusBarSwipe? = null
             private set
 
-        private var ownUiResumed = 0
+        private var ownUiShown = 0
 
-        /** Called for PanelActivity / LockActivity, so the strip never sits on top of them. */
+        /** Called when PanelActivity / LockActivity start and stop, so the strip never sits on them. */
         fun ownUiVisible(visible: Boolean) {
-            ownUiResumed = (ownUiResumed + if (visible) 1 else -1).coerceAtLeast(0)
+            ownUiShown = (ownUiShown + if (visible) 1 else -1).coerceAtLeast(0)
             instance?.refresh()
         }
 
@@ -84,8 +84,10 @@ class StatusBarSwipe : AccessibilityService() {
 
     /**
      * Accessibility overlays sit above the status bar and, at least on MIUI 14 / Android 12, are
-     * never told that it's visible. An ordinary app overlay below it is, so a 1 px, untouchable
-     * one reports the bar's live visibility. Without overlay permission the strip stays touchable.
+     * never told that it's visible. An ordinary app overlay below it is, so a 1 px, untouchable,
+     * fully transparent one reports the bar's visibility. Transparent and untouchable, it doesn't
+     * count as obscuring other apps' touches. Without it the strip isn't shown at all, rather
+     * than risk covering fullscreen apps.
      */
     private val probeCtx by lazy {
         getSystemService(DisplayManager::class.java).getDisplay(Display.DEFAULT_DISPLAY)
@@ -105,6 +107,7 @@ class StatusBarSwipe : AccessibilityService() {
     ).apply {
         title = "Chronotif status bar probe"
         gravity = Gravity.BOTTOM or Gravity.LEFT
+        alpha = 0f
     }
 
     private val screenReceiver = object : BroadcastReceiver() {
@@ -154,7 +157,9 @@ class StatusBarSwipe : AccessibilityService() {
     }
 
     private fun eligible(): Boolean {
-        if (!Prefs.enabled || !Prefs.statusSwipeEnabled || ownUiResumed > 0) return false
+        if (!Prefs.enabled || !Prefs.statusSwipeEnabled || ownUiShown > 0) return false
+        // The probe needs it; see probeParams.
+        if (!Settings.canDrawOverlays(this)) return false
         if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) return false
         // The lock screen keeps the system shade.
         return getSystemService(PowerManager::class.java).isInteractive &&
@@ -164,14 +169,48 @@ class StatusBarSwipe : AccessibilityService() {
     private fun show() {
         val metrics = wm.currentWindowMetrics
         val bar = metrics.windowInsets.getInsetsIgnoringVisibility(WindowInsets.Type.statusBars()).top
-        if (bar <= 0) {
-            // No status bar to cover; never guess a height over app content.
+        // No status bar to cover (never guess a height over app content), or no way to tell
+        // when it's hidden.
+        if (bar <= 0 || !showProbe()) {
             hide()
             return
         }
         params.width = metrics.bounds.width() / 2
         params.height = bar
-        applyTouchable()
+        applyStrip()
+    }
+
+    /** Ensures the probe is attached. A new probe starts from "hidden" until it reports. */
+    private fun showProbe(): Boolean {
+        if (probe != null) return true
+        barVisible = false
+        val p = View(probeCtx)
+        p.setOnApplyWindowInsetsListener { _, insets ->
+            val visible = insets.isVisible(WindowInsets.Type.statusBars())
+            if (visible != barVisible) {
+                barVisible = visible
+                applyStrip()
+            }
+            insets
+        }
+        return try {
+            probeWm.addView(p, probeParams)
+            probe = p
+            true
+        } catch (e: RuntimeException) {
+            Log.w(TAG, "Couldn't add the status-bar probe", e)
+            false
+        }
+    }
+
+    /** Adds or updates the strip with the current size and touchability, re-adding it if needed. */
+    private fun applyStrip() {
+        params.flags = if (barVisible) {
+            params.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
+        } else {
+            params.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+        }
+        if (params.height <= 0) return // Not sized yet: show() calls again.
         view?.let { v ->
             try {
                 wm.updateViewLayout(v, params)
@@ -182,45 +221,12 @@ class StatusBarSwipe : AccessibilityService() {
                 view = null
             }
         }
-        barVisible = true
-        applyTouchable()
         val v = SwipeView(this, ::open)
         try {
             wm.addView(v, params)
             view = v
         } catch (e: RuntimeException) {
             Log.w(TAG, "Couldn't add the status-bar overlay", e)
-            return
-        }
-        showProbe()
-    }
-
-    /** Tracks the bar's live visibility: hidden in fullscreen apps, where touches must pass through. */
-    private fun showProbe() {
-        if (probe != null || !Settings.canDrawOverlays(this)) return
-        val p = View(probeCtx)
-        p.setOnApplyWindowInsetsListener { _, insets ->
-            val visible = insets.isVisible(WindowInsets.Type.statusBars())
-            if (visible != barVisible) {
-                barVisible = visible
-                applyTouchable()
-                view?.let { runCatching { wm.updateViewLayout(it, params) } }
-            }
-            insets
-        }
-        try {
-            probeWm.addView(p, probeParams)
-            probe = p
-        } catch (e: RuntimeException) {
-            Log.w(TAG, "Couldn't add the status-bar probe; the strip stays touchable", e)
-        }
-    }
-
-    private fun applyTouchable() {
-        params.flags = if (barVisible) {
-            params.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
-        } else {
-            params.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
         }
     }
 

@@ -10,7 +10,7 @@ Setup help, notification behaviour, privacy rules, and development details.
 |---|---|---|
 | Notification listener | Mirrors active notifications in memory; opens/dismisses/acts on them | Event-driven, no polling |
 | Edge handle | A slim pill on the screen edge. Tap or swipe it to open the panel. Tinted with your accent colour while something is NEW | One tiny overlay window, no timers |
-| Status-bar swipe (optional) | An invisible touch area on the left half of the status bar. Tap or swipe down there to open the panel instead of the system notifications | One tiny overlay window, no timers |
+| Status-bar swipe (optional) | An invisible touch area on the left half of the status bar. Tap or swipe down there to open the panel instead of the system notifications | Two tiny overlay windows, no timers |
 | Quick Settings tile | Another way into the panel; shows "N new" | Only when the shade is open |
 | Panel | The shade-like screen: blurred backdrop, calls and media, NEW / EARLIER, collapsed Running | Exists only while open |
 | Lock-screen view | Shown over the locked keyguard when the screen turns on | Started only on screen-on |
@@ -162,15 +162,21 @@ normal system behaviour, e.g. Control Center.
 The service subscribes to no accessibility events and can't retrieve other apps' screen
 content. Notification content still comes only through notification access.
 
-To turn it on, tap **Grant** next to *Status-bar swipe* in setup, and turn on **Chronotif** in
-Android's Accessibility settings. Android 13+ may block this for sideloaded apps the same way as
+It also needs **Display over other apps**: besides the touch area, Chronotif keeps a 1-pixel,
+fully transparent, untouchable overlay that tells it when a fullscreen app hides the status bar.
+Without that permission the touch area isn't shown.
+
+To turn it on, tap **Grant** next to *Status-bar swipe* in setup, and turn on Chronotif's
+service in Android's Accessibility settings. Depending on the phone it's listed as
+**Status-bar swipe** or **Chronotif**, sometimes under *Downloaded apps*. Android 13+ may block this for sideloaded apps the same way as
 notification access; use **Allow restricted settings** as described in [Install](#install), then
 try again. Android shows a warning that the service can control your device; that's the
 standard warning for every accessibility service.
 
-The touch area is hidden while the phone is locked, in landscape, while a fullscreen app hides
-the status bar, while Chronotif's own panel or lock-screen view is open, and when *Use
-status-bar swipe* or *Chronotif is on* is off. It covers the main display only.
+The touch area is hidden while the phone is locked, in landscape, while Chronotif's own panel or
+lock-screen view is open, and when *Use status-bar swipe* or *Chronotif is on* is off. While a
+fullscreen app hides the status bar, touches pass through to the app; that includes when you
+swipe the bar in temporarily, so it then opens the system shade. It covers the main display only.
 
 ## Using it
 
@@ -209,7 +215,7 @@ works **alongside** them:
   to turn that notification off.
 - Custom notification layouts (RemoteViews) are rendered from their text, not pixel-for-pixel.
 - Apps that refuse input while *any* overlay is on screen (rare, mostly banking) may complain.
-  Disable the edge handle and use the tile instead.
+  Disable the edge handle and the status-bar swipe, and use the tile instead.
 
 ## Build
 

@@ -14,15 +14,15 @@ class App : Application() {
         Prefs.init(this)
         Updater.sync(this)
         registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
-            override fun onActivityResumed(a: Activity) {
+            override fun onActivityStarted(a: Activity) {
                 if (a is PanelActivity || a is LockActivity) StatusBarSwipe.ownUiVisible(true)
             }
-            override fun onActivityPaused(a: Activity) {
+            override fun onActivityStopped(a: Activity) {
                 if (a is PanelActivity || a is LockActivity) StatusBarSwipe.ownUiVisible(false)
             }
             override fun onActivityCreated(a: Activity, state: Bundle?) {}
-            override fun onActivityStarted(a: Activity) {}
-            override fun onActivityStopped(a: Activity) {}
+            override fun onActivityResumed(a: Activity) {}
+            override fun onActivityPaused(a: Activity) {}
             override fun onActivitySaveInstanceState(a: Activity, state: Bundle) {}
             override fun onActivityDestroyed(a: Activity) {}
         })

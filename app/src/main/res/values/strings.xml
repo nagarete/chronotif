@@ -57,7 +57,7 @@
 
     <string name="setup_panel">Panel</string>
     <string name="status_swipe_title">Status-bar swipe</string>
-    <string name="status_swipe_desc">Tap or swipe down on the left half of the status bar to open Chronotif instead of the system notifications. The other half works as usual. Needs Chronotif turned on in Accessibility settings; it only uses that to place the touch area and doesn\'t read other apps\' screens.</string>
+    <string name="status_swipe_desc">Tap or swipe down on the left half of the status bar to open Chronotif instead of the system notifications. The other half works as usual. Needs Display over other apps, and Chronotif turned on in Accessibility settings; it only uses that to place the touch area and doesn\'t read other apps\' screens.</string>
     <string name="status_swipe_enabled">Use status-bar swipe</string>
     <string name="status_swipe_service_desc">Lets you open Chronotif by tapping or swiping down on the left half of the status bar. Chronotif uses this only to place an invisible touch area there. It doesn\'t read other apps\' screens. Turn the swipe off any time in Chronotif\'s setup.</string>
     <string name="handle_enabled">Edge handle</string>
