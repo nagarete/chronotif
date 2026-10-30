@@ -96,7 +96,8 @@ notification privacy settings and requires unlocking before opening notification
 using actions, or replying.
 
 The optional status-bar swipe uses an accessibility service to place a touch area over the left
-half of the status bar. The service subscribes to no accessibility events and can't retrieve
+half of the status bar, and to close the system shade when you open Chronotif from its Quick
+Settings tile. The service subscribes to no accessibility events and can't retrieve
 other apps' screen content; notification content comes separately through notification access.
 
 The app has no third-party dependencies and responds to system events without polling,

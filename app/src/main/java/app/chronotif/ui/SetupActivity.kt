@@ -74,6 +74,8 @@ class SetupActivity : Activity() {
     override fun onResume() {
         super.onResume()
         refreshers.forEach { it() }
+        // Back from granting a permission (e.g. display over other apps): let the strip re-check.
+        StatusBarSwipe.instance?.refresh()
         Updater.foreground = true
         body.postDelayed(settle, SETTLE_MS)
     }
@@ -187,7 +189,7 @@ class SetupActivity : Activity() {
         val buttons = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         buttons.addView(Button(this).apply {
             setText(R.string.open_panel)
-            setOnClickListener { startActivity(Intent(context, PanelActivity::class.java)) }
+            setOnClickListener { Panel.open(context) }
         })
         if (Build.VERSION.SDK_INT >= 33) buttons.addView(Button(this).apply {
             text = "+ " + getString(R.string.tile_label)

@@ -15,7 +15,8 @@ translations and accessibility improvements are always welcome.
   response to system events. The one exception is the opt-in daily update job. Avoid
   dependencies; the app currently has none.
 - **Keep the accessibility service minimal.** `StatusBarSwipe` exists only to place a touch
-  area over the status bar. Don't subscribe it to events, retrieve window content, inject
+  area over the status bar and to close the system shade when the Quick Settings tile opens the
+  panel. Don't subscribe it to events, retrieve window content, inject
   gestures or log anything about other apps. It must stay opt-in, respect *Chronotif is on*,
   and be tested with TalkBack, the lock screen and fullscreen apps when changed.
 - **Respect lock-screen privacy.** Anything shown on the lock screen must follow the

@@ -4,7 +4,6 @@ package app.chronotif
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.Canvas
 import android.graphics.Paint
@@ -16,7 +15,7 @@ import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
-import app.chronotif.ui.PanelActivity
+import app.chronotif.ui.Panel
 import app.chronotif.ui.Ui
 import app.chronotif.ui.dp
 import kotlin.math.abs
@@ -138,12 +137,7 @@ class EdgeHandle(service: Context) {
         private fun open() {
             fired = true
             performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
-            runCatching {
-                context.startActivity(
-                    Intent(context, PanelActivity::class.java)
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION),
-                )
-            }
+            runCatching { Panel.open(context) }
         }
     }
 }

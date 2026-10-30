@@ -3,7 +3,7 @@
 package app.chronotif.ui
 
 import android.animation.LayoutTransition
-import android.app.Activity
+import android.content.Context
 import android.content.Intent
 import android.content.res.ColorStateList
 import android.view.Gravity
@@ -35,7 +35,8 @@ class NotifList(
 ) : CardCallbacks {
 
     interface Host {
-        val activity: Activity
+        /** Starts what the user opens; the panel and lock screen may be windows, not activities. */
+        val context: Context
         /** Something was launched; get out of the way. */
         fun launched()
         /** Run [action] now, or after the user unlocks (lock screen). */
@@ -115,7 +116,7 @@ class NotifList(
 
         if (!NotifStore.connected) {
             rows += message("m:access", R.string.no_access_title, R.string.no_access_body) {
-                host.activity.startActivity(Intent(ctx, SetupActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                host.context.startActivity(Intent(ctx, SetupActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                 host.launched()
             }
         } else if (s.isEmpty && running.isEmpty()) {
@@ -198,7 +199,7 @@ class NotifList(
             if (!c.redacted) onToggleExpand(e)
             return
         }
-        host.guarded { if (Act.open(host.activity, e)) host.launched() }
+        host.guarded { if (Act.open(host.context, e)) host.launched() }
     }
 
     override fun onToggleExpand(e: Entry) {
@@ -218,12 +219,12 @@ class NotifList(
             }
             return
         }
-        host.guarded { if (Act.action(host.activity, a)) host.launched() }
+        host.guarded { if (Act.action(host.context, a)) host.launched() }
     }
 
     override fun onSendReply(e: Entry, index: Int, text: CharSequence) {
         val a = e.n.actions?.getOrNull(index) ?: return
-        Act.reply(host.activity, a, text)
+        Act.reply(host.context, a, text)
         replying = null
         expanded -= e.key
         render()

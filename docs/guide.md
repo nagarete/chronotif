@@ -12,7 +12,7 @@ Setup help, notification behaviour, privacy rules, and development details.
 | Edge handle | A slim pill on the screen edge. Tap or swipe it to open the panel. Tinted with your accent colour while something is NEW | One tiny overlay window, no timers |
 | Status-bar swipe (optional) | An invisible touch area on the left half of the status bar. Tap or swipe down there to open the panel instead of the system notifications | Two tiny overlay windows, no timers |
 | Quick Settings tile | Another way into the panel; shows "N new" | Only when the shade is open |
-| Panel | The shade-like screen: blurred backdrop, calls and media, NEW / EARLIER, collapsed Running | Exists only while open |
+| Panel | The shade-like screen: blurred backdrop, calls and media, NEW / EARLIER, collapsed Running. Drawn over the current app like the system shade, so videos and games keep running underneath | Exists only while open |
 | Lock-screen view | Shown over the locked keyguard when the screen turns on | Started only on screen-on |
 
 No foreground service, wakelocks or alarms. The only scheduled work is the once-a-day update
@@ -68,7 +68,8 @@ storage and excluded from backups.
 
      <img src="../website/public/screens/install-denied.webp" width="300" alt="Android's 'App was denied access' dialog, with a Close button.">
      <img src="../website/public/screens/install-restricted.webp" width="300" alt="App info on HyperOS, with the Allow restricted settings switch under Advanced settings highlighted.">
-   - **Display over other apps**: for the edge handle and the lock-screen view.
+   - **Display over other apps**: for the edge handle, the lock-screen view, and opening the
+     panel over the current app without pausing it.
 3. Optional: add the **Chronotif** Quick Settings tile (button in setup on Android 13+).
 4. Optional: turn on the **status-bar swipe** (see [Status-bar swipe](#status-bar-swipe)).
 
@@ -154,10 +155,11 @@ keep its accessibility access. Choose to keep it, or the swipe stops working.
 ### Status-bar swipe
 
 Android doesn't let apps receive touches on the status bar, except through an accessibility
-service. Chronotif's is optional and does one thing: it places an invisible touch area over the
-**left half** of the status bar (on HyperOS, the side that opens notifications). Tap or swipe
-down there and Chronotif opens instead of the system notifications. The right half keeps its
-normal system behaviour, e.g. Control Center.
+service. Chronotif's is optional. It places an invisible touch area over the **left half** of
+the status bar (on HyperOS, the side that opens notifications). Tap or swipe down there and
+Chronotif opens instead of the system notifications. The right half keeps its normal system
+behaviour, e.g. Control Center. When you use the Quick Settings tile, it also closes the system
+shade, so the panel can open over your app without pausing it.
 
 The service subscribes to no accessibility events and can't retrieve other apps' screen
 content. Notification content still comes only through notification access.
@@ -204,6 +206,12 @@ To open Chronotif in fullscreen, use the Quick Settings tile, or turn off the ed
 - **Turn it off**: switch off *Settings → Chronotif is on* to hide the edge handle, status-bar
   swipe and lock-screen view without uninstalling. Your handle and lock-screen settings are kept for when
   you turn it back on. The Quick Settings tile shows "Off" and still opens the panel.
+
+The panel opens as a window over the current app only when Chronotif may *display over other
+apps* and the phone is unlocked. Otherwise it opens as a regular screen, which pauses the app
+underneath. From the Quick Settings tile it only opens as a window when the
+[status-bar swipe](#status-bar-swipe) is in use (its service closes the system shade first) and
+the phone runs Android 12 or newer.
 
 ## Limitations
 
@@ -302,7 +310,9 @@ app/src/main/java/app/chronotif/
   core/Version.kt       version comparison and checksum parsing (unit-tested)
   ui/NotifList.kt       renders sections with keyed view reuse (shared by panel and lock view)
   ui/CardView.kt        notification card and collapsed stack
-  ui/PanelActivity.kt   the panel
+  ui/PanelView.kt       the panel's content and gestures
+  ui/Panel.kt           opens the panel as an overlay window, or falls back to PanelActivity
+  ui/PanelActivity.kt   the panel as an activity (fallback)
   ui/LockActivity.kt    the lock-screen view
   ui/SetupActivity.kt   one-time setup & settings
 ```

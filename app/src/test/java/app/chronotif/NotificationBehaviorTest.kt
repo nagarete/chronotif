@@ -80,7 +80,7 @@ class NotificationBehaviorTest {
             val activity = controller.get()
             val container = LinearLayout(activity)
             val list = NotifList(object : NotifList.Host {
-                override val activity = activity
+                override val context: Context = activity
                 override fun launched() {}
                 override fun guarded(action: () -> Unit) = action()
             }, container, onLock = true)
@@ -219,7 +219,7 @@ class NotificationBehaviorTest {
             val activity = controller.get()
             val container = LinearLayout(activity)
             val list = NotifList(object : NotifList.Host {
-                override val activity = activity
+                override val context: Context = activity
                 override fun launched() {}
                 override fun guarded(action: () -> Unit) = action()
             }, container, onLock = false)
@@ -257,7 +257,7 @@ class NotificationBehaviorTest {
             val activity = controller.get()
             fun list(onLock: Boolean) = LinearLayout(activity).also { container ->
                 NotifList(object : NotifList.Host {
-                    override val activity = activity
+                    override val context: Context = activity
                     override fun launched() {}
                     override fun guarded(action: () -> Unit) = action()
                 }, container, onLock).render()
