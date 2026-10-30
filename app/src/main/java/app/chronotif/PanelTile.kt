@@ -37,7 +37,7 @@ class PanelTile : TileService() {
         // The panel window can only show once the shade is out of the way. Collapsing it needs
         // the status-bar swipe's accessibility service; otherwise open the activity, which
         // collapses the shade itself but pauses the app underneath.
-        val swipe = StatusBarSwipe.instance
+        val swipe = StatusBarSwipe.instance?.takeIf { Prefs.enabled && Prefs.statusSwipeEnabled }
         if (swipe != null && Settings.canDrawOverlays(this) && swipe.dismissShade()) {
             Panel.open(this)
             return

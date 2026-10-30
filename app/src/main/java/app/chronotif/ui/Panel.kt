@@ -18,6 +18,8 @@ import android.view.Display
 import android.view.KeyEvent
 import android.view.WindowManager
 import android.widget.FrameLayout
+import android.window.OnBackInvokedCallback
+import android.window.OnBackInvokedDispatcher
 import app.chronotif.R
 import app.chronotif.StatusBarSwipe
 
@@ -32,6 +34,8 @@ object Panel {
     fun open(context: Context, focusKey: String? = null, replyIndex: Int = -1) {
         val app = context.applicationContext
         val locked = app.getSystemService(KeyguardManager::class.java).isKeyguardLocked
+        // Opening while it animates out replaces it, rather than losing the request.
+        current?.takeIf { it.closing }?.remove()
         val panel = current ?: if (Settings.canDrawOverlays(app) && !locked) {
             OverlayPanel(app).takeIf { it.show() }?.also { current = it }
         } else {
@@ -41,7 +45,7 @@ object Panel {
             openActivity(context, focusKey, replyIndex)
             return
         }
-        if (focusKey != null) panel.view.focus(focusKey, replyIndex)
+        if (focusKey != null) panel.focusWhenReady(focusKey, replyIndex)
     }
 
     fun openActivity(context: Context, focusKey: String? = null, replyIndex: Int = -1) {
@@ -64,6 +68,10 @@ object Panel {
 
 /** The panel as a focusable, full-screen overlay window. Gone as soon as it loses focus. */
 internal class OverlayPanel(app: Context) : NotifList.Host {
+    private companion object {
+        const val FOCUS_TIMEOUT_MS = 3000L
+    }
+
     private val ctx: Context = app.getSystemService(DisplayManager::class.java)
         .getDisplay(Display.DEFAULT_DISPLAY)
         .let { app.createDisplayContext(it) }
@@ -71,11 +79,36 @@ internal class OverlayPanel(app: Context) : NotifList.Host {
         .let { ContextThemeWrapper(it, R.style.Theme_Chronotif_Panel) }
     private val wm = ctx.getSystemService(WindowManager::class.java)
     private val blur = Build.VERSION.SDK_INT >= 31 && wm.isCrossWindowBlurEnabled
-    val view = PanelView(ctx, this, blur) { remove() }
+    // The window dims instead of the view: Android then gives the status and navigation bars
+    // light icons over it, as for the shade. A view scrim leaves them to the app underneath.
+    private val view = PanelView(ctx, this, blur, windowDims = true) { remove() }
     private var attached = false
     private var hadFocus = false
+    private var pendingFocus: Pair<String, Int>? = null
+
+    val closing get() = view.isClosing
+
+    /** A window that never gets focus (e.g. overlays suppressed) would otherwise never close. */
+    private val focusTimeout = Runnable { if (!hadFocus) remove() }
+
+    private val back = if (Build.VERSION.SDK_INT >= 33) OnBackInvokedCallback { view.close() } else null
 
     private val root = object : FrameLayout(ctx) {
+        override fun onAttachedToWindow() {
+            super.onAttachedToWindow()
+            // Android 16 (and 13+ with predictive back) routes Back to callbacks, not key events.
+            if (Build.VERSION.SDK_INT >= 33) {
+                findOnBackInvokedDispatcher()?.registerOnBackInvokedCallback(
+                    OnBackInvokedDispatcher.PRIORITY_DEFAULT, back!!,
+                )
+            }
+        }
+
+        override fun onDetachedFromWindow() {
+            if (Build.VERSION.SDK_INT >= 33) findOnBackInvokedDispatcher()?.unregisterOnBackInvokedCallback(back!!)
+            super.onDetachedFromWindow()
+        }
+
         override fun dispatchKeyEvent(event: KeyEvent): Boolean {
             if (event.keyCode == KeyEvent.KEYCODE_BACK) {
                 if (event.action == KeyEvent.ACTION_UP && !event.isCanceled) view.close()
@@ -88,7 +121,16 @@ internal class OverlayPanel(app: Context) : NotifList.Host {
             super.onWindowFocusChanged(hasWindowFocus)
             // Like the shade: home, recents, another app or the system shade taking over
             // closes it. The keyboard doesn't take window focus.
-            if (hasWindowFocus) hadFocus = true else if (hadFocus) remove()
+            if (hasWindowFocus) {
+                if (!hadFocus) {
+                    hadFocus = true
+                    // The keyboard for a reply handoff only shows once the window has focus.
+                    pendingFocus?.let { (key, index) -> view.focus(key, index) }
+                    pendingFocus = null
+                }
+            } else if (hadFocus) {
+                remove()
+            }
         }
     }
 
@@ -109,6 +151,8 @@ internal class OverlayPanel(app: Context) : NotifList.Host {
         fitInsetsTypes = 0
         layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
         softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING
+        flags = flags or WindowManager.LayoutParams.FLAG_DIM_BEHIND
+        dimAmount = PanelView.scrimAlpha(blur)
         if (blur) {
             flags = flags or WindowManager.LayoutParams.FLAG_BLUR_BEHIND
             blurBehindRadius = ctx.dp(48)
@@ -117,6 +161,11 @@ internal class OverlayPanel(app: Context) : NotifList.Host {
 
     init {
         root.addView(view, FrameLayout.LayoutParams(-1, -1))
+        root.accessibilityPaneTitle = ctx.getString(R.string.tile_label)
+    }
+
+    fun focusWhenReady(key: String, replyIndex: Int) {
+        if (hadFocus) view.focus(key, replyIndex) else pendingFocus = key to replyIndex
     }
 
     /** Returns false if the window couldn't be added; the caller falls back to the activity. */
@@ -143,12 +192,14 @@ internal class OverlayPanel(app: Context) : NotifList.Host {
         StatusBarSwipe.ownUiVisible(true)
         view.shown()
         view.animateIn()
+        root.postDelayed(focusTimeout, FOCUS_TIMEOUT_MS)
         return true
     }
 
-    private fun remove() {
+    fun remove() {
         if (!attached) return
         attached = false
+        root.removeCallbacks(focusTimeout)
         view.dismissed()
         runCatching { ctx.unregisterReceiver(receiver) }
         runCatching { wm.removeViewImmediate(root) }

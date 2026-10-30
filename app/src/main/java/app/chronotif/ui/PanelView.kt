@@ -35,11 +35,15 @@ class PanelView(
     context: Context,
     host: NotifList.Host,
     blur: Boolean,
+    windowDims: Boolean = false,
     private val onClose: () -> Unit,
 ) : FrameLayout(context) {
 
     companion object {
         private const val CHECK_DWELL_MS = 1500L
+
+        /** How dark the backdrop is: lighter over a blur. */
+        fun scrimAlpha(blur: Boolean) = if (blur) 0x8C / 255f else 0xD9 / 255f
 
         /** Only an unmoving tap that begins and ends below the list may dismiss it. */
         internal fun isEmptySpaceTap(
@@ -75,7 +79,8 @@ class PanelView(
 
     init {
         scrim = View(context).apply {
-            setBackgroundColor(if (blur) 0x8C000000.toInt() else 0xD9000000.toInt())
+            // When the host window dims, this only catches outside taps.
+            if (!windowDims) setBackgroundColor(if (blur) 0x8C000000.toInt() else 0xD9000000.toInt())
             setOnClickListener { close() }
         }
         addView(scrim, LayoutParams(-1, -1))
@@ -222,6 +227,8 @@ class PanelView(
         scroll.animate().alpha(1f).translationY(0f).setDuration(260)
             .setInterpolator(DecelerateInterpolator(2f)).start()
     }
+
+    val isClosing get() = closing
 
     /** Animates out, then asks the host to remove the panel. */
     fun close() {

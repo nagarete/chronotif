@@ -5,7 +5,7 @@ Chronotif separates notifications that arrived since the last check from those a
 ## Language
 
 **Panel**:
-Chronotif's notification screen, opened on demand on top of whatever is in use, which keeps running underneath, as it does under the system shade.
+Chronotif's notification screen, opened on demand on top of whatever is in use. Wherever Android allows, what's underneath keeps running, as it does under the system shade.
 _Avoid_: Shade (the system's), drawer
 
 **New**:
