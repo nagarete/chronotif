@@ -4,6 +4,7 @@ package app.chronotif.ui
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.graphics.Rect
 import android.os.Handler
 import android.os.Looper
 import android.view.Gravity
@@ -13,6 +14,7 @@ import android.view.View
 import android.view.ViewConfiguration
 import android.view.WindowInsets
 import android.view.animation.DecelerateInterpolator
+import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -152,9 +154,20 @@ class PanelView(
             val bars = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())
             val ime = insets.getInsets(WindowInsets.Type.ime())
             scroll.setPadding(bars.left, bars.top + dp(8), bars.right, maxOf(bars.bottom, ime.bottom))
+            // The window doesn't resize for the keyboard, so keep what's being typed above it.
+            if (ime.bottom > 0) scroll.post(::revealFocusedEditor)
             insets
         }
         list = NotifList(host, content, onLock = false)
+    }
+
+    /** Scrolls the focused reply box above the keyboard; the scroll view's bottom padding is the keyboard. */
+    private fun revealFocusedEditor() {
+        val editor = findFocus() as? EditText ?: return
+        val r = Rect(0, 0, editor.width, editor.height)
+        scroll.offsetDescendantRectToMyCoords(editor, r)
+        val visibleBottom = scroll.scrollY + scroll.height - scroll.paddingBottom - dp(8)
+        if (r.bottom > visibleBottom) scroll.smoothScrollBy(0, r.bottom - visibleBottom)
     }
 
     fun focus(key: String, replyIndex: Int) {
