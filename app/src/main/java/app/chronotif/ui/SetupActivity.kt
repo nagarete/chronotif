@@ -292,12 +292,15 @@ class SetupActivity : Activity() {
 
     // --- Tiny view helpers ---
 
+    // Explicit colours: some themes (HyperOS dark) make plain text grey, unlike the switch labels.
+    private val palette by lazy { Palette(this) }
+
     private fun text(s: CharSequence, sp: Float, bold: Boolean = false, secondary: Boolean = false) =
         TextView(this).apply {
             text = s
             setTextSize(TypedValue.COMPLEX_UNIT_SP, sp)
             if (bold) setTypeface(typeface, android.graphics.Typeface.BOLD)
-            if (secondary) alpha = 0.7f
+            setTextColor(if (secondary) palette.textSecondary else palette.text)
         }
 
     private fun gap(top: Int) = Ui.lp().apply { topMargin = dp(top) }
@@ -355,6 +358,7 @@ class SetupActivity : Activity() {
         val s = Switch(this).apply {
             text = getString(title)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+            setTextColor(palette.text)
             isChecked = value()
             setOnCheckedChangeListener { _, v -> onChange(v) }
         }
@@ -370,6 +374,7 @@ class SetupActivity : Activity() {
             group.addView(RadioButton(this).apply {
                 id = View.generateViewId()
                 setText(l)
+                setTextColor(palette.text)
                 isChecked = i == selected
                 setOnClickListener { onPick(i) }
             })
