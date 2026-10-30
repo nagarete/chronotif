@@ -12,9 +12,11 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.res.Configuration
 import android.graphics.PixelFormat
+import android.hardware.display.DisplayManager
 import android.os.PowerManager
 import android.provider.Settings
 import android.util.Log
+import android.view.Display
 import android.view.Gravity
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
@@ -61,6 +63,7 @@ class StatusBarSwipe : AccessibilityService() {
 
     private val wm by lazy { getSystemService(WindowManager::class.java) }
     private var view: SwipeView? = null
+    private var probe: View? = null
     private var barVisible = true
     private var receiverRegistered = false
 
@@ -77,6 +80,31 @@ class StatusBarSwipe : AccessibilityService() {
         // Physical left, also in RTL: the system's notification side doesn't follow our locale.
         gravity = Gravity.TOP or Gravity.LEFT
         layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+    }
+
+    /**
+     * Accessibility overlays sit above the status bar and, at least on MIUI 14 / Android 12, are
+     * never told that it's visible. An ordinary app overlay below it is, so a 1 px, untouchable
+     * one reports the bar's live visibility. Without overlay permission the strip stays touchable.
+     */
+    private val probeCtx by lazy {
+        getSystemService(DisplayManager::class.java).getDisplay(Display.DEFAULT_DISPLAY)
+            .let { createDisplayContext(it) }
+            .createWindowContext(WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, null)
+    }
+    private val probeWm by lazy { probeCtx.getSystemService(WindowManager::class.java) }
+
+    @SuppressLint("RtlHardcoded")
+    private val probeParams = WindowManager.LayoutParams(
+        1, 1,
+        WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+        WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+            WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+        PixelFormat.TRANSLUCENT,
+    ).apply {
+        title = "Chronotif status bar probe"
+        gravity = Gravity.BOTTOM or Gravity.LEFT
     }
 
     private val screenReceiver = object : BroadcastReceiver() {
@@ -157,8 +185,21 @@ class StatusBarSwipe : AccessibilityService() {
         barVisible = true
         applyTouchable()
         val v = SwipeView(this, ::open)
-        // The bar's live visibility: hidden in fullscreen apps, where the strip must let touches through.
-        v.setOnApplyWindowInsetsListener { _, insets ->
+        try {
+            wm.addView(v, params)
+            view = v
+        } catch (e: RuntimeException) {
+            Log.w(TAG, "Couldn't add the status-bar overlay", e)
+            return
+        }
+        showProbe()
+    }
+
+    /** Tracks the bar's live visibility: hidden in fullscreen apps, where touches must pass through. */
+    private fun showProbe() {
+        if (probe != null || !Settings.canDrawOverlays(this)) return
+        val p = View(probeCtx)
+        p.setOnApplyWindowInsetsListener { _, insets ->
             val visible = insets.isVisible(WindowInsets.Type.statusBars())
             if (visible != barVisible) {
                 barVisible = visible
@@ -168,10 +209,10 @@ class StatusBarSwipe : AccessibilityService() {
             insets
         }
         try {
-            wm.addView(v, params)
-            view = v
+            probeWm.addView(p, probeParams)
+            probe = p
         } catch (e: RuntimeException) {
-            Log.w(TAG, "Couldn't add the status-bar overlay", e)
+            Log.w(TAG, "Couldn't add the status-bar probe; the strip stays touchable", e)
         }
     }
 
@@ -186,6 +227,8 @@ class StatusBarSwipe : AccessibilityService() {
     private fun hide() {
         view?.let { runCatching { wm.removeViewImmediate(it) } }
         view = null
+        probe?.let { runCatching { probeWm.removeViewImmediate(it) } }
+        probe = null
     }
 
     private fun teardown() {
