@@ -137,6 +137,7 @@ internal class OverlayPanel(app: Context) : NotifList.Host {
         if (Build.VERSION.SDK_INT >= 33) {
             ctx.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
         } else {
+            @SuppressLint("UnspecifiedRegisterReceiverFlag") // The flags only exist from API 33.
             ctx.registerReceiver(receiver, filter)
         }
         StatusBarSwipe.ownUiVisible(true)
