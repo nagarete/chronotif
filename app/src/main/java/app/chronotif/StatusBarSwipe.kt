@@ -25,7 +25,6 @@ import android.view.ViewConfiguration
 import android.view.WindowInsets
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
-import app.chronotif.ui.PanelActivity
 import kotlin.math.abs
 
 /**
@@ -160,7 +159,7 @@ class StatusBarSwipe : AccessibilityService() {
         if (!Prefs.enabled || !Prefs.statusSwipeEnabled || ownUiShown > 0) return false
         // The probe needs it; see probeParams.
         if (!Settings.canDrawOverlays(this)) return false
-        if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) return false
+        // SPIKE: allowed in landscape to see whether temporarily revealed bars are reported.
         // The lock screen keeps the system shade.
         return getSystemService(PowerManager::class.java).isInteractive &&
             !getSystemService(KeyguardManager::class.java).isKeyguardLocked
@@ -187,6 +186,7 @@ class StatusBarSwipe : AccessibilityService() {
         val p = View(probeCtx)
         p.setOnApplyWindowInsetsListener { _, insets ->
             val visible = insets.isVisible(WindowInsets.Type.statusBars())
+            Log.i("SPIKE", "probe: statusBar visible=$visible top=${insets.getInsets(WindowInsets.Type.statusBars()).top}")
             if (visible != barVisible) {
                 barVisible = visible
                 applyStrip()
@@ -252,14 +252,40 @@ class StatusBarSwipe : AccessibilityService() {
             hide()
             return false
         }
+        return spikePanel()
+    }
+
+    private var spike: View? = null
+
+    /** SPIKE: a bare, focusable, full-screen overlay window standing in for the panel. Tap to close. */
+    private fun spikePanel(): Boolean {
+        if (spike != null) return true
+        val v = android.widget.TextView(probeCtx).apply {
+            text = "SPIKE overlay panel\n\nIs the app underneath still playing?\n\nTap anywhere to close"
+            textSize = 22f
+            setTextColor(0xFFFFFFFF.toInt())
+            gravity = Gravity.CENTER
+            setBackgroundColor(0xB0000000.toInt())
+            setOnClickListener {
+                runCatching { probeWm.removeViewImmediate(this) }
+                spike = null
+                Log.i("SPIKE", "overlay panel closed")
+            }
+        }
+        val lp = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            PixelFormat.TRANSLUCENT,
+        ).apply { title = "Chronotif SPIKE panel" }
         return try {
-            startActivity(
-                Intent(this, PanelActivity::class.java)
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION),
-            )
+            probeWm.addView(v, lp)
+            spike = v
+            Log.i("SPIKE", "overlay panel opened")
             true
         } catch (e: RuntimeException) {
-            Log.w(TAG, "Couldn't open the panel", e)
+            Log.w("SPIKE", "couldn't open overlay panel", e)
             false
         }
     }
