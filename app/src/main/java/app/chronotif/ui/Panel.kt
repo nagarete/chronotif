@@ -128,14 +128,17 @@ internal class OverlayPanel(app: Context) : NotifList.Host {
             return false
         }
         attached = true
-        @Suppress("DEPRECATION") // Still delivered for home and recents.
-        ctx.registerReceiver(
-            receiver,
-            IntentFilter().apply {
-                addAction(Intent.ACTION_SCREEN_OFF)
-                addAction(Intent.ACTION_CLOSE_SYSTEM_DIALOGS)
-            },
-        )
+        val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_SCREEN_OFF)
+            @Suppress("DEPRECATION") // Still sent by the system for home and recents.
+            addAction(Intent.ACTION_CLOSE_SYSTEM_DIALOGS)
+        }
+        // Both come from the system, which reaches non-exported receivers.
+        if (Build.VERSION.SDK_INT >= 33) {
+            ctx.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            ctx.registerReceiver(receiver, filter)
+        }
         StatusBarSwipe.ownUiVisible(true)
         view.shown()
         view.animateIn()
