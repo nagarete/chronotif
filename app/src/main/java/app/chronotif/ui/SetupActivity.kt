@@ -74,6 +74,8 @@ class SetupActivity : Activity() {
     override fun onResume() {
         super.onResume()
         refreshers.forEach { it() }
+        // Back from granting a permission (e.g. display over other apps): let the strip re-check.
+        StatusBarSwipe.instance?.refresh()
         Updater.foreground = true
         body.postDelayed(settle, SETTLE_MS)
     }
