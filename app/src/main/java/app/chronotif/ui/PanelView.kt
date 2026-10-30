@@ -199,21 +199,53 @@ class PanelView(
 
     // --- Gestures: upward fling at the bottom of the list closes, like pushing a shade up.
 
+    private var downX = 0f
     private var downY = 0f
     private var atBottomOnDown = false
     private var tracker: VelocityTracker? = null
+    private var edgeSwipe = false
+    private var swallowGesture = false
+
+    // --- Back swipe from a screen edge. Over the home screen, MIUI turns its Back gesture off
+    // and the swipe reaches the panel window instead; elsewhere the system's gesture wins.
 
     @SuppressLint("Recycle")
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        if (swallowGesture) {
+            if (ev.actionMasked == MotionEvent.ACTION_DOWN) swallowGesture = false else return true
+        }
         when (ev.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 interacted = true
+                downX = ev.rawX
                 downY = ev.rawY
+                edgeSwipe = ev.x < dp(24) || ev.x > width - dp(24)
                 atBottomOnDown = !scroll.canScrollVertically(1)
                 tracker?.recycle()
                 tracker = VelocityTracker.obtain().also { it.addMovement(ev) }
             }
-            MotionEvent.ACTION_MOVE -> tracker?.addMovement(ev)
+            MotionEvent.ACTION_POINTER_DOWN -> edgeSwipe = false
+            MotionEvent.ACTION_MOVE -> {
+                tracker?.addMovement(ev)
+                if (edgeSwipe) {
+                    val dx = abs(ev.rawX - downX)
+                    val dy = abs(ev.rawY - downY)
+                    if (dx > dp(56) && dx > dy * 2) {
+                        edgeSwipe = false
+                        // Children stop tracking this gesture (e.g. a card swipe).
+                        MotionEvent.obtain(ev).also {
+                            it.action = MotionEvent.ACTION_CANCEL
+                            super.dispatchTouchEvent(it)
+                            it.recycle()
+                        }
+                        swallowGesture = true
+                        close()
+                        return true
+                    } else if (dy > dp(48)) {
+                        edgeSwipe = false
+                    }
+                }
+            }
             MotionEvent.ACTION_UP -> {
                 val t = tracker
                 t?.addMovement(ev)
