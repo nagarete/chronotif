@@ -187,9 +187,14 @@ class StatusBarSwipe : AccessibilityService() {
         p.setOnApplyWindowInsetsListener { _, insets ->
             val visible = insets.isVisible(WindowInsets.Type.statusBars())
             Log.i("SPIKE", "probe: statusBar visible=$visible top=${insets.getInsets(WindowInsets.Type.statusBars()).top}")
-            if (visible != barVisible) {
-                barVisible = visible
+            // SPIKE: stay touchable for a grace period after the bar hides, so a swipe on a bar
+            // that just auto-hid still opens Chronotif rather than the stock shade.
+            graceHandler.removeCallbacks(graceHide)
+            if (visible && !barVisible) {
+                barVisible = true
                 applyStrip()
+            } else if (!visible && barVisible) {
+                graceHandler.postDelayed(graceHide, GRACE_MS)
             }
             insets
         }
@@ -231,6 +236,7 @@ class StatusBarSwipe : AccessibilityService() {
     }
 
     private fun hide() {
+        graceHandler.removeCallbacks(graceHide)
         view?.let { runCatching { wm.removeViewImmediate(it) } }
         view = null
         probe?.let { runCatching { probeWm.removeViewImmediate(it) } }
@@ -254,6 +260,14 @@ class StatusBarSwipe : AccessibilityService() {
         }
         return spikePanel()
     }
+
+    private val graceHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val graceHide = Runnable {
+        Log.i("SPIKE", "grace over: strip untouchable")
+        barVisible = false
+        applyStrip()
+    }
+    private val GRACE_MS = 1000L
 
     private var spike: View? = null
 
