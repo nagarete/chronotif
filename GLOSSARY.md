@@ -27,3 +27,7 @@ _Avoid_: Now playing card
 **Running**:
 Notifications for work that continues in the background (always-running services, connected devices, step counters, downloads, navigation, timers). They sit collapsed below Earlier and never count as New. Ongoing calls are not Running; they stay at the top with Media players.
 _Avoid_: Ongoing, Background
+
+**Status-bar swipe**:
+Opening the panel by swiping down on, or tapping, the notification side of the status bar, in place of the system shade.
+_Avoid_: Top swipe, top-edge gesture
