@@ -10,6 +10,7 @@ Setup help, notification behaviour, privacy rules, and development details.
 |---|---|---|
 | Notification listener | Mirrors active notifications in memory; opens/dismisses/acts on them | Event-driven, no polling |
 | Edge handle | A slim pill on the screen edge. Tap or swipe it to open the panel. Tinted with your accent colour while something is NEW | One tiny overlay window, no timers |
+| Status-bar swipe (optional) | An invisible touch area on the left half of the status bar. Tap or swipe down there to open the panel instead of the system notifications | One tiny overlay window, no timers |
 | Quick Settings tile | Another way into the panel; shows "N new" | Only when the shade is open |
 | Panel | The shade-like screen: blurred backdrop, calls and media, NEW / EARLIER, collapsed Running | Exists only while open |
 | Lock-screen view | Shown over the locked keyguard when the screen turns on | Started only on screen-on |
@@ -69,6 +70,7 @@ storage and excluded from backups.
      <img src="../website/public/screens/install-restricted.webp" width="300" alt="App info on HyperOS, with the Allow restricted settings switch under Advanced settings highlighted.">
    - **Display over other apps**: for the edge handle and the lock-screen view.
 3. Optional: add the **Chronotif** Quick Settings tile (button in setup on Android 13+).
+4. Optional: turn on the **status-bar swipe** (see [Status-bar swipe](#status-bar-swipe)).
 
 After that you never need to open the app again. Use the edge handle or the tile.
 
@@ -146,9 +148,34 @@ buttons jump to the right screens:
 
 Optionally, lock Chronotif in Recents so the system doesn't kill it.
 
+If you use the status-bar swipe, Xiaomi Security may now and then ask whether Chronotif should
+keep its accessibility access. Choose to keep it, or the swipe stops working.
+
+### Status-bar swipe
+
+Android doesn't let apps receive touches on the status bar, except through an accessibility
+service. Chronotif's is optional and does one thing: it places an invisible touch area over the
+**left half** of the status bar (on HyperOS, the side that opens notifications). Tap or swipe
+down there and Chronotif opens instead of the system notifications. The right half keeps its
+normal system behaviour, e.g. Control Center.
+
+The service subscribes to no accessibility events and can't retrieve other apps' screen
+content. Notification content still comes only through notification access.
+
+To turn it on, tap **Grant** next to *Status-bar swipe* in setup, and turn on **Chronotif** in
+Android's Accessibility settings. Android 13+ may block this for sideloaded apps the same way as
+notification access; use **Allow restricted settings** as described in [Install](#install), then
+try again. Android shows a warning that the service can control your device; that's the
+standard warning for every accessibility service.
+
+The touch area is hidden while the phone is locked, in landscape, while a fullscreen app hides
+the status bar, while Chronotif's own panel or lock-screen view is open, and when *Use
+status-bar swipe* or *Chronotif is on* is off. It covers the main display only.
+
 ## Using it
 
-- **Open the panel**: tap the edge handle, or swipe it down/inward; or use the QS tile.
+- **Open the panel**: tap the edge handle, or swipe it down/inward; or use the QS tile. With the
+  [status-bar swipe](#status-bar-swipe) on, tap or swipe down on the left half of the status bar.
 - **Close**: back, tap empty space, or fling up at the end of the list.
 - **Open a notification**: tap it.
 - **Dismiss**: swipe sideways. Swiping a collapsed stack dismisses the whole stack.
@@ -163,8 +190,8 @@ Optionally, lock Chronotif in Recents so the system doesn't kill it.
   display timeout, which can be longer than the stock lock-screen timeout.
   *Settings → Lock screen* chooses Off / *When something is new* (default) /
   *Whenever there are notifications*.
-- **Turn it off**: switch off *Settings → Chronotif is on* to hide the edge handle and
-  lock-screen view without uninstalling. Your handle and lock-screen settings are kept for when
+- **Turn it off**: switch off *Settings → Chronotif is on* to hide the edge handle, status-bar
+  swipe and lock-screen view without uninstalling. Your handle and lock-screen settings are kept for when
   you turn it back on. The Quick Settings tile shows "Off" and still opens the panel.
 
 ## Limitations
@@ -172,8 +199,10 @@ Optionally, lock Chronotif in Recents so the system doesn't kill it.
 Android doesn't let a third-party app replace the system shade or lock screen, so Chronotif
 works **alongside** them:
 
-- Swiping down from the top still opens the system shade. Heads-up banners are still the
-  system's.
+- Swiping down from the top still opens the system shade, unless you turn on the
+  [status-bar swipe](#status-bar-swipe); even then, the right half of the status bar and the
+  launcher's own swipe down on the home screen still open the system's. Heads-up banners are
+  still the system's.
 - The lock-screen view is an activity on top of the (still locked) keyguard. You may briefly see
   the system lock screen as the screen turns on. It shows your home wallpaper.
 - On stock Android 8+, the system posts "Chronotif is displaying over other apps". Long-press it

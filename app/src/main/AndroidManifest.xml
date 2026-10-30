@@ -78,7 +78,7 @@
             </intent-filter>
         </service>
 
-        <!-- Prototype: opt-in status-bar swipe. Needs an accessibility service because only
+        <!-- Optional status-bar swipe. Needs an accessibility service because only
              accessibility overlays can sit above the status bar. Reads no window content. -->
         <service
             android:name=".StatusBarSwipe"

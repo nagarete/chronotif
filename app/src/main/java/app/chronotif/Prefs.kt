@@ -34,6 +34,11 @@ object Prefs {
         get() = sp.getBoolean("enabled", true)
         set(v) = sp.edit().putBoolean("enabled", v).apply()
 
+    /** The status-bar swipe; it also needs Chronotif's accessibility service turned on. */
+    var statusSwipeEnabled: Boolean
+        get() = sp.getBoolean("status_swipe_enabled", true)
+        set(v) = sp.edit().putBoolean("status_swipe_enabled", v).apply()
+
     var handleEnabled: Boolean
         get() = sp.getBoolean("handle_enabled", true)
         set(v) = sp.edit().putBoolean("handle_enabled", v).apply()
