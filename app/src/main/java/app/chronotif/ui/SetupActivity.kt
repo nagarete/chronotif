@@ -31,6 +31,7 @@ import app.chronotif.ListenerService
 import app.chronotif.PanelTile
 import app.chronotif.Prefs
 import app.chronotif.R
+import app.chronotif.StatusBarSwipe
 import app.chronotif.Updater
 
 /** One-time setup and settings. Not needed in daily use. */
@@ -91,6 +92,7 @@ class SetupActivity : Activity() {
         toggle(R.string.enabled, R.string.enabled_desc, { Prefs.enabled }) {
             Prefs.enabled = it
             applyHandle()
+            StatusBarSwipe.instance?.refresh()
             TileService.requestListeningState(this, ComponentName(this, PanelTile::class.java))
         }
 
@@ -133,6 +135,24 @@ class SetupActivity : Activity() {
         }
 
         section(R.string.setup_panel)
+        // The feature is optional, so the restricted-settings hint waits until someone tries it.
+        var swipeAsked = false
+        permission(R.string.status_swipe_title, R.string.status_swipe_desc,
+            granted = { StatusBarSwipe.isEnabled(this) },
+            broken = { settled && StatusBarSwipe.isEnabled(this) && StatusBarSwipe.instance == null }) {
+            swipeAsked = true
+            open(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+        }
+        val swipeRestricted = text(getString(R.string.perm_restricted_hint), 13f, secondary = true)
+        body.addView(swipeRestricted, gap(4))
+        refreshers += {
+            swipeRestricted.visibility =
+                if (Build.VERSION.SDK_INT >= 33 && swipeAsked && !StatusBarSwipe.isEnabled(this)) View.VISIBLE else View.GONE
+        }
+        toggle(R.string.status_swipe_enabled, null, { Prefs.statusSwipeEnabled }) {
+            Prefs.statusSwipeEnabled = it
+            StatusBarSwipe.instance?.refresh()
+        }
         toggle(R.string.handle_enabled, R.string.handle_enabled_desc, { Prefs.handleEnabled }) {
             Prefs.handleEnabled = it
             applyHandle()

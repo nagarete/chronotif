@@ -78,6 +78,21 @@
             </intent-filter>
         </service>
 
+        <!-- Optional status-bar swipe. Needs an accessibility service because only
+             accessibility overlays can sit above the status bar. Reads no window content. -->
+        <service
+            android:name=".StatusBarSwipe"
+            android:exported="true"
+            android:label="@string/status_swipe_title"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/status_bar_swipe" />
+        </service>
+
         <service
             android:name=".UpdateJob"
             android:exported="false"

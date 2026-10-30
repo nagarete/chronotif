@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Status-bar swipe: only places a touch area over the status bar. Subscribes to no
+     accessibility events and can't retrieve window content. -->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:canRetrieveWindowContent="false"
+    android:description="@string/status_swipe_service_desc"
+    android:notificationTimeout="0" />

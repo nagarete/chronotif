@@ -35,9 +35,9 @@
     <string name="more_in_stack">%d more</string>
 
     <!-- Setup -->
-    <string name="setup_intro">An iPhone-style, chronological notification panel. New notifications stay prominent; ones you\'ve already seen recede into Earlier. Open the panel with the edge handle or the Quick Settings tile — this screen is only for setup.</string>
+    <string name="setup_intro">An iPhone-style, chronological notification panel. New notifications stay prominent; ones you\'ve already seen recede into Earlier. Open the panel with the edge handle, the Quick Settings tile or the optional status-bar swipe — this screen is only for setup.</string>
     <string name="enabled">Chronotif is on</string>
-    <string name="enabled_desc">Turn off to hide the edge handle and lock-screen view without changing their settings. You can still open the panel from the Quick Settings tile.</string>
+    <string name="enabled_desc">Turn off to hide the edge handle, status-bar swipe and lock-screen view without changing their settings. You can still open the panel from the Quick Settings tile.</string>
     <string name="setup_permissions">Permissions</string>
     <string name="perm_listener">Notification access</string>
     <string name="perm_listener_desc">Read, open, dismiss and act on notifications.</string>
@@ -56,6 +56,10 @@
     <string name="open">Open</string>
 
     <string name="setup_panel">Panel</string>
+    <string name="status_swipe_title">Status-bar swipe</string>
+    <string name="status_swipe_desc">Tap or swipe down on the left half of the status bar to open Chronotif instead of the system notifications. The other half works as usual. Needs Display over other apps, and Chronotif turned on in Accessibility settings; it only uses that to place the touch area and doesn\'t read other apps\' screens.</string>
+    <string name="status_swipe_enabled">Use status-bar swipe</string>
+    <string name="status_swipe_service_desc">Lets you open Chronotif by tapping or swiping down on the left half of the status bar. Chronotif uses this only to place an invisible touch area there. It doesn\'t read other apps\' screens. Turn the swipe off any time in Chronotif\'s setup.</string>
     <string name="handle_enabled">Edge handle</string>
     <string name="handle_enabled_desc">A thin handle at the screen edge. Tap or swipe it to open the panel. It lights up when something is new.</string>
     <string name="handle_side">Side</string>

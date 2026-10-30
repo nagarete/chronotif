@@ -57,12 +57,14 @@ it. On the lock screen, notifications move to Earlier after you unlock. A new in
 message makes its conversation new again, even if the app updates its notification silently.
 A timestamp refresh or progress update doesn't.
 
-Tap the edge handle or the Quick Settings tile to open the panel. Tap a notification
+Tap the edge handle or the Quick Settings tile to open the panel, or turn on the optional
+status-bar swipe to open it from the top of the screen. Tap a notification
 to open its app, swipe sideways to dismiss it, or expand it for details and actions.
 Reply inline when the app supports it.
 
 Chronotif works alongside Android's notification shade and lock screen. Swiping down
-from the top still opens the system shade. The optional lock-screen view appears over
+from the top still opens the system shade, unless you turn on the status-bar swipe for the
+left half of the status bar. The optional lock-screen view appears over
 the system lock screen, which stays locked until you unlock it.
 
 ## Get started
@@ -71,7 +73,8 @@ the system lock screen, which stays locked until you unlock it.
    and open it. Allow your browser or file manager to install unknown apps if asked.
 2. Open Chronotif and grant **Notification access** so it can show and act on your notifications.
 3. Allow **Display over other apps** for the edge handle and lock-screen view.
-4. Optionally add the **Chronotif** Quick Settings tile.
+4. Optionally add the **Chronotif** Quick Settings tile, or turn on the
+   [status-bar swipe](docs/guide.md#status-bar-swipe).
 
 On Android 13 or newer, if notification access is blocked, try enabling it once, then
 open Android's **Settings → Apps → Chronotif → ⋮ → Allow restricted settings**.
@@ -91,6 +94,10 @@ Notifications stay in memory on your device. Chronotif saves your settings and t
 of your last check, with backups disabled. The lock-screen view follows Android's
 notification privacy settings and requires unlocking before opening notifications,
 using actions, or replying.
+
+The optional status-bar swipe uses an accessibility service to place a touch area over the left
+half of the status bar. The service subscribes to no accessibility events and can't retrieve
+other apps' screen content; notification content comes separately through notification access.
 
 The app has no third-party dependencies and responds to system events without polling,
 a foreground service, or wakelocks. Its only network use is the optional GitHub updater,
