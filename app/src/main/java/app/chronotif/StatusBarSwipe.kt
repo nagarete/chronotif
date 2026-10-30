@@ -13,6 +13,7 @@ import android.content.IntentFilter
 import android.content.res.Configuration
 import android.graphics.PixelFormat
 import android.hardware.display.DisplayManager
+import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
 import android.util.Log
@@ -25,7 +26,7 @@ import android.view.ViewConfiguration
 import android.view.WindowInsets
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
-import app.chronotif.ui.PanelActivity
+import app.chronotif.ui.Panel
 import kotlin.math.abs
 
 /**
@@ -48,7 +49,7 @@ class StatusBarSwipe : AccessibilityService() {
 
         private var ownUiShown = 0
 
-        /** Called when PanelActivity / LockActivity start and stop, so the strip never sits on them. */
+        /** Called while the panel or lock-screen view is shown, so the strip never sits on them. */
         fun ownUiVisible(visible: Boolean) {
             ownUiShown = (ownUiShown + if (visible) 1 else -1).coerceAtLeast(0)
             instance?.refresh()
@@ -148,6 +149,10 @@ class StatusBarSwipe : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {}
+
+    /** Collapses the system shade, so the Quick Settings tile can open the panel window. */
+    fun dismissShade(): Boolean =
+        Build.VERSION.SDK_INT >= 31 && performGlobalAction(GLOBAL_ACTION_DISMISS_NOTIFICATION_SHADE)
 
     override fun onInterrupt() {}
 
@@ -253,10 +258,7 @@ class StatusBarSwipe : AccessibilityService() {
             return false
         }
         return try {
-            startActivity(
-                Intent(this, PanelActivity::class.java)
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION),
-            )
+            Panel.open(this)
             true
         } catch (e: RuntimeException) {
             Log.w(TAG, "Couldn't open the panel", e)

@@ -187,7 +187,7 @@ class SetupActivity : Activity() {
         val buttons = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         buttons.addView(Button(this).apply {
             setText(R.string.open_panel)
-            setOnClickListener { startActivity(Intent(context, PanelActivity::class.java)) }
+            setOnClickListener { Panel.open(context) }
         })
         if (Build.VERSION.SDK_INT >= 33) buttons.addView(Button(this).apply {
             text = "+ " + getString(R.string.tile_label)

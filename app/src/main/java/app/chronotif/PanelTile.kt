@@ -6,8 +6,10 @@ import android.annotation.SuppressLint
 import android.app.PendingIntent
 import android.content.Intent
 import android.os.Build
+import android.provider.Settings
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
+import app.chronotif.ui.Panel
 import app.chronotif.ui.PanelActivity
 
 /** Quick Settings tile: a second way into the panel, showing how many are new. */
@@ -32,6 +34,14 @@ class PanelTile : TileService() {
     @SuppressLint("StartActivityAndCollapseDeprecated")
     @Suppress("DEPRECATION")
     private fun launch() {
+        // The panel window can only show once the shade is out of the way. Collapsing it needs
+        // the status-bar swipe's accessibility service; otherwise open the activity, which
+        // collapses the shade itself but pauses the app underneath.
+        val swipe = StatusBarSwipe.instance
+        if (swipe != null && Settings.canDrawOverlays(this) && swipe.dismissShade()) {
+            Panel.open(this)
+            return
+        }
         val intent = Intent(this, PanelActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         if (Build.VERSION.SDK_INT >= 34) {
             startActivityAndCollapse(

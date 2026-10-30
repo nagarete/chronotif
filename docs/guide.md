@@ -12,7 +12,7 @@ Setup help, notification behaviour, privacy rules, and development details.
 | Edge handle | A slim pill on the screen edge. Tap or swipe it to open the panel. Tinted with your accent colour while something is NEW | One tiny overlay window, no timers |
 | Status-bar swipe (optional) | An invisible touch area on the left half of the status bar. Tap or swipe down there to open the panel instead of the system notifications | Two tiny overlay windows, no timers |
 | Quick Settings tile | Another way into the panel; shows "N new" | Only when the shade is open |
-| Panel | The shade-like screen: blurred backdrop, calls and media, NEW / EARLIER, collapsed Running | Exists only while open |
+| Panel | The shade-like screen: blurred backdrop, calls and media, NEW / EARLIER, collapsed Running. Drawn over the current app like the system shade, so videos and games keep running underneath | Exists only while open |
 | Lock-screen view | Shown over the locked keyguard when the screen turns on | Started only on screen-on |
 
 No foreground service, wakelocks or alarms. The only scheduled work is the once-a-day update
@@ -204,6 +204,11 @@ To open Chronotif in fullscreen, use the Quick Settings tile, or turn off the ed
 - **Turn it off**: switch off *Settings → Chronotif is on* to hide the edge handle, status-bar
   swipe and lock-screen view without uninstalling. Your handle and lock-screen settings are kept for when
   you turn it back on. The Quick Settings tile shows "Off" and still opens the panel.
+
+The panel opens as a window over the current app only when Chronotif may *display over other
+apps* and the phone is unlocked. Otherwise, and from the Quick Settings tile unless the
+[status-bar swipe](#status-bar-swipe) is on, it opens as a regular screen, which pauses the app
+underneath.
 
 ## Limitations
 
