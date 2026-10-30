@@ -175,8 +175,13 @@ standard warning for every accessibility service.
 
 The touch area is hidden while the phone is locked, in landscape, while Chronotif's own panel or
 lock-screen view is open, and when *Use status-bar swipe* or *Chronotif is on* is off. While a
-fullscreen app hides the status bar, touches pass through to the app; that includes when you
-swipe the bar in temporarily, so it then opens the system shade. It covers the main display only.
+fullscreen app hides the status bar, touches pass through to the app. It covers the main display
+only.
+
+**Fullscreen apps** (videos, games): the status-bar swipe doesn't work there. When you swipe the
+status bar in temporarily, the system handles swipes on it itself, so they open the system shade.
+To open Chronotif in fullscreen, use the Quick Settings tile, or turn off the edge handle's
+*Hide in landscape*.
 
 ## Using it
 
@@ -207,7 +212,8 @@ works **alongside** them:
 
 - Swiping down from the top still opens the system shade, unless you turn on the
   [status-bar swipe](#status-bar-swipe); even then, the right half of the status bar and the
-  launcher's own swipe down on the home screen still open the system's. Heads-up banners are
+  launcher's own swipe down on the home screen and swipes in fullscreen apps still open the
+  system's. Heads-up banners are
   still the system's.
 - The lock-screen view is an activity on top of the (still locked) keyguard. You may briefly see
   the system lock screen as the screen turns on. It shows your home wallpaper.
