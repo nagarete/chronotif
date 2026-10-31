@@ -250,14 +250,15 @@ class NotifList(
     ) {
         shownUpTo = maxOf(shownUpTo, e.alertTime)
         val latest = msgs.last()
+        val newest = c.messages.lastOrNull { it.incoming }?.id
         when {
-            msgs.size == 1 -> rows += messageCard(stackId, e, c, latest, latest = true, style, now)
+            msgs.size == 1 -> rows += messageCard(stackId, e, c, latest, latest.id == newest, style, now)
             stackId in openStacks -> {
                 rows += stackHeader("sh:$stackId", c.title, e.clearable, close = { openStacks -= stackId; render() }) {
                     openStacks -= stackId
                     dismissAll(listOf(e))
                 }
-                msgs.asReversed().forEach { rows += messageCard(stackId, e, c, it, it === latest, CardView.Style.FULL, now) }
+                msgs.asReversed().forEach { rows += messageCard(stackId, e, c, it, it.id == newest, CardView.Style.FULL, now) }
             }
             else -> rows += Row("cs:$stackId", { StackView(ctx, this) }) { v ->
                 v as StackView
@@ -277,7 +278,7 @@ class NotifList(
         }
     }
 
-    /** One message's card. The latest also answers to the notification's key (reply handoff, [focus]). */
+    /** One message's card. The conversation's latest also answers to its key (reply handoff, [focus]). */
     private fun messageCard(
         stackId: String, e: Entry, c: Content, m: Content.Msg, latest: Boolean, style: CardView.Style, now: Long,
     ): Row {
