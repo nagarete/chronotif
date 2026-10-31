@@ -29,7 +29,7 @@ This covers messages available in active Android notifications. It does not requ
 
 A new incoming message returns its conversation to New, including when the app sends the update silently or marks it to alert only once. Timestamp refreshes, progress updates, and updates with no new incoming message do not return a checked conversation to New merely because they were reposted.
 
-For structured conversations, incoming message timestamps identify arrivals. Outgoing replies and changes to historic messages do not count. For apps that supply only a message title and body, changed text identifies an arrival; Android supplies no incoming-message identity in that format. Identical plain-text messages cannot be distinguished from reposts.
+For structured conversations, incoming message timestamps identify arrivals. A conversation Chronotif sees for the first time (after a restart, or when an app re-alerts old chats) arrived with its latest message, not when it was posted, so yesterday's chat stays in Earlier. Conversations sort by their newest message, the time their cards show. Outgoing replies and changes to historic messages do not count. For apps that supply only a message title and body, changed text identifies an arrival; Android supplies no incoming-message identity in that format. Identical plain-text messages cannot be distinguished from reposts.
 
 ## Avatars and Attachments
 
