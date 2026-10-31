@@ -99,31 +99,60 @@ class NotificationBehaviorTest {
     }
 
     @Test
-    fun silentIncomingMessageReturnsToNewAndExpandsWithoutEarlier() {
+    fun silentIncomingMessageReturnsToNewWhileTheCheckedOneStaysEarlier() {
         post(notification("first"))
         Prefs.markChecked(1000)
-        val updated = post(notification("first", "second"), 2000)
+        post(notification("first", "second"), 2000)
         assertEquals("The new message must not remain trapped in Earlier", 1, NotifStore.newCount())
 
         withLockList { list, container ->
             list.render()
-            assertFalse(texts(container).contains("first"))
-            list.onToggleExpand(updated)
-            assertTrue(texts(container).containsAll(listOf("first", "second")))
+            val shown = shownTexts(container)
+            assertTrue(shown.contains("second"))
+            assertFalse("The checked message moved to Earlier", shown.contains("first"))
+            assertTrue(shown.contains("1 earlier"))
         }
     }
 
     @Test
-    fun newConversationCardListsEveryMessageSinceTheLastCheckWithoutExpanding() {
+    fun newMessagesStackInNewAndOpenIntoOneCardEach() {
         post(notification(listOf("seen" to 900L)), 900)
         Prefs.markChecked(1000)
         post(notification(listOf("seen" to 900L, "Jiah" to 1100L, "Gawd damn" to 1200L)), 1200)
+        withLockList { _, container ->
+            NotifList(object : NotifList.Host {
+                override val context: Context = container.context
+                override fun launched() {}
+                override fun guarded(action: () -> Unit) = action()
+            }, container, onLock = false).render()
+            var shown = shownTexts(container)
+            assertTrue("Collapsed to the latest, with a count", shown.containsAll(listOf("Gawd damn", "2")))
+            assertFalse(shown.contains("Jiah"))
+
+            views(container).filterIsInstance<app.chronotif.ui.StackView>().single { it.isShown || it.visibility == View.VISIBLE }
+                .card.performClick()
+            shown = shownTexts(container)
+            assertTrue(shown.containsAll(listOf("Jiah", "Gawd damn", "Show less")))
+            assertTrue("Newest first", shown.indexOf("Gawd damn") < shown.indexOf("Jiah"))
+            assertTrue("The checked message sits in its own Earlier stack", shown.contains("seen"))
+            assertTrue(shown.indexOf("Jiah") < shown.indexOf("seen"))
+        }
+    }
+
+    @Test
+    fun swipingAMessageCardHidesOnlyThatMessage() {
+        val e = post(notification(listOf("one" to 1100L, "two" to 1200L)), 1200)
+        val c = Content.of(context, e, false)
+        NotifStore.hideMessage(e.key, c.messages.first().id)
+        shadowOf(Looper.getMainLooper()).idle()
         withLockList { list, container ->
             list.render()
-            val shown = texts(container)
-            assertTrue(shown.containsAll(listOf("Jiah", "Gawd damn")))
-            assertFalse("Checked messages stay behind the expand chevron", shown.contains("seen"))
+            val shown = shownTexts(container)
+            assertTrue(shown.contains("two"))
+            assertFalse(shown.contains("one"))
+            assertFalse("A single remaining message is a plain card", shown.contains("2"))
         }
+        assertNotNull("The notification itself stays", NotifStore.get(e.key))
     }
 
     @Test
@@ -311,6 +340,100 @@ class NotificationBehaviorTest {
     private fun views(view: View): List<View> =
         if (view is ViewGroup) listOf(view) + (0 until view.childCount).flatMap { views(view.getChildAt(it)) }
         else listOf(view)
+
+    private fun replyable(messages: List<Pair<String, Long>>): Notification {
+        val input = android.app.RemoteInput.Builder("reply").setLabel("Reply").build()
+        val pi = android.app.PendingIntent.getBroadcast(context, 0, Intent("reply"), android.app.PendingIntent.FLAG_MUTABLE)
+        return Notification.Builder(context, "messages")
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setCategory(Notification.CATEGORY_MESSAGE)
+            .setStyle(Notification.MessagingStyle(me).also { style ->
+                messages.forEach { (text, time) -> style.addMessage(text, time, sender) }
+            })
+            .addAction(Notification.Action.Builder(null, "Reply", pi).addRemoteInput(input).build())
+            .build()
+    }
+
+    private fun <T> withPanelList(block: (NotifList, LinearLayout) -> T): T = withLockList { _, container ->
+        val list = NotifList(object : NotifList.Host {
+            override val context: Context = container.context
+            override fun launched() {}
+            override fun guarded(action: () -> Unit) = action()
+        }, container, onLock = false)
+        block(list, container)
+    }
+
+    private fun replyBoxShown(container: View) =
+        views(container).any { it is android.widget.EditText && it.isShownInTree() }
+
+    private fun View.isShownInTree(): Boolean {
+        var v: View? = this
+        while (v != null) {
+            if (v.visibility != View.VISIBLE) return false
+            v = v.parent as? View
+        }
+        return true
+    }
+
+    @Test
+    fun aDraftReplySurvivesAnotherMessageArriving() {
+        val e = post(replyable(listOf("one" to 1100L)), 1100)
+        withPanelList { list, container ->
+            list.render()
+            val id = "${e.key}#${Content.of(context, e, false).messages.single().id}"
+            list.onAction(e, id, 0)
+            assertTrue(replyBoxShown(container))
+            post(replyable(listOf("one" to 1100L, "two" to 1200L)), 1200)
+            list.render()
+            assertTrue("The card being replied to stays open with its editor", replyBoxShown(container))
+            assertTrue(shownTexts(container).containsAll(listOf("one", "two")))
+        }
+    }
+
+    @Test
+    fun aReplyHandoffFindsTheNewestMessageStillShown() {
+        val e = post(replyable(listOf("older" to 1100L, "newer" to 1200L)), 1200)
+        NotifStore.hideMessage(e.key, Content.of(context, e, false).messages.last().id)
+        withPanelList { list, container ->
+            list.focus(e.key, 0)
+            list.render()
+            assertTrue(shownTexts(container).contains("older"))
+            assertTrue("The reply editor opens on the newest message left", replyBoxShown(container))
+        }
+    }
+
+    @Test
+    fun aQuietlyRepostedChatSortsByItsMessagesNotItsRepost() {
+        // WhatsApp reposts yesterday's chat; a mail arrived in between. The list follows the times its cards show.
+        post(notification(listOf("old chat" to 1000L)), time = 5000, id = 1)
+        val mail = Notification.Builder(context, "mail")
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle("Mail").setContentText("newer mail")
+            .build()
+        post(mail, time = 3000, id = 2)
+        Prefs.markChecked(10_000)
+        withPanelList { list, container ->
+            list.render()
+            val shown = shownTexts(container)
+            assertTrue(shown.toString(), shown.indexOf("newer mail") in 0 until shown.indexOf("old chat"))
+        }
+    }
+
+    @Test
+    fun aConversationWithEveryMessageHiddenIsNotNew() {
+        val e = post(notification(listOf("one" to 1100L, "two" to 1200L)), 1200)
+        assertEquals(1, NotifStore.newCount())
+        Content.of(context, e, false).messages.forEach { NotifStore.hideMessage(e.key, it.id) }
+        assertEquals(0, NotifStore.newCount())
+    }
+
+    /** Text a user could see: skips views that are gone. */
+    private fun shownTexts(view: View): List<String> = when {
+        view.visibility != View.VISIBLE -> emptyList()
+        view is TextView -> listOf(view.text.toString())
+        view is ViewGroup -> (0 until view.childCount).flatMap { shownTexts(view.getChildAt(it)) }
+        else -> emptyList()
+    }
 
     private fun texts(view: View): List<String> = when (view) {
         is TextView -> listOf(view.text.toString())

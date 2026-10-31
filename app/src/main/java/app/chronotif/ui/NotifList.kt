@@ -71,10 +71,13 @@ class NotifList(
         }
     }
 
+    /** A conversation focuses its latest message card: see [messageCard]. */
     fun focus(key: String, replyIndex: Int) {
         expanded += key
         if (replyIndex >= 0) replying = key to replyIndex
         NotifStore.get(key)?.let { openStacks += it.stackId }
+        openStacks += newStackId(key)
+        openStacks += earlierStackId(key)
     }
 
     fun render() {
@@ -139,31 +142,76 @@ class NotifList(
         s.calls.forEach { card(it, CardView.Style.FULL) }
         s.media.forEach { player(it) }
 
-        if (s.fresh.isNotEmpty()) {
-            rows += header("h:new", ctx.getString(R.string.section_new) + "  ${s.fresh.size}", null)
-            s.fresh.forEach { card(it, CardView.Style.FULL, newSince = lastCheck) }
+        // A conversation that lists its messages is split by message: those since the check
+        // stack in New, the rest in Earlier (ADR 0002). Each part sorts by its newest message, the
+        // time its card shows: apps quietly repost old chats, which moves the notification's own time.
+        val fresh = ArrayList<Pair<Long, List<Row>>>()
+        var newCount = 0
+        val earlier = ArrayList<Pair<Long, () -> Unit>>()
+        for (e in s.fresh) {
+            val c = Content.of(ctx, e, redacted(e))
+            val incoming = c.messages.filter { it.incoming }
+            if (incoming.isEmpty()) {
+                val before = rows.size
+                card(e, CardView.Style.FULL, newSince = lastCheck)
+                fresh += e.alertTime to listOf(rows.removeAt(before))
+                newCount++
+                continue
+            }
+            val newIds = incoming.takeLast(Attention.newMessages(incoming.map { it.time }, lastCheck)).map { it.id }.toSet()
+            val hidden = NotifStore.hiddenMessages(e.key)
+            val shown = incoming.filter { it.id !in hidden }
+            val (new, old) = shown.partition { it.id in newIds }
+            if (new.isNotEmpty()) {
+                val before = rows.size
+                conversation(newStackId(e.key), e, c, new, CardView.Style.FULL, rows, now)
+                val part = ArrayList<Row>()
+                while (rows.size > before) part += rows.removeAt(before)
+                fresh += new.last().time to part
+                newCount++
+            }
+            if (old.isNotEmpty()) earlier += old.last().time to {
+                conversation(earlierStackId(e.key), e, c, old, CardView.Style.RECEDED, rows, now)
+            }
+        }
+        if (fresh.isNotEmpty()) {
+            rows += header("h:new", ctx.getString(R.string.section_new) + "  $newCount", null)
+            fresh.sortedByDescending { it.first }.forEach { rows += it.second }
         }
 
-        if (s.earlier.isNotEmpty()) {
+        for (stack in s.earlier) {
+            val top = stack.items[0]
+            val c = if (stack.items.size == 1) Content.of(ctx, top, redacted(top)) else null
+            val incoming = c?.messages.orEmpty().filter { it.incoming }
+            val newestShown = incoming.lastOrNull { it.id !in NotifStore.hiddenMessages(top.key) }?.time
+            earlier += (newestShown ?: top.alertTime) to {
+                when {
+                    c != null && incoming.isNotEmpty() -> {
+                        val hidden = NotifStore.hiddenMessages(top.key)
+                        val shown = incoming.filter { it.id !in hidden }
+                        if (shown.isNotEmpty()) conversation(earlierStackId(top.key), top, c, shown, CardView.Style.RECEDED, rows, now)
+                    }
+                    stack.items.size == 1 -> card(top, CardView.Style.RECEDED)
+                    stack.id in openStacks -> {
+                        rows += stackHeader(stack)
+                        stack.items.forEach { card(it, CardView.Style.FULL) }
+                    }
+                    else -> collapsedStack(stack, rows, now, ::redacted)
+                }
+            }
+        }
+
+        if (earlier.isNotEmpty()) {
             val earlierAll = s.earlier.flatMap { it.items }
             if (!earlierRevealed) {
-                rows += pill("p:earlier", ctx.getString(R.string.earlier_count, s.earlierCount)) {
+                rows += pill("p:earlier", ctx.getString(R.string.earlier_count, earlier.size)) {
                     earlierRevealed = true
                     render()
                 }
             } else {
                 rows += header("h:earlier", ctx.getString(R.string.section_earlier),
                     clear = earlierAll.takeIf { l -> l.any { it.clearable } })
-                for (stack in s.earlier) {
-                    when {
-                        stack.items.size == 1 -> card(stack.items[0], CardView.Style.RECEDED)
-                        stack.id in openStacks -> {
-                            rows += stackHeader(stack)
-                            stack.items.forEach { card(it, CardView.Style.FULL) }
-                        }
-                        else -> collapsedStack(stack, rows, now, ::redacted)
-                    }
-                }
+                earlier.sortedByDescending { it.first }.forEach { it.second() }
             }
         }
 
@@ -204,29 +252,101 @@ class NotifList(
         }
     }
 
+    private fun newStackId(key: String) = "new|$key"
+    private fun earlierStackId(key: String) = "earlier|$key"
+
+    /**
+     * A Conversation stack of [msgs] (oldest first): one card for a single message; otherwise
+     * collapsed to the latest with a count, or opened into one card per message, newest first.
+     */
+    private fun conversation(
+        stackId: String, e: Entry, c: Content, msgs: List<Content.Msg>, style: CardView.Style,
+        rows: MutableList<Row>, now: Long,
+    ) {
+        shownUpTo = maxOf(shownUpTo, e.alertTime)
+        val latest = msgs.last()
+        // The conversation's newest shown message answers a focus (reply handoff), even if a newer one was hidden.
+        val hidden = NotifStore.hiddenMessages(e.key)
+        val newest = c.messages.lastOrNull { it.incoming && it.id !in hidden }?.id
+        // A reply being typed keeps its card on screen when another message turns it into a stack.
+        val replyingHere = replying?.first.let { r -> r == e.key || msgs.any { r == "${e.key}#${it.id}" } }
+        when {
+            msgs.size == 1 -> rows += messageCard(stackId, e, c, latest, latest.id == newest, style, now)
+            stackId in openStacks || replyingHere -> {
+                val close = {
+                    openStacks -= stackId
+                    if (replyingHere) replying = null
+                    render()
+                }
+                rows += stackHeader("sh:$stackId", c.title, e.clearable, close) {
+                    openStacks -= stackId
+                    dismissAll(listOf(e))
+                }
+                msgs.asReversed().forEach { rows += messageCard(stackId, e, c, it, it.id == newest, CardView.Style.FULL, now) }
+            }
+            else -> rows += Row("cs:$stackId", { StackView(ctx, this) }) { v ->
+                v as StackView
+                v.bind(msgs.size)
+                v.card.showCount(msgs.size)
+                v.card.tapOverride = {
+                    openStacks += stackId
+                    render()
+                }
+                // The whole conversation is one notification: swiping the stack clears it.
+                v.card.swipeAllowed = { e.clearable }
+                v.card.onSwiped = { dismissAll(listOf(e)) }
+                v.card.bind(e, c.forMessage(latest), style, false, -1, now, id = "$stackId#top", at = latest.time)
+                if (e.key !in pendingDismiss) v.card.swipe.reset(v.card)
+                v.layoutParams = gap(8)
+            }
+        }
+    }
+
+    /** One message's card. The conversation's latest also answers to its key (reply handoff, [focus]). */
+    private fun messageCard(
+        stackId: String, e: Entry, c: Content, m: Content.Msg, latest: Boolean, style: CardView.Style, now: Long,
+    ): Row {
+        val id = "${e.key}#${m.id}"
+        return Row("m:$stackId#${m.id}", { CardView(ctx, this) }) { v ->
+            v as CardView
+            val open = id in expanded || (latest && e.key in expanded)
+            val reply = replying?.takeIf { it.first == id || (latest && it.first == e.key) }?.second ?: -1
+            // Android can't drop one message from a notification, so only Chronotif hides it.
+            v.swipeAllowed = { true }
+            v.onSwiped = { NotifStore.hideMessage(e.key, m.id) }
+            v.showCount(0)
+            v.bind(e, c.forMessage(m), style, open, reply, now, id = id, at = m.time)
+            v.swipe.reset(v)
+            v.layoutParams = gap(8)
+        }
+    }
+
     // --- Card callbacks ---------------------------------------------------------------
 
     override fun onTap(e: Entry, c: Content) {
         if (e.n.contentIntent == null) {
-            if (!c.redacted) onToggleExpand(e)
+            if (!c.redacted) onToggleExpand(e, e.key)
             return
         }
         host.guarded { if (Act.open(host.context, e)) host.launched() }
     }
 
-    override fun onToggleExpand(e: Entry) {
-        if (!expanded.remove(e.key)) expanded += e.key else if (replying?.first == e.key) replying = null
+    override fun onToggleExpand(e: Entry, id: String) {
+        // A latest message card can be open under the notification's key (focus); closing closes both.
+        val wasOpen = expanded.remove(id) or (id.startsWith("${e.key}#") && expanded.remove(e.key))
+        if (!wasOpen) expanded += id
+        else if (replying?.first == id || replying?.first == e.key) replying = null
         render()
     }
 
-    override fun onAction(e: Entry, index: Int) {
+    override fun onAction(e: Entry, id: String, index: Int) {
         val a = e.n.actions?.getOrNull(index) ?: return
         if (Act.replyInput(a) != null) {
             if (onLock) {
                 host.guarded { host.replyElsewhere(e, index) }
             } else {
-                expanded += e.key
-                replying = e.key to index
+                expanded += id
+                replying = id to index
                 render()
             }
             return
@@ -234,10 +354,11 @@ class NotifList(
         host.guarded { if (Act.action(host.context, a)) host.launched() }
     }
 
-    override fun onSendReply(e: Entry, index: Int, text: CharSequence) {
+    override fun onSendReply(e: Entry, id: String, index: Int, text: CharSequence) {
         val a = e.n.actions?.getOrNull(index) ?: return
         Act.reply(host.context, a, text)
         replying = null
+        expanded -= id
         expanded -= e.key
         render()
     }
@@ -286,7 +407,17 @@ class NotifList(
         v.layoutParams = gap(0)
     }
 
-    private fun stackHeader(stack: Stack<Entry>) = Row("sh:${stack.id}", {
+    private fun stackHeader(stack: Stack<Entry>) =
+        stackHeader("sh:${stack.id}", Apps.label(ctx, stack.items[0].pkg), stack.items.any { it.clearable },
+            close = { openStacks -= stack.id; render() }) {
+            openStacks -= stack.id
+            dismissAll(stack.items)
+        }
+
+    /** An open stack's title, with Show less ([close]) and × ([clear]). */
+    private fun stackHeader(
+        id: String, title: CharSequence, clearable: Boolean, close: () -> Unit, clear: () -> Unit,
+    ) = Row(id, {
         LinearLayout(ctx).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -304,17 +435,11 @@ class NotifList(
         }
     }) { v ->
         v as LinearLayout
-        (v.getChildAt(0) as TextView).text = Apps.label(ctx, stack.items[0].pkg)
-        v.getChildAt(1).setOnClickListener {
-            openStacks -= stack.id
-            render()
-        }
+        (v.getChildAt(0) as TextView).text = title
+        v.getChildAt(1).setOnClickListener { close() }
         v.getChildAt(2).apply {
-            visibility = if (stack.items.any { it.clearable }) View.VISIBLE else View.GONE
-            setOnClickListener {
-                openStacks -= stack.id
-                dismissAll(stack.items)
-            }
+            visibility = if (clearable) View.VISIBLE else View.GONE
+            setOnClickListener { clear() }
         }
         v.layoutParams = gap(6)
     }

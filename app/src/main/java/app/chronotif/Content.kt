@@ -41,8 +41,22 @@ class Content(
     val redacted: Boolean,
     /** The image or video still sent with each of [lines], if any; empty for non-conversations. */
     val attachments: List<Attachment?> = emptyList(),
+    /** A conversation's messages, oldest first, one per [lines] entry; empty when it has none. */
+    val messages: List<Msg> = emptyList(),
+    /** Every attachment in the conversation, for the viewer to page through. */
+    val gallery: List<Attachment> = attachments.filterNotNull(),
 ) {
     class Progress(val value: Int, val max: Int, val indeterminate: Boolean)
+
+    /** One message of a conversation; [id] stays the same when the app reposts the notification. */
+    class Msg(val id: String, val line: CharSequence, val time: Long, val attachment: Attachment?, val incoming: Boolean)
+
+    /** What a single message's card shows: the conversation's title over just that message. */
+    fun forMessage(m: Msg) = Content(
+        appName = appName, title = title, text = m.line, bigText = null,
+        lines = listOf(m.line), lineTimes = listOf(m.time), subText = subText, progress = null,
+        redacted = redacted, attachments = listOf(m.attachment), messages = listOf(m), gallery = gallery,
+    )
 
     /** An image, or a video's still frame, sent inside a message. */
     class Attachment(val uri: Uri, val mime: String) {
@@ -55,11 +69,10 @@ class Content(
     /** The messages sent after [since] (at least the latest), oldest first; the collapsed New card shows them. */
     fun messagesSince(since: Long): List<CharSequence> {
         if (lineTimes.size != lines.size || lines.isEmpty()) return emptyList()
-        return lines.takeLast(lineTimes.count { it > since }.coerceIn(1, MAX_PREVIEW))
+        return lines.takeLast(lineTimes.count { it > since }.coerceAtLeast(1))
     }
 
     companion object {
-        private const val MAX_PREVIEW = 5
         /** Where MessagingStyle keeps a conversation icon; the key is hidden and rarely sent by apps. */
         private const val EXTRA_CONVERSATION_ICON = "android.conversationIcon"
 
@@ -86,6 +99,7 @@ class Content(
                 x.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)?.filterNotNull().orEmpty()
             var lineTimes = emptyList<Long>()
             var attachments = emptyList<Attachment?>()
+            var msgs = emptyList<Msg>()
 
             val messages = (messages(x, Notification.EXTRA_HISTORIC_MESSAGES) + messages(x))
                 .distinctBy { Triple(it.time, it.senderKey ?: it.sender?.toString(), it.body.toString()) }
@@ -104,6 +118,14 @@ class Content(
                 }
                 lineTimes = messages.map { it.time }
                 attachments = messages.map { it.attachment }
+                val user = user(x)
+                msgs = messages.mapIndexed { i, m ->
+                    Msg(
+                        id = idOf(m),
+                        line = uncolored(lines[i]), time = m.time, attachment = m.attachment,
+                        incoming = !isOwn(m, user),
+                    )
+                }
                 text = lines.last()
             }
 
@@ -125,6 +147,7 @@ class Content(
                 progress = progress,
                 redacted = false,
                 attachments = attachments,
+                messages = msgs,
             )
         }
 
@@ -219,15 +242,29 @@ class Content(
             if (x.containsKey(Notification.EXTRA_IS_GROUP_CONVERSATION)) x.getBoolean(Notification.EXTRA_IS_GROUP_CONVERSATION)
             else x.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE) != null
 
-        @Suppress("DEPRECATION")
-        private fun latestIncoming(x: Bundle): Message? {
-            val user = x.getParcelable(Notification.EXTRA_MESSAGING_PERSON) as? Person
-            return messages(x).filter { message ->
-                message.sender != null && !(user != null &&
-                    (if (user.key != null && message.senderKey != null) user.key == message.senderKey
-                    else user.name?.toString() == message.sender.toString()))
-            }.maxByOrNull { it.time }
+        /** The ids of a conversation's incoming messages, as [Msg.id], without building its [Content]. */
+        fun incomingIds(n: Notification): List<String> {
+            val x = n.extras
+            val user = user(x)
+            return (messages(x, Notification.EXTRA_HISTORIC_MESSAGES) + messages(x))
+                .filter { !isOwn(it, user) }.map(::idOf).distinct()
         }
+
+        private fun idOf(m: Message) = "${m.time}|${m.senderKey ?: m.sender}|${m.body.toString().hashCode()}"
+
+        private fun latestIncoming(x: Bundle): Message? {
+            val user = user(x)
+            return messages(x).filter { !isOwn(it, user) }.maxByOrNull { it.time }
+        }
+
+        @Suppress("DEPRECATION")
+        private fun user(x: Bundle) = x.getParcelable(Notification.EXTRA_MESSAGING_PERSON) as? Person
+
+        /** The user's own messages have no sender, or the messaging style's user as sender. */
+        private fun isOwn(message: Message, user: Person?): Boolean =
+            message.sender == null || (user != null &&
+                (if (user.key != null && message.senderKey != null) user.key == message.senderKey
+                else user.name?.toString() == message.sender.toString()))
 
         private class Message(
             val sender: CharSequence?, val senderKey: String?, val senderIcon: Icon?,
@@ -289,7 +326,7 @@ object Apps {
     }
 
     fun icon(context: Context, e: Entry): Drawable? {
-        icons.get(e.stackId)?.let { return it }
+        icons.get(e.appId)?.let { return it }
         val pm = context.packageManager
         val d = try {
             val plain = pm.getApplicationIcon(e.pkg)
@@ -298,7 +335,7 @@ object Apps {
         } catch (_: PackageManager.NameNotFoundException) {
             runCatching { e.n.smallIcon?.loadDrawable(context) }.getOrNull()
         } ?: return null
-        icons.put(e.stackId, d)
+        icons.put(e.appId, d)
         return d
     }
 
