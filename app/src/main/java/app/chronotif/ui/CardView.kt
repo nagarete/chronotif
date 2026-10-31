@@ -268,8 +268,8 @@ class CardView(context: Context, private val cb: CardCallbacks) : LinearLayout(c
             }, Ui.lp().apply { topMargin = dp(3) })
             addAttachment(e, c, i, expanded)
         }
-        // A single message shows as the body; its attachment goes under it.
-        if (shownLines.isEmpty() && bodyText != null && c.lines.isNotEmpty()) addAttachment(e, c, c.lines.lastIndex, expanded)
+        // A single message shows as the body (if it has text); its attachment goes under it.
+        if (shownLines.isEmpty() && c.lines.isNotEmpty()) addAttachment(e, c, c.lines.lastIndex, expanded)
         lines.visibility = if (lines.childCount > 0) VISIBLE else GONE
 
         val pic = if (expanded && !c.redacted) Content.picture(context, e) else null

@@ -136,6 +136,30 @@ class NotificationBehaviorTest {
     }
 
     @Test
+    fun aDmNamedOnlyByItsShortcutTakesTheShortcutLabelAndShowsItsSenderLine() {
+        // As TikTok sends it: every name field reads "sent you a message", the text is empty,
+        // and only the conversation shortcut knows who it's from.
+        val them = Person.Builder().setName("sent you a message").setKey("them").build()
+        val n = Notification.Builder(context, "messages")
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle("sent you a message")
+            .setStyle(Notification.MessagingStyle(Person.Builder().setName("sent you a message").build())
+                .addMessage("", 100, them))
+            .build()
+        @Suppress("DEPRECATION")
+        val sbn = StatusBarNotification("example.chat", "example.chat", 7, null, 1000, 0, 0,
+            n, Process.myUserHandle(), 1000)
+        val shortcut = android.content.pm.ShortcutInfo.Builder(context, "dm")
+            .setShortLabel("[samuel irvan] caramel").build()
+        val ranking = object : Ranking() {
+            override fun getConversationShortcutInfo() = shortcut
+        }
+        val c = Content.of(context, Entry(sbn, ranking, 1000), false)
+        assertEquals("[samuel irvan] caramel", c.title.toString())
+        assertEquals(listOf("sent you a message"), c.lines.map { it.toString() })
+    }
+
+    @Test
     fun expansionRetainsAllSuppliedMessages() {
         val messages = (1..9).map { "message $it" }
         val entry = post(notification(*messages.toTypedArray()))
