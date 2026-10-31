@@ -96,7 +96,8 @@ class CardPreview private constructor(
     private val back = if (Build.VERSION.SDK_INT >= 33) OnBackInvokedCallback { close() } else null
 
     init {
-        setBackgroundColor(0xB3000000.toInt())
+        // Behind a blur (Android 12+) a light dim is enough; without one, dim harder so the list doesn't compete.
+        setBackgroundColor(if (Build.VERSION.SDK_INT >= 31) 0x80000000.toInt() else 0xD9000000.toInt())
         isClickable = true
         isFocusable = true
         isFocusableInTouchMode = true
@@ -139,14 +140,14 @@ class CardPreview private constructor(
 
         buttons.orientation = LinearLayout.VERTICAL
         acts.forEachIndexed { i, a ->
-            buttons.addView(button(a, i), Ui.lp(LayoutParams.MATCH_PARENT, dp(52)).apply { topMargin = dp(8) })
+            buttons.addView(button(a, i), Ui.lp(LayoutParams.WRAP_CONTENT, dp(52)).apply { topMargin = dp(8) })
         }
         buildReply()
 
         val column = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             addView(card)
-            addView(buttons, Ui.lp(LayoutParams.WRAP_CONTENT).apply { gravity = Gravity.CENTER_HORIZONTAL })
+            addView(buttons, Ui.lp(LayoutParams.WRAP_CONTENT))
             addView(reply, Ui.lp().apply { topMargin = dp(10) })
         }
         val scroll = ScrollView(context).apply {
@@ -205,6 +206,7 @@ class CardPreview private constructor(
         Ui.text(context, 16f, pal.text, bold = true, lines = 1).apply {
             text = a.title?.takeIf { it.isNotBlank() } ?: context.getString(R.string.open_in_app)
             gravity = Gravity.CENTER_VERTICAL
+            minWidth = dp(180)
             setPadding(dp(22), 0, dp(28), 0)
             background = Ui.pressable(pal.card or 0xFF000000.toInt(), dp(26).toFloat(), pal.ripple)
             setOnClickListener {
@@ -278,8 +280,23 @@ class CardPreview private constructor(
         animate().alpha(0f).setDuration(150).withEndAction { (parent as? ViewGroup)?.removeView(this) }.start()
     }
 
+    /** What sits behind in the same window, blurred while the Preview is up. */
+    private val blurred = ArrayList<View>()
+
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
+        val parent = parent as? ViewGroup
+        if (Build.VERSION.SDK_INT >= 31 && parent != null) {
+            val blur = android.graphics.RenderEffect.createBlurEffect(
+                dp(24).toFloat(), dp(24).toFloat(), android.graphics.Shader.TileMode.CLAMP,
+            )
+            for (i in 0 until parent.childCount) {
+                val v = parent.getChildAt(i)
+                if (v === this || v is Overlay) continue
+                v.setRenderEffect(blur)
+                blurred += v
+            }
+        }
         alpha = 0f
         animate().alpha(1f).setDuration(150).start()
         requestApplyInsets()
@@ -289,6 +306,8 @@ class CardPreview private constructor(
     }
 
     override fun onDetachedFromWindow() {
+        if (Build.VERSION.SDK_INT >= 31) blurred.forEach { it.setRenderEffect(null) }
+        blurred.clear()
         if (Build.VERSION.SDK_INT >= 33) findOnBackInvokedDispatcher()?.unregisterOnBackInvokedCallback(back!!)
         super.onDetachedFromWindow()
     }
