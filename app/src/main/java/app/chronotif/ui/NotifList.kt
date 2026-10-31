@@ -149,8 +149,9 @@ class NotifList(
         s.media.forEach { player(it) }
 
         // A conversation that lists its messages is split by message: those since the check
-        // stack in New, the rest in Earlier (ADR 0002). Earlier parts sort by their newest message.
-        val fresh = ArrayList<Row>()
+        // stack in New, the rest in Earlier (ADR 0002). Each part sorts by its newest message, the
+        // time its card shows: apps quietly repost old chats, which moves the notification's own time.
+        val fresh = ArrayList<Pair<Long, List<Row>>>()
         var newCount = 0
         val earlier = ArrayList<Pair<Long, () -> Unit>>()
         for (e in s.fresh) {
@@ -159,7 +160,7 @@ class NotifList(
             if (incoming.isEmpty()) {
                 val before = rows.size
                 card(e, CardView.Style.FULL, newSince = lastCheck)
-                fresh += rows.removeAt(before)
+                fresh += e.alertTime to listOf(rows.removeAt(before))
                 newCount++
                 continue
             }
@@ -170,7 +171,9 @@ class NotifList(
             if (new.isNotEmpty()) {
                 val before = rows.size
                 conversation(newStackId(e.key), e, c, new, CardView.Style.FULL, rows, now)
-                while (rows.size > before) fresh += rows.removeAt(before)
+                val part = ArrayList<Row>()
+                while (rows.size > before) part += rows.removeAt(before)
+                fresh += new.last().time to part
                 newCount++
             }
             if (old.isNotEmpty()) earlier += old.last().time to {
@@ -179,14 +182,15 @@ class NotifList(
         }
         if (fresh.isNotEmpty()) {
             rows += header("h:new", ctx.getString(R.string.section_new) + "  $newCount", null)
-            rows += fresh
+            fresh.sortedByDescending { it.first }.forEach { rows += it.second }
         }
 
         for (stack in s.earlier) {
             val top = stack.items[0]
             val c = if (stack.items.size == 1) Content.of(ctx, top, redacted(top)) else null
             val incoming = c?.messages.orEmpty().filter { it.incoming }
-            earlier += top.alertTime to {
+            val newestShown = incoming.lastOrNull { it.id !in NotifStore.hiddenMessages(top.key) }?.time
+            earlier += (newestShown ?: top.alertTime) to {
                 when {
                     c != null && incoming.isNotEmpty() -> {
                         val hidden = NotifStore.hiddenMessages(top.key)
