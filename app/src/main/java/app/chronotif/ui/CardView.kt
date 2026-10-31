@@ -32,7 +32,7 @@ interface CardCallbacks {
     fun onDismiss(e: Entry)
 }
 
-/** One notification, iOS-style: app icon, title + time, body, optional avatar; expands in place. */
+/** One notification, iOS-style: app icon or avatar, title + time, body, optional large icon; expands in place. */
 @SuppressLint("ViewConstructor", "ClickableViewAccessibility")
 class CardView(context: Context, private val cb: CardCallbacks) : LinearLayout(context) {
 
@@ -40,6 +40,10 @@ class CardView(context: Context, private val cb: CardCallbacks) : LinearLayout(c
 
     private val pal = Palette(context)
     private val icon = ImageView(context)
+    /** Conversations show who they're with in the icon's place, the app shrunk to a badge on it. */
+    private val avatar = ImageView(context)
+    private val badge = ImageView(context)
+    private val iconBox = FrameLayout(context)
     private val app = Ui.text(context, 12f, pal.textSecondary, lines = 1)
     private val title = Ui.text(context, 15f, pal.text, bold = true, lines = 1)
     private val time = Ui.text(context, 13f, pal.textSecondary, lines = 1)
@@ -71,6 +75,19 @@ class CardView(context: Context, private val cb: CardCallbacks) : LinearLayout(c
 
         icon.scaleType = ImageView.ScaleType.FIT_CENTER
         Ui.clipRounded(icon, dp(9).toFloat())
+        avatar.scaleType = ImageView.ScaleType.CENTER_CROP
+        Ui.clipOval(avatar)
+        badge.background = Ui.rounded(pal.card or 0xFF000000.toInt(), dp(10).toFloat())
+        badge.setPadding(dp(1), dp(1), dp(1), dp(1))
+        Ui.clipOval(badge)
+        iconBox.apply {
+            addView(icon, FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
+            addView(avatar, FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
+            addView(badge, FrameLayout.LayoutParams(dp(16), dp(16), Gravity.BOTTOM or Gravity.END).apply {
+                setMargins(0, 0, -dp(3), -dp(3))
+            })
+            clipChildren = false
+        }
 
         chevron.setImageResource(R.drawable.ic_chevron)
         chevron.imageTintList = ColorStateList.valueOf(pal.textSecondary)
@@ -97,10 +114,13 @@ class CardView(context: Context, private val cb: CardCallbacks) : LinearLayout(c
         val top = LinearLayout(context).apply {
             orientation = HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            addView(icon, Ui.lp(dp(36), dp(36)).apply { marginEnd = dp(12) })
+            addView(iconBox, Ui.lp(dp(36), dp(36)).apply { marginEnd = dp(12) })
             addView(column, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
             addView(large, Ui.lp(dp(40), dp(40)).apply { marginStart = dp(10) })
+            clipChildren = false
         }
+        clipChildren = false
+        clipToPadding = false
         addView(top)
 
         lines.orientation = VERTICAL
@@ -179,7 +199,7 @@ class CardView(context: Context, private val cb: CardCallbacks) : LinearLayout(c
             val radius = dp(if (style == Style.COMPACT) 18 else 22).toFloat()
             background = Ui.pressable(if (style == Style.RECEDED) pal.cardReceded else pal.card, radius, pal.ripple)
             val iconSize = dp(when (style) { Style.FULL -> 36; Style.RECEDED -> 32; Style.COMPACT -> 28 })
-            icon.layoutParams = (icon.layoutParams as LayoutParams).apply { width = iconSize; height = iconSize }
+            iconBox.layoutParams = (iconBox.layoutParams as LayoutParams).apply { width = iconSize; height = iconSize }
             val textSp = if (style == Style.FULL) 15f else 14f
             title.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSp)
             body.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSp)
@@ -187,8 +207,13 @@ class CardView(context: Context, private val cb: CardCallbacks) : LinearLayout(c
             setPadding(dp(14), vpad, dp(14), vpad)
         }
 
-        icon.setImageDrawable(Apps.icon(context, e))
-        icon.contentDescription = c.appName
+        val appIcon = Apps.icon(context, e)
+        val face = if (c.redacted) null else Apps.avatar(context, e)
+        icon.setImageDrawable(if (face == null) appIcon else null)
+        icon.visibility = if (face == null) VISIBLE else GONE
+        bindImage(avatar, face)
+        bindImage(badge, if (face != null) appIcon else null)
+        iconBox.contentDescription = c.appName
 
         val showApp = expanded && !c.redacted
         app.visibility = if (showApp) VISIBLE else GONE
@@ -224,8 +249,8 @@ class CardView(context: Context, private val cb: CardCallbacks) : LinearLayout(c
         }
         body.ellipsize = android.text.TextUtils.TruncateAt.END
 
-        val avatar = if (c.redacted) null else Apps.largeIcon(context, e)
-        bindImage(large, avatar)
+        // A conversation's large icon is its avatar, already shown on the left.
+        bindImage(large, if (c.redacted || Content.isConversation(e.n)) null else Apps.largeIcon(context, e))
 
         // Expanded extras.
         lines.removeAllViews()

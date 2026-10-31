@@ -9,13 +9,24 @@ Chronotif's notification screen, opened on demand on top of whatever is in use. 
 _Avoid_: Shade (the system's), drawer
 
 **New**:
-Notifications that brought new activity since the user's last meaningful check.
+Notifications that brought new activity since the user's last meaningful check. For a conversation, only its messages that arrived since that check are New.
 
 **Earlier**:
-Still-active notifications the user has already checked, folded into stacks by app.
+Still-active notifications the user has already checked, folded into stacks: one per conversation, otherwise one per app. A conversation can sit in New and Earlier at once, split by message.
+
+**Conversation stack**:
+A conversation shown as one card per message, collapsed to its latest message with a count until opened.
 
 **Conversation history**:
 The messages Android currently supplies for a conversation, including messages already checked. It is distinct from the Earlier section.
+
+**Avatar**:
+The picture of the person or group a conversation is with, shown in place of the app icon (which shrinks to a badge on it). Only conversations have one, and it is never shown when content is hidden.
+_Avoid_: Large icon, profile pic
+
+**Attachment**:
+An image, or a video's still frame, sent inside a message. It can be opened full screen and saved without opening the app.
+_Avoid_: Picture (a non-conversation notification's single image, which opens the same way)
 
 **Wake session**:
 One continuous period from the display waking until it sleeps. Chronotif and the stock lock screen share this period.

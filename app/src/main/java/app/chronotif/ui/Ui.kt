@@ -87,6 +87,15 @@ object Ui {
         v.clipToOutline = true
     }
 
+    fun clipOval(v: View) {
+        v.outlineProvider = object : ViewOutlineProvider() {
+            override fun getOutline(view: View, outline: Outline) {
+                outline.setOval(0, 0, view.width, view.height)
+            }
+        }
+        v.clipToOutline = true
+    }
+
     fun lp(w: Int = ViewGroup.LayoutParams.MATCH_PARENT, h: Int = ViewGroup.LayoutParams.WRAP_CONTENT) =
         LinearLayout.LayoutParams(w, h)
 

@@ -52,6 +52,8 @@ class Content(
 
     companion object {
         private const val MAX_PREVIEW = 5
+        /** Where MessagingStyle keeps a conversation icon; the key is hidden and rarely sent by apps. */
+        private const val EXTRA_CONVERSATION_ICON = "android.conversationIcon"
 
         fun of(context: Context, e: Entry, redact: Boolean): Content {
             val appName = Apps.label(context, e.pkg)
@@ -81,9 +83,13 @@ class Content(
                 .sortedBy { it.time }
             if (messages.isNotEmpty()) {
                 val conversation = x.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE)
-                val group = conversation != null ||
-                    x.getBoolean(Notification.EXTRA_IS_GROUP_CONVERSATION)
-                title = conversation ?: title
+                val group = isGroup(x)
+                // Like the system shade: the conversation's shortcut names it best. TikTok, for one,
+                // titles its DMs "sent you a message" and puts the sender only in its shortcut.
+                val shortcut = if (Build.VERSION.SDK_INT >= 31) {
+                    e.ranking.conversationShortcutInfo?.let { it.longLabel ?: it.shortLabel }
+                } else null
+                title = shortcut?.takeIf { it.isNotBlank() } ?: conversation ?: title
                 lines = messages.map { message ->
                     if (group && message.sender != null) "${message.sender}: ${message.body}" else message.body
                 }
@@ -146,16 +152,10 @@ class Content(
             n.category == Notification.CATEGORY_MESSAGE || n.extras.containsKey(Notification.EXTRA_MESSAGES)
 
         /** Only active incoming messages advance attention; historic and outgoing messages don't. */
-        @Suppress("DEPRECATION")
         fun incomingMessage(n: Notification): MessageStamp? {
             val x = n.extras
             if (x.containsKey(Notification.EXTRA_MESSAGES)) {
-                val user = x.getParcelable(Notification.EXTRA_MESSAGING_PERSON) as? Person
-                val last = messages(x).filter { message ->
-                    message.sender != null && !(user != null &&
-                        (if (user.key != null && message.senderKey != null) user.key == message.senderKey
-                        else user.name?.toString() == message.sender.toString()))
-                }.maxByOrNull { it.time } ?: return null
+                val last = latestIncoming(x) ?: return null
                 return MessageStamp(last.time, listOf(last.senderKey, last.sender?.toString(), last.body.toString()).hashCode())
             }
             if (!isConversation(n)) return null
@@ -186,17 +186,54 @@ class Content(
             return out
         }
 
-        private class Message(val sender: CharSequence?, val senderKey: String?, val body: CharSequence, val time: Long)
+        /**
+         * Who a conversation is with, as the system's conversation layout picks it: the conversation's own
+         * icon if supplied, then for a group its large icon (the group picture) before the latest sender's
+         * photo, and for a one-to-one chat the other way round.
+         */
+        @Suppress("DEPRECATION")
+        fun avatar(n: Notification): Icon? {
+            if (!isConversation(n)) return null
+            val x = n.extras
+            (x.getParcelable(EXTRA_CONVERSATION_ICON) as? Icon)?.let { return it }
+            val sender = latestIncoming(x)?.senderIcon
+            return if (isGroup(x)) n.getLargeIcon() ?: sender else sender ?: n.getLargeIcon()
+        }
+
+        /**
+         * Apps state it explicitly (X titles its one-to-one chats yet says they aren't groups);
+         * older ones only hint at it with a conversation title, as Android itself falls back to.
+         */
+        private fun isGroup(x: Bundle): Boolean =
+            if (x.containsKey(Notification.EXTRA_IS_GROUP_CONVERSATION)) x.getBoolean(Notification.EXTRA_IS_GROUP_CONVERSATION)
+            else x.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE) != null
+
+        @Suppress("DEPRECATION")
+        private fun latestIncoming(x: Bundle): Message? {
+            val user = x.getParcelable(Notification.EXTRA_MESSAGING_PERSON) as? Person
+            return messages(x).filter { message ->
+                message.sender != null && !(user != null &&
+                    (if (user.key != null && message.senderKey != null) user.key == message.senderKey
+                    else user.name?.toString() == message.sender.toString()))
+            }.maxByOrNull { it.time }
+        }
+
+        private class Message(
+            val sender: CharSequence?, val senderKey: String?, val senderIcon: Icon?,
+            val body: CharSequence, val time: Long,
+        )
 
         @Suppress("DEPRECATION")
         private fun messages(x: Bundle, key: String = Notification.EXTRA_MESSAGES): List<Message> {
             val arr: Array<Parcelable>? = x.getParcelableArray(key)
             return arr.orEmpty().mapNotNull { p ->
                 val b = p as? Bundle ?: return@mapNotNull null
-                val body = b.getCharSequence("text") ?: return@mapNotNull null
+                val text = b.getCharSequence("text") ?: return@mapNotNull null
                 val person = b.getParcelable("sender_person") as? Person
                 val sender = b.getCharSequence("sender") ?: person?.name
-                Message(sender, person?.key, body, b.getLong("time"))
+                // A message with no text (TikTok's image-only DMs) reads as its sender line, as in the shade.
+                val body = if (text.isBlank() && !sender.isNullOrBlank()) sender else text
+                Message(sender, person?.key, person?.icon, body, b.getLong("time"))
             }
         }
 
@@ -221,6 +258,9 @@ object Apps {
     private val labels = HashMap<String, CharSequence>()
     private val icons = LruCache<String, Drawable>(48)
     private val large = LruCache<String, Drawable>(48)
+    private val loading = HashSet<String>()
+    private val io = java.util.concurrent.Executors.newSingleThreadExecutor()
+    private val main = android.os.Handler(android.os.Looper.getMainLooper())
 
     fun label(context: Context, pkg: String): CharSequence = labels.getOrPut(pkg) {
         val pm = context.packageManager
@@ -252,6 +292,36 @@ object Apps {
         val d = runCatching { e.n.getLargeIcon()?.loadDrawable(context) }.getOrNull() ?: return null
         large.put(k, d)
         return d
+    }
+
+    /**
+     * The conversation's [Content.avatar], keyed by post time like [largeIcon]. A photo behind
+     * another app's content link loads off the main thread, which a slow app could otherwise
+     * freeze; the card redraws once it's in.
+     */
+    fun avatar(context: Context, e: Entry): Drawable? {
+        val k = "a:${e.key}@${e.sbn.postTime}"
+        large.get(k)?.let { return it }
+        val icon = Content.avatar(e.n) ?: return null
+        if (icon.type != Icon.TYPE_URI && icon.type != Icon.TYPE_URI_ADAPTIVE_BITMAP) {
+            val d = runCatching { icon.loadDrawable(context) }.getOrNull() ?: return null
+            large.put(k, d)
+            return d
+        }
+        if (loading.add(k)) {
+            val app = context.applicationContext
+            io.execute {
+                val d = runCatching { icon.loadDrawable(app) }.getOrNull()
+                main.post {
+                    loading.remove(k)
+                    if (d != null) {
+                        large.put(k, d)
+                        NotifStore.changed()
+                    }
+                }
+            }
+        }
+        return null
     }
 
     fun actionIcon(context: Context, a: Notification.Action): Drawable? =
