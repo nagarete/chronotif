@@ -52,6 +52,8 @@ class Content(
 
     companion object {
         private const val MAX_PREVIEW = 5
+        /** Where MessagingStyle keeps a conversation icon; the key is hidden and rarely sent by apps. */
+        private const val EXTRA_CONVERSATION_ICON = "android.conversationIcon"
 
         fun of(context: Context, e: Entry, redact: Boolean): Content {
             val appName = Apps.label(context, e.pkg)
@@ -146,16 +148,10 @@ class Content(
             n.category == Notification.CATEGORY_MESSAGE || n.extras.containsKey(Notification.EXTRA_MESSAGES)
 
         /** Only active incoming messages advance attention; historic and outgoing messages don't. */
-        @Suppress("DEPRECATION")
         fun incomingMessage(n: Notification): MessageStamp? {
             val x = n.extras
             if (x.containsKey(Notification.EXTRA_MESSAGES)) {
-                val user = x.getParcelable(Notification.EXTRA_MESSAGING_PERSON) as? Person
-                val last = messages(x).filter { message ->
-                    message.sender != null && !(user != null &&
-                        (if (user.key != null && message.senderKey != null) user.key == message.senderKey
-                        else user.name?.toString() == message.sender.toString()))
-                }.maxByOrNull { it.time } ?: return null
+                val last = latestIncoming(x) ?: return null
                 return MessageStamp(last.time, listOf(last.senderKey, last.sender?.toString(), last.body.toString()).hashCode())
             }
             if (!isConversation(n)) return null
@@ -186,7 +182,36 @@ class Content(
             return out
         }
 
-        private class Message(val sender: CharSequence?, val senderKey: String?, val body: CharSequence, val time: Long)
+        /**
+         * Who a conversation is with, as the system's conversation layout picks it: the conversation's own
+         * icon if supplied, then for a group its large icon (the group picture) before the latest sender's
+         * photo, and for a one-to-one chat the other way round.
+         */
+        @Suppress("DEPRECATION")
+        fun avatar(n: Notification): Icon? {
+            if (!isConversation(n)) return null
+            val x = n.extras
+            (x.getParcelable(EXTRA_CONVERSATION_ICON) as? Icon)?.let { return it }
+            val sender = latestIncoming(x)?.senderIcon
+            val group = x.getBoolean(Notification.EXTRA_IS_GROUP_CONVERSATION) ||
+                x.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE) != null
+            return if (group) n.getLargeIcon() ?: sender else sender ?: n.getLargeIcon()
+        }
+
+        @Suppress("DEPRECATION")
+        private fun latestIncoming(x: Bundle): Message? {
+            val user = x.getParcelable(Notification.EXTRA_MESSAGING_PERSON) as? Person
+            return messages(x).filter { message ->
+                message.sender != null && !(user != null &&
+                    (if (user.key != null && message.senderKey != null) user.key == message.senderKey
+                    else user.name?.toString() == message.sender.toString()))
+            }.maxByOrNull { it.time }
+        }
+
+        private class Message(
+            val sender: CharSequence?, val senderKey: String?, val senderIcon: Icon?,
+            val body: CharSequence, val time: Long,
+        )
 
         @Suppress("DEPRECATION")
         private fun messages(x: Bundle, key: String = Notification.EXTRA_MESSAGES): List<Message> {
@@ -196,7 +221,7 @@ class Content(
                 val body = b.getCharSequence("text") ?: return@mapNotNull null
                 val person = b.getParcelable("sender_person") as? Person
                 val sender = b.getCharSequence("sender") ?: person?.name
-                Message(sender, person?.key, body, b.getLong("time"))
+                Message(sender, person?.key, person?.icon, body, b.getLong("time"))
             }
         }
 
@@ -250,6 +275,15 @@ object Apps {
         val k = "${e.key}@${e.sbn.postTime}"
         large.get(k)?.let { return it }
         val d = runCatching { e.n.getLargeIcon()?.loadDrawable(context) }.getOrNull() ?: return null
+        large.put(k, d)
+        return d
+    }
+
+    /** The conversation's [Content.avatar], keyed by post time like [largeIcon]. */
+    fun avatar(context: Context, e: Entry): Drawable? {
+        val k = "a:${e.key}@${e.sbn.postTime}"
+        large.get(k)?.let { return it }
+        val d = runCatching { Content.avatar(e.n)?.loadDrawable(context) }.getOrNull() ?: return null
         large.put(k, d)
         return d
     }
