@@ -341,6 +341,75 @@ class NotificationBehaviorTest {
         if (view is ViewGroup) listOf(view) + (0 until view.childCount).flatMap { views(view.getChildAt(it)) }
         else listOf(view)
 
+    private fun replyable(messages: List<Pair<String, Long>>): Notification {
+        val input = android.app.RemoteInput.Builder("reply").setLabel("Reply").build()
+        val pi = android.app.PendingIntent.getBroadcast(context, 0, Intent("reply"), android.app.PendingIntent.FLAG_MUTABLE)
+        return Notification.Builder(context, "messages")
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setCategory(Notification.CATEGORY_MESSAGE)
+            .setStyle(Notification.MessagingStyle(me).also { style ->
+                messages.forEach { (text, time) -> style.addMessage(text, time, sender) }
+            })
+            .addAction(Notification.Action.Builder(null, "Reply", pi).addRemoteInput(input).build())
+            .build()
+    }
+
+    private fun <T> withPanelList(block: (NotifList, LinearLayout) -> T): T = withLockList { _, container ->
+        val list = NotifList(object : NotifList.Host {
+            override val context: Context = container.context
+            override fun launched() {}
+            override fun guarded(action: () -> Unit) = action()
+        }, container, onLock = false)
+        block(list, container)
+    }
+
+    private fun replyBoxShown(container: View) =
+        views(container).any { it is android.widget.EditText && it.isShownInTree() }
+
+    private fun View.isShownInTree(): Boolean {
+        var v: View? = this
+        while (v != null) {
+            if (v.visibility != View.VISIBLE) return false
+            v = v.parent as? View
+        }
+        return true
+    }
+
+    @Test
+    fun aDraftReplySurvivesAnotherMessageArriving() {
+        val e = post(replyable(listOf("one" to 1100L)), 1100)
+        withPanelList { list, container ->
+            list.render()
+            val id = "${e.key}#${Content.of(context, e, false).messages.single().id}"
+            list.onAction(e, id, 0)
+            assertTrue(replyBoxShown(container))
+            post(replyable(listOf("one" to 1100L, "two" to 1200L)), 1200)
+            list.render()
+            assertTrue("The card being replied to stays open with its editor", replyBoxShown(container))
+            assertTrue(shownTexts(container).containsAll(listOf("one", "two")))
+        }
+    }
+
+    @Test
+    fun aReplyHandoffFindsTheNewestMessageStillShown() {
+        val e = post(replyable(listOf("older" to 1100L, "newer" to 1200L)), 1200)
+        NotifStore.hideMessage(e.key, Content.of(context, e, false).messages.last().id)
+        withPanelList { list, container ->
+            list.focus(e.key, 0)
+            list.render()
+            assertTrue(shownTexts(container).contains("older"))
+            assertTrue("The reply editor opens on the newest message left", replyBoxShown(container))
+        }
+    }
+
+    @Test
+    fun aConversationWithEveryMessageHiddenIsNotNew() {
+        val e = post(notification(listOf("one" to 1100L, "two" to 1200L)), 1200)
+        assertEquals(1, NotifStore.newCount())
+        Content.of(context, e, false).messages.forEach { NotifStore.hideMessage(e.key, it.id) }
+        assertEquals(0, NotifStore.newCount())
+    }
+
     /** Text a user could see: skips views that are gone. */
     private fun shownTexts(view: View): List<String> = when {
         view.visibility != View.VISIBLE -> emptyList()

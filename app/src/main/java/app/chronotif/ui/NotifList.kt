@@ -261,11 +261,20 @@ class NotifList(
     ) {
         shownUpTo = maxOf(shownUpTo, e.alertTime)
         val latest = msgs.last()
-        val newest = c.messages.lastOrNull { it.incoming }?.id
+        // The conversation's newest shown message answers a focus (reply handoff), even if a newer one was hidden.
+        val hidden = NotifStore.hiddenMessages(e.key)
+        val newest = c.messages.lastOrNull { it.incoming && it.id !in hidden }?.id
+        // A reply being typed keeps its card on screen when another message turns it into a stack.
+        val replyingHere = replying?.first.let { r -> r == e.key || msgs.any { r == "${e.key}#${it.id}" } }
         when {
             msgs.size == 1 -> rows += messageCard(stackId, e, c, latest, latest.id == newest, style, now)
-            stackId in openStacks -> {
-                rows += stackHeader("sh:$stackId", c.title, e.clearable, close = { openStacks -= stackId; render() }) {
+            stackId in openStacks || replyingHere -> {
+                val close = {
+                    openStacks -= stackId
+                    if (replyingHere) replying = null
+                    render()
+                }
+                rows += stackHeader("sh:$stackId", c.title, e.clearable, close) {
                     openStacks -= stackId
                     dismissAll(listOf(e))
                 }

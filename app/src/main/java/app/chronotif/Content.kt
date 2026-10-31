@@ -121,7 +121,7 @@ class Content(
                 val user = user(x)
                 msgs = messages.mapIndexed { i, m ->
                     Msg(
-                        id = "${m.time}|${m.senderKey ?: m.sender}|${m.body.toString().hashCode()}",
+                        id = idOf(m),
                         line = uncolored(lines[i]), time = m.time, attachment = m.attachment,
                         incoming = !isOwn(m, user),
                     )
@@ -241,6 +241,16 @@ class Content(
         private fun isGroup(x: Bundle): Boolean =
             if (x.containsKey(Notification.EXTRA_IS_GROUP_CONVERSATION)) x.getBoolean(Notification.EXTRA_IS_GROUP_CONVERSATION)
             else x.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE) != null
+
+        /** The ids of a conversation's incoming messages, as [Msg.id], without building its [Content]. */
+        fun incomingIds(n: Notification): List<String> {
+            val x = n.extras
+            val user = user(x)
+            return (messages(x, Notification.EXTRA_HISTORIC_MESSAGES) + messages(x))
+                .filter { !isOwn(it, user) }.map(::idOf).distinct()
+        }
+
+        private fun idOf(m: Message) = "${m.time}|${m.senderKey ?: m.sender}|${m.body.toString().hashCode()}"
 
         private fun latestIncoming(x: Bundle): Message? {
             val user = user(x)

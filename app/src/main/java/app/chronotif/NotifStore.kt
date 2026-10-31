@@ -71,9 +71,16 @@ object NotifStore {
         }
     }
 
+    /** A conversation whose every message was swiped away isn't New: there's nothing left to show. */
     fun newCount(): Int {
         val lastCheck = Prefs.lastCheck
-        return visible().count { Attention.isNew(it, lastCheck) }
+        return visible().count { Attention.isNew(it, lastCheck) && !allHidden(it) }
+    }
+
+    private fun allHidden(e: Entry): Boolean {
+        val h = hidden[e.key] ?: return false
+        val ids = Content.incomingIds(e.n)
+        return ids.isNotEmpty() && h.containsAll(ids)
     }
 
     fun connect(active: Array<StatusBarNotification>?, map: RankingMap) {
