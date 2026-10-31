@@ -70,6 +70,15 @@ class AvatarTest {
     }
 
     @Test
+    fun aTitledOneToOneChatIsNotAGroup() {
+        // As X sends it: a conversation title, but explicitly not a group.
+        val n = chat(large = largeIcon)
+        n.extras.putCharSequence(Notification.EXTRA_CONVERSATION_TITLE, "natan")
+        n.extras.putBoolean(Notification.EXTRA_IS_GROUP_CONVERSATION, false)
+        assertSame(senderIcon, Content.avatar(n))
+    }
+
+    @Test
     fun ownRepliesNeverBecomeTheAvatar() {
         assertSame(senderIcon, Content.avatar(chat(reply = true)))
     }
