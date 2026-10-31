@@ -20,6 +20,7 @@ import app.chronotif.LockPolicy
 import app.chronotif.NotifStore
 import app.chronotif.Prefs
 import app.chronotif.R
+import app.chronotif.Viewable
 import app.chronotif.core.Attention
 import app.chronotif.core.Stack
 
@@ -231,6 +232,16 @@ class NotifList(
     }
 
     override fun onDismiss(e: Entry) = dismissAll(listOf(e))
+
+    override fun onViewImages(anchor: View, e: Entry, items: List<Viewable>, start: Int) {
+        ImageViewer.show(anchor, items, start, object : ImageViewer.Actions {
+            override fun share(start: () -> Unit) = host.guarded(start)
+
+            override fun launched() = host.launched()
+
+            override fun openInApp() = host.guarded { if (Act.open(host.context, e)) host.launched() }
+        })
+    }
 
     private fun dismissAll(entries: List<Entry>) {
         val keys = entries.filter { it.clearable }.map { it.key }

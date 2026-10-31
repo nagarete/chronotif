@@ -111,7 +111,7 @@ internal class OverlayPanel(app: Context) : NotifList.Host {
 
         override fun dispatchKeyEvent(event: KeyEvent): Boolean {
             if (event.keyCode == KeyEvent.KEYCODE_BACK) {
-                if (event.action == KeyEvent.ACTION_UP && !event.isCanceled) view.close()
+                if (event.action == KeyEvent.ACTION_UP && !event.isCanceled && !ImageViewer.dismissIn(this)) view.close()
                 return true
             }
             return super.dispatchKeyEvent(event)

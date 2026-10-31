@@ -10,6 +10,7 @@ import android.graphics.Bitmap
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.Icon
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Parcelable
@@ -38,8 +39,15 @@ class Content(
     val subText: CharSequence?,
     val progress: Progress?,
     val redacted: Boolean,
+    /** The image or video still sent with each of [lines], if any; empty for non-conversations. */
+    val attachments: List<Attachment?> = emptyList(),
 ) {
     class Progress(val value: Int, val max: Int, val indeterminate: Boolean)
+
+    /** An image, or a video's still frame, sent inside a message. */
+    class Attachment(val uri: Uri, val mime: String) {
+        val isVideo get() = mime.startsWith("video/")
+    }
 
     val expandable: Boolean
         get() = !redacted && (bigText != null || lines.size > 1 || (text?.length ?: 0) > 80)
@@ -77,6 +85,7 @@ class Content(
             var lines: List<CharSequence> =
                 x.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)?.filterNotNull().orEmpty()
             var lineTimes = emptyList<Long>()
+            var attachments = emptyList<Attachment?>()
 
             val messages = (messages(x, Notification.EXTRA_HISTORIC_MESSAGES) + messages(x))
                 .distinctBy { Triple(it.time, it.senderKey ?: it.sender?.toString(), it.body.toString()) }
@@ -90,6 +99,7 @@ class Content(
                     if (group && message.sender != null) "${message.sender}: ${message.body}" else message.body
                 }
                 lineTimes = messages.map { it.time }
+                attachments = messages.map { it.attachment }
                 text = lines.last()
             }
 
@@ -110,6 +120,7 @@ class Content(
                     ?: x.getCharSequence(Notification.EXTRA_SUMMARY_TEXT))?.let(::uncolored),
                 progress = progress,
                 redacted = false,
+                attachments = attachments,
             )
         }
 
@@ -210,7 +221,7 @@ class Content(
 
         private class Message(
             val sender: CharSequence?, val senderKey: String?, val senderIcon: Icon?,
-            val body: CharSequence, val time: Long,
+            val body: CharSequence, val time: Long, val attachment: Attachment?,
         )
 
         @Suppress("DEPRECATION")
@@ -221,7 +232,12 @@ class Content(
                 val body = b.getCharSequence("text") ?: return@mapNotNull null
                 val person = b.getParcelable("sender_person") as? Person
                 val sender = b.getCharSequence("sender") ?: person?.name
-                Message(sender, person?.key, person?.icon, body, b.getLong("time"))
+                val uri = b.getParcelable("uri") as? Uri
+                val mime = b.getString("type")
+                val attachment = if (uri != null && mime != null && (mime.startsWith("image/") || mime.startsWith("video/"))) {
+                    Attachment(uri, mime)
+                } else null
+                Message(sender, person?.key, person?.icon, body, b.getLong("time"), attachment)
             }
         }
 
