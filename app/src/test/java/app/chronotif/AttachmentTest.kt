@@ -140,6 +140,45 @@ class AttachmentTest {
     }
 
     @Test
+    fun theViewerClosesWhenItsNotificationGoesAway() {
+        val e = post(message("look", 100, "image/jpeg", photo))
+        withPanel { activity, list, container ->
+            list.render()
+            (all(container).first { it.contentDescription == context.getString(R.string.view_image) }.parent as View).performClick()
+            assertNotNull(viewer(activity))
+            NotifStore.remove(e.key, null)
+            list.render()
+            shadowOf(Looper.getMainLooper()).idle()
+            assertNull(viewer(activity))
+        }
+    }
+
+    @Test
+    fun anImageMessageWithNoTextAtAllKeepsItsImage() {
+        val bundle = android.os.Bundle().apply {
+            putParcelable("sender_person", sender)
+            putCharSequence("sender", "Sender")
+            putLong("time", 100)
+            putParcelable("uri", photo)
+            putString("type", "image/jpeg")
+        }
+        val n = Notification.Builder(context, "messages")
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setCategory(Notification.CATEGORY_MESSAGE)
+            .setStyle(Notification.MessagingStyle(me).addMessage("placeholder", 50, sender))
+            .build()
+        n.extras.putParcelableArray(Notification.EXTRA_MESSAGES, arrayOf(bundle))
+        @Suppress("DEPRECATION")
+        val sbn = StatusBarNotification("example.chat", "example.chat", 2, null, 1000, 0, 0, n, Process.myUserHandle(), 1000)
+        val ranking = ReflectionHelpers.callConstructor(RankingMap::class.java,
+            ReflectionHelpers.ClassParameter.from(Array<Ranking>::class.java, emptyArray<Ranking>()))
+        NotifStore.post(sbn, ranking)
+        val c = Content.of(context, NotifStore.get(sbn.key)!!, redact = false)
+        assertEquals(listOf(photo), c.attachments.map { it?.uri })
+        assertEquals(listOf("Sender"), c.lines.map { it.toString() })
+    }
+
+    @Test
     fun videoStillsOfferOpenInAppInsteadOfSave() {
         post(message("clip", 100, "video/mp4", clip))
         withPanel { activity, list, container ->

@@ -266,16 +266,17 @@ class Content(
             val arr: Array<Parcelable>? = x.getParcelableArray(key)
             return arr.orEmpty().mapNotNull { p ->
                 val b = p as? Bundle ?: return@mapNotNull null
-                val text = b.getCharSequence("text") ?: return@mapNotNull null
-                val person = b.getParcelable("sender_person") as? Person
-                val sender = b.getCharSequence("sender") ?: person?.name
-                // A message with no text (TikTok's image-only DMs) reads as its sender line, as in the shade.
-                val body = if (text.isBlank() && !sender.isNullOrBlank()) sender else text
                 val uri = b.getParcelable("uri") as? Uri
                 val mime = b.getString("type")
                 val attachment = if (uri != null && mime != null && (mime.startsWith("image/") || mime.startsWith("video/"))) {
                     Attachment(uri, mime)
                 } else null
+                // Only an attachment makes a message without text worth keeping.
+                val text = b.getCharSequence("text") ?: if (attachment != null) "" else return@mapNotNull null
+                val person = b.getParcelable("sender_person") as? Person
+                val sender = b.getCharSequence("sender") ?: person?.name
+                // A message with no text (TikTok's image-only DMs) reads as its sender line, as in the shade.
+                val body = if (text.isBlank() && !sender.isNullOrBlank()) sender else text
                 Message(sender, person?.key, person?.icon, body, b.getLong("time"), attachment)
             }
         }
@@ -301,6 +302,9 @@ object Apps {
     private val labels = HashMap<String, CharSequence>()
     private val icons = LruCache<String, Drawable>(48)
     private val large = LruCache<String, Drawable>(48)
+    private val loading = HashSet<String>()
+    private val io = java.util.concurrent.Executors.newSingleThreadExecutor()
+    private val main = android.os.Handler(android.os.Looper.getMainLooper())
 
     fun label(context: Context, pkg: String): CharSequence = labels.getOrPut(pkg) {
         val pm = context.packageManager
@@ -334,13 +338,34 @@ object Apps {
         return d
     }
 
-    /** The conversation's [Content.avatar], keyed by post time like [largeIcon]. */
+    /**
+     * The conversation's [Content.avatar], keyed by post time like [largeIcon]. A photo behind
+     * another app's content link loads off the main thread, which a slow app could otherwise
+     * freeze; the card redraws once it's in.
+     */
     fun avatar(context: Context, e: Entry): Drawable? {
         val k = "a:${e.key}@${e.sbn.postTime}"
         large.get(k)?.let { return it }
-        val d = runCatching { Content.avatar(e.n)?.loadDrawable(context) }.getOrNull() ?: return null
-        large.put(k, d)
-        return d
+        val icon = Content.avatar(e.n) ?: return null
+        if (icon.type != Icon.TYPE_URI && icon.type != Icon.TYPE_URI_ADAPTIVE_BITMAP) {
+            val d = runCatching { icon.loadDrawable(context) }.getOrNull() ?: return null
+            large.put(k, d)
+            return d
+        }
+        if (loading.add(k)) {
+            val app = context.applicationContext
+            io.execute {
+                val d = runCatching { icon.loadDrawable(app) }.getOrNull()
+                main.post {
+                    loading.remove(k)
+                    if (d != null) {
+                        large.put(k, d)
+                        NotifStore.changed()
+                    }
+                }
+            }
+        }
+        return null
     }
 
     fun actionIcon(context: Context, a: Notification.Action): Drawable? =
