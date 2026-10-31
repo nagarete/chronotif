@@ -84,7 +84,8 @@ class ImageViewer private constructor(
     private val back = if (Build.VERSION.SDK_INT >= 33) OnBackInvokedCallback { close() } else null
 
     init {
-        setBackgroundColor(0xF5000000.toInt())
+        // Opaque, like the system photo viewer: the panel behind it shouldn't show through.
+        setBackgroundColor(0xFF000000.toInt())
         isClickable = true
         isFocusable = true
         isFocusableInTouchMode = true
