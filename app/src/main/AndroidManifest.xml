@@ -93,6 +93,13 @@
                 android:resource="@xml/status_bar_swipe" />
         </service>
 
+        <!-- Images the user chose to share, copied into our cache and readable only by the app they picked. -->
+        <provider
+            android:name=".ShareProvider"
+            android:authorities="${applicationId}.share"
+            android:exported="false"
+            android:grantUriPermissions="true" />
+
         <service
             android:name=".UpdateJob"
             android:exported="false"

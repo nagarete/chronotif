@@ -21,7 +21,9 @@ import app.chronotif.Act
 import app.chronotif.Apps
 import app.chronotif.Content
 import app.chronotif.Entry
+import app.chronotif.Images
 import app.chronotif.R
+import app.chronotif.Viewable
 import app.chronotif.core.Kind
 
 interface CardCallbacks {
@@ -30,6 +32,8 @@ interface CardCallbacks {
     fun onAction(e: Entry, index: Int)
     fun onSendReply(e: Entry, index: Int, text: CharSequence)
     fun onDismiss(e: Entry)
+    /** Opens [items] full screen at [start], over the window that holds [anchor]. */
+    fun onViewImages(anchor: View, e: Entry, items: List<Viewable>, start: Int)
 }
 
 /** One notification, iOS-style: app icon or avatar, title + time, body, optional large icon; expands in place. */
@@ -230,8 +234,8 @@ class CardView(context: Context, private val cb: CardCallbacks) : LinearLayout(c
         val conversationExpanded = expanded && c.lines.size > 1 && c.text == c.lines.last()
         val newMessages = if (expanded) emptyList() else c.messagesSince(newSince)
         val shownLines = when {
-            expanded && c.lines.size > 1 -> c.lines
-            newMessages.size > 1 -> newMessages
+            expanded && c.lines.size > 1 -> c.lines.indices.toList()
+            newMessages.size > 1 -> (c.lines.size - newMessages.size until c.lines.size).toList()
             else -> emptyList()
         }
         val bodyText = when {
@@ -252,20 +256,27 @@ class CardView(context: Context, private val cb: CardCallbacks) : LinearLayout(c
         // A conversation's large icon is its avatar, already shown on the left.
         bindImage(large, if (c.redacted || Content.isConversation(e.n)) null else Apps.largeIcon(context, e))
 
-        // Expanded extras.
+        // Expanded extras, and the messages (with their attachments) a New card lists.
         lines.removeAllViews()
-        for (l in shownLines) {
+        for (i in shownLines) {
             lines.addView(Ui.text(context, 14f, pal.text).apply {
-                text = l
+                text = c.lines[i]
                 if (!expanded) {
                     maxLines = 3
                     ellipsize = android.text.TextUtils.TruncateAt.END
                 }
             }, Ui.lp().apply { topMargin = dp(3) })
+            addAttachment(e, c, i, expanded)
         }
+        // A single message shows as the body (if it has text); its attachment goes under it.
+        if (shownLines.isEmpty() && c.lines.isNotEmpty()) addAttachment(e, c, c.lines.lastIndex, expanded)
         lines.visibility = if (lines.childCount > 0) VISIBLE else GONE
 
-        bindImage(picture, if (expanded && !c.redacted) Content.picture(context, e) else null)
+        val pic = if (expanded && !c.redacted) Content.picture(context, e) else null
+        bindImage(picture, pic)
+        picture.setOnClickListener(if (pic == null) null else OnClickListener {
+            cb.onViewImages(this, e, listOf(Viewable(null, pic)), 0)
+        })
 
         val p = c.progress
         progress.visibility = if (p != null && !c.redacted) VISIBLE else GONE
@@ -331,6 +342,35 @@ class CardView(context: Context, private val cb: CardCallbacks) : LinearLayout(c
         if (text.isEmpty() || replyIndex < 0) return
         context.getSystemService(InputMethodManager::class.java).hideSoftInputFromWindow(windowToken, 0)
         cb.onSendReply(e, replyIndex, text)
+    }
+
+    /** The image sent with message [i], tappable to view it full screen with the conversation's others. */
+    private fun addAttachment(e: Entry, c: Content, i: Int, expanded: Boolean) {
+        val a = c.attachments.getOrNull(i) ?: return
+        val image = ImageView(context).apply {
+            adjustViewBounds = true
+            maxWidth = dp(240)
+            maxHeight = dp(if (expanded) 280 else 180)
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            Ui.clipRounded(this, dp(12).toFloat())
+            contentDescription = context.getString(if (a.isVideo) R.string.video else R.string.view_image)
+        }
+        val box = FrameLayout(context).apply {
+            addView(image, FrameLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT))
+            if (a.isVideo) addView(ImageView(context).apply {
+                setImageResource(R.drawable.ic_media_play)
+                imageTintList = ColorStateList.valueOf(0xFFFFFFFF.toInt())
+                background = Ui.rounded(0x80000000.toInt(), dp(18).toFloat())
+                setPadding(dp(9), dp(9), dp(9), dp(9))
+            }, FrameLayout.LayoutParams(dp(36), dp(36), Gravity.CENTER))
+            setOnClickListener {
+                val all = c.attachments.filterNotNull()
+                cb.onViewImages(this@CardView, e, all.map { Viewable(it, null) }, all.indexOf(a))
+            }
+        }
+        lines.addView(box, Ui.lp(LayoutParams.WRAP_CONTENT).apply { topMargin = dp(6) })
+        // Unreadable (the app revoked it, or never shared it): just the text, as before.
+        Images.into(image, a, Images.CARD_PX) { ok -> if (!ok) box.visibility = GONE }
     }
 
     private fun bindImage(v: ImageView, d: Drawable?) {

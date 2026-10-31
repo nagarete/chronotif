@@ -20,6 +20,7 @@ import app.chronotif.LockPolicy
 import app.chronotif.NotifStore
 import app.chronotif.Prefs
 import app.chronotif.R
+import app.chronotif.Viewable
 import app.chronotif.core.Attention
 import app.chronotif.core.Stack
 
@@ -56,6 +57,8 @@ class NotifList(
     private var replying: Pair<String, Int>? = null
     private var earlierRevealed = !onLock
     private var runningRevealed = false
+    /** The open image viewer and whose images it shows. */
+    private var viewer: Pair<String, ImageViewer>? = null
 
     /** Newest arrival time the user has had on screen; feeds the last-check watermark. */
     var shownUpTo = 0L
@@ -82,6 +85,15 @@ class NotifList(
             val v = LockPolicy.visibility(ctx, e)
             vis[e.key] = v
             v != LockPolicy.Vis.HIDE
+        }
+        // An open viewer shows only what its card may: it closes once the notification is gone,
+        // or the lock screen starts hiding its content.
+        viewer?.let { (key, v) ->
+            if (!v.isAttachedToWindow) viewer = null
+            else if (all.none { it.key == key } || vis[key] == LockPolicy.Vis.REDACT) {
+                v.close()
+                viewer = null
+            }
         }
         val lastCheck = Prefs.lastCheck
         val s = Attention.sections(all, lastCheck)
@@ -231,6 +243,16 @@ class NotifList(
     }
 
     override fun onDismiss(e: Entry) = dismissAll(listOf(e))
+
+    override fun onViewImages(anchor: View, e: Entry, items: List<Viewable>, start: Int) {
+        viewer = e.key to (ImageViewer.show(anchor, items, start, object : ImageViewer.Actions {
+            override fun share(start: () -> Unit) = host.guarded(start)
+
+            override fun launched() = host.launched()
+
+            override fun openInApp() = host.guarded { if (Act.open(host.context, e)) host.launched() }
+        }) ?: return)
+    }
 
     private fun dismissAll(entries: List<Entry>) {
         val keys = entries.filter { it.clearable }.map { it.key }
