@@ -46,6 +46,20 @@ class AttentionTest {
     }
 
     @Test
+    fun aChatFirstSeenArrivedWithItsLatestMessageNotWhenItWasReposted() {
+        val c = AlertClock()
+        // Yesterday's chat, reposted just now (Chronotif restarted, WhatsApp re-alerted it).
+        assertEquals(1_000, c.onPosted("chat", 90_000, signature = 1, quiet = false, conversation = true,
+            message = MessageStamp(1_000, 1)))
+        // A message from a clock running slightly ahead still can't arrive later than its post.
+        assertEquals(90_000, AlertClock().onPosted("chat", 90_000, signature = 1, quiet = false, conversation = true,
+            message = MessageStamp(95_000, 1)))
+        // Plain-text chats have no message time: they arrive when posted, as before.
+        assertEquals(90_000, AlertClock().onPosted("chat", 90_000, signature = 1, quiet = false, conversation = true,
+            message = MessageStamp(0, 1)))
+    }
+
+    @Test
     fun liveKindsAreSeparateAndNeverNew() {
         val call = N("c", "dialer", 40, Kind.CALL)
         val music = N("m", "music", 50, Kind.MEDIA)
@@ -90,8 +104,9 @@ class AttentionTest {
         val c = AlertClock()
         fun post(time: Long, message: MessageStamp?) =
             c.onPosted("chat", time, signature = 1, quiet = true, conversation = true, message = message)
-        assertEquals(100, post(100, MessageStamp(10, 1)))
-        assertEquals(100, post(200, MessageStamp(10, 1)))
+        // First seen: it arrived with its message.
+        assertEquals(10, post(100, MessageStamp(10, 1)))
+        assertEquals(10, post(200, MessageStamp(10, 1)))
         assertEquals(300, post(300, MessageStamp(20, 1)))
         // Trimming history or appending an outgoing reply must not move the arrival time.
         assertEquals(300, post(400, MessageStamp(10, 1)))

@@ -99,8 +99,13 @@ class AlertClock {
             message.time > prev.message.time ||
             (message.time == 0L && message != prev.message))
         val arrived = if (conversation) incoming else !quiet && signature != prev?.signature
-        val alertTime =
-            if (prev == null || arrived) postTime else prev.alertTime
+        val alertTime = when {
+            // First sight of a chat (after a restart, or an app re-alerting old chats): it arrived with
+            // its latest message, not now. The sender's clock may run a little ahead, hence min.
+            prev == null && conversation && message != null && message.time > 0 -> minOf(postTime, message.time)
+            prev == null || arrived -> postTime
+            else -> prev.alertTime
+        }
         // Keep the newest incoming marker when an app trims history or adds an outgoing reply.
         val latest = if (message != null && (prev?.message == null || message.time >= prev.message.time)) {
             message
