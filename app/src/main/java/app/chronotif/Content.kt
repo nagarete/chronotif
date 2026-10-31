@@ -107,7 +107,12 @@ class Content(
             if (messages.isNotEmpty()) {
                 val conversation = x.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE)
                 val group = isGroup(x)
-                title = conversation ?: title
+                // Like the system shade: the conversation's shortcut names it best. TikTok, for one,
+                // titles its DMs "sent you a message" and puts the sender only in its shortcut.
+                val shortcut = if (Build.VERSION.SDK_INT >= 31) {
+                    e.ranking.conversationShortcutInfo?.let { it.longLabel ?: it.shortLabel }
+                } else null
+                title = shortcut?.takeIf { it.isNotBlank() } ?: conversation ?: title
                 lines = messages.map { message ->
                     if (group && message.sender != null) "${message.sender}: ${message.body}" else message.body
                 }
@@ -261,9 +266,11 @@ class Content(
             val arr: Array<Parcelable>? = x.getParcelableArray(key)
             return arr.orEmpty().mapNotNull { p ->
                 val b = p as? Bundle ?: return@mapNotNull null
-                val body = b.getCharSequence("text") ?: return@mapNotNull null
+                val text = b.getCharSequence("text") ?: return@mapNotNull null
                 val person = b.getParcelable("sender_person") as? Person
                 val sender = b.getCharSequence("sender") ?: person?.name
+                // A message with no text (TikTok's image-only DMs) reads as its sender line, as in the shade.
+                val body = if (text.isBlank() && !sender.isNullOrBlank()) sender else text
                 val uri = b.getParcelable("uri") as? Uri
                 val mime = b.getString("type")
                 val attachment = if (uri != null && mime != null && (mime.startsWith("image/") || mime.startsWith("video/"))) {

@@ -31,7 +31,13 @@ import java.util.concurrent.Executors
 /** An image the viewer shows: a message's attachment, or a notification's picture. */
 class Viewable(val attachment: Content.Attachment?, val picture: Drawable?) {
     val isVideo get() = attachment?.isVideo == true
-    val mime get() = attachment?.mime?.takeIf { it.startsWith("image/") } ?: "image/png"
+    /** A concrete type for the gallery; apps may send a wildcard image type, as TikTok does. */
+    val mime: String get() {
+        val sent = attachment?.mime ?: return "image/png"
+        if (sent.startsWith("image/") && '*' !in sent) return sent
+        val ext = MimeTypeMap.getFileExtensionFromUrl(attachment.uri.toString())
+        return MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext)?.takeIf { it.startsWith("image/") } ?: "image/jpeg"
+    }
 }
 
 /** Saves to the gallery and hands images to other apps. Both copy, so nothing depends on the source staying readable. */

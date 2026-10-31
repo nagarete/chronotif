@@ -128,6 +128,18 @@ class AttachmentTest {
     }
 
     @Test
+    fun anImageWithNoTextStillShowsAndSavesWithAConcreteType() {
+        // As TikTok sends a DM: empty text, a wildcard type.
+        val e = post(message("", 100, "image/*", photo))
+        withPanel { _, list, container ->
+            list.render()
+            assertEquals(1, all(container).count { it.contentDescription == context.getString(R.string.view_image) })
+        }
+        val a = Content.of(context, e, redact = false).attachments.single()!!
+        assertEquals("image/jpeg", Viewable(a, null).mime)
+    }
+
+    @Test
     fun videoStillsOfferOpenInAppInsteadOfSave() {
         post(message("clip", 100, "video/mp4", clip))
         withPanel { activity, list, container ->
