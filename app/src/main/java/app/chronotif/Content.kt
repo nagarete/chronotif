@@ -86,7 +86,9 @@ class Content(
                 val group = isGroup(x)
                 // Like the system shade: the conversation's shortcut names it best. TikTok, for one,
                 // titles its DMs "sent you a message" and puts the sender only in its shortcut.
-                val shortcut = e.ranking.conversationShortcutInfo?.let { it.longLabel ?: it.shortLabel }
+                val shortcut = if (Build.VERSION.SDK_INT >= 31) {
+                    e.ranking.conversationShortcutInfo?.let { it.longLabel ?: it.shortLabel }
+                } else null
                 title = shortcut?.takeIf { it.isNotBlank() } ?: conversation ?: title
                 lines = messages.map { message ->
                     if (group && message.sender != null) "${message.sender}: ${message.body}" else message.body
