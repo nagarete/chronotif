@@ -403,6 +403,23 @@ class NotificationBehaviorTest {
     }
 
     @Test
+    fun aQuietlyRepostedChatSortsByItsMessagesNotItsRepost() {
+        // WhatsApp reposts yesterday's chat; a mail arrived in between. The list follows the times its cards show.
+        post(notification(listOf("old chat" to 1000L)), time = 5000, id = 1)
+        val mail = Notification.Builder(context, "mail")
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle("Mail").setContentText("newer mail")
+            .build()
+        post(mail, time = 3000, id = 2)
+        Prefs.markChecked(10_000)
+        withPanelList { list, container ->
+            list.render()
+            val shown = shownTexts(container)
+            assertTrue(shown.toString(), shown.indexOf("newer mail") in 0 until shown.indexOf("old chat"))
+        }
+    }
+
+    @Test
     fun aConversationWithEveryMessageHiddenIsNotNew() {
         val e = post(notification(listOf("one" to 1100L, "two" to 1200L)), 1200)
         assertEquals(1, NotifStore.newCount())
