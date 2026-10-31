@@ -153,6 +153,61 @@ class AttachmentTest {
         }
     }
 
+    private fun repost(id: Int, n: Notification) {
+        @Suppress("DEPRECATION")
+        val sbn = StatusBarNotification("example.chat", "example.chat", id, null, 1000, 0, 0, n, Process.myUserHandle(), 2000)
+        val ranking = ReflectionHelpers.callConstructor(RankingMap::class.java,
+            ReflectionHelpers.ClassParameter.from(Array<Ranking>::class.java, emptyArray<Ranking>()))
+        NotifStore.post(sbn, ranking)
+    }
+
+    private fun chat(vararg messages: Notification.MessagingStyle.Message): Notification {
+        val style = Notification.MessagingStyle(me)
+        messages.forEach(style::addMessage)
+        return Notification.Builder(context, "messages")
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setCategory(Notification.CATEGORY_MESSAGE)
+            .setStyle(style)
+            .build()
+    }
+
+    @Test
+    fun aMessagesPreviewOutlivesNewMessagesButNotItsOwnRemoval() {
+        post(message("look", 100))
+        withPanel { activity, list, container ->
+            list.render()
+            all(container).filterIsInstance<app.chronotif.ui.CardView>().first().performLongClick()
+            assertNotNull(preview(activity))
+
+            repost(1, chat(message("look", 100), message("and this", 200)))
+            list.render()
+            shadowOf(Looper.getMainLooper()).idle()
+            assertNotNull("A new message in the chat leaves the Preview (and any draft) alone", preview(activity))
+
+            repost(1, chat(message("and this", 200)))
+            list.render()
+            shadowOf(Looper.getMainLooper()).idle()
+            assertNull("The previewed message is gone, so is its Preview", preview(activity))
+        }
+    }
+
+    @Test
+    fun anInboxNotificationsPreviewShowsEveryLine() {
+        val n = Notification.Builder(context, "mail")
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle("2 new emails")
+            .setContentText("Alice, Bob")
+            .setStyle(Notification.InboxStyle().addLine("Alice: lunch?").addLine("Bob: invoice"))
+            .build()
+        repost(4, n)
+        withPanel { activity, list, container ->
+            list.render()
+            all(container).filterIsInstance<app.chronotif.ui.CardView>().first().performLongClick()
+            val text = shown(preview(activity)!!).joinToString("\n")
+            assertTrue(text, text.contains("Alice: lunch?") && text.contains("Bob: invoice"))
+        }
+    }
+
     @Test
     fun replyTypesInsideThePreview() {
         val input = android.app.RemoteInput.Builder("reply").setLabel("Reply").build()

@@ -109,7 +109,8 @@ class CardPreview private constructor(
             text = if (e.kind != Kind.NOTIFICATION) "" else Ui.relTime(context, at)
         }
         val body = Ui.text(context, 15f, pal.text).apply {
-            text = c.bigText ?: c.text
+            // Inbox-style notifications (a mail app's one line per email) show every line, as expanding does.
+            text = if (c.lines.size > 1) c.lines.joinToString("\n") else c.bigText ?: c.text
             visibility = if (text.isNullOrEmpty()) GONE else VISIBLE
         }
         val head = LinearLayout(context).apply {
@@ -311,6 +312,9 @@ class CardPreview private constructor(
         if (Build.VERSION.SDK_INT >= 33) findOnBackInvokedDispatcher()?.unregisterOnBackInvokedCallback(back!!)
         super.onDetachedFromWindow()
     }
+
+    /** Once closing, nothing in it reacts: its content may already be one the screen can't show. */
+    override fun dispatchTouchEvent(ev: android.view.MotionEvent): Boolean = closing || super.dispatchTouchEvent(ev)
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.keyCode == KeyEvent.KEYCODE_BACK) {

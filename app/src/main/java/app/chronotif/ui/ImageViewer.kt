@@ -199,6 +199,9 @@ class ImageViewer private constructor(
         super.onDetachedFromWindow()
     }
 
+    /** Once closing, nothing in it reacts. */
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean = closing || super.dispatchTouchEvent(ev)
+
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.keyCode == KeyEvent.KEYCODE_BACK) {
             if (event.action == KeyEvent.ACTION_UP && !event.isCanceled) close()
