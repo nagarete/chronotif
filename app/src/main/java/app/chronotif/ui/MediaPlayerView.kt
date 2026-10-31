@@ -199,7 +199,7 @@ class MediaPlayerView(context: Context, private val cb: CardCallbacks) : LinearL
                     setPadding(dp(10), dp(10), dp(10), dp(10))
                     background = Ui.pressable(0, dp(22).toFloat(), pal.ripple)
                     contentDescription = a.title
-                    setOnClickListener { cb.onAction(e, i) }
+                    setOnClickListener { cb.onAction(e, e.key, i) }
                 }, Ui.lp(dp(44), dp(44)).apply { marginStart = dp(8); marginEnd = dp(8) })
             }
             controls.visibility = if (controls.childCount > 0) VISIBLE else GONE

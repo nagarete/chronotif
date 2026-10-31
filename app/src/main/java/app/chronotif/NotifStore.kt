@@ -21,8 +21,12 @@ class Entry(
     val key: String get() = sbn.key
     val n: Notification get() = sbn.notification
     val pkg: String get() = sbn.packageName
-    override val stackId = "${sbn.packageName}|${sbn.user.hashCode()}"
+    /** One app for one user. */
+    val appId = "${sbn.packageName}|${sbn.user.hashCode()}"
     override val kind = Content.kind(sbn)
+    /** A conversation that lists its messages gets its own stack; anything else stacks by app. */
+    override val stackId =
+        if (kind == Kind.NOTIFICATION && n.extras.containsKey(Notification.EXTRA_MESSAGES)) "$appId|${sbn.key}" else appId
     val clearable: Boolean get() = sbn.isClearable
     val isSummary get() = n.flags and Notification.FLAG_GROUP_SUMMARY != 0
     /** Includes the system's auto-grouping, so its empty summaries can be hidden too. */
@@ -36,6 +40,8 @@ class Entry(
  */
 object NotifStore {
     private val entries = LinkedHashMap<String, Entry>()
+    /** Message cards swiped away, by notification key. Android can't remove one message, so only we hide it. */
+    private val hidden = HashMap<String, MutableSet<String>>()
     private val clock = AlertClock()
     private val listeners = ArrayList<() -> Unit>()
     private val main = Handler(Looper.getMainLooper())
@@ -45,6 +51,12 @@ object NotifStore {
         private set
 
     fun get(key: String): Entry? = entries[key]
+
+    fun hiddenMessages(key: String): Set<String> = hidden[key].orEmpty()
+
+    fun hideMessage(key: String, messageId: String) {
+        if (hidden.getOrPut(key) { HashSet() }.add(messageId)) changed()
+    }
 
     /** What the UI shows: group summaries with children, suspended apps and DND-hidden ones drop out. */
     fun visible(): List<Entry> {
@@ -67,6 +79,7 @@ object NotifStore {
     fun connect(active: Array<StatusBarNotification>?, map: RankingMap) {
         connected = true
         entries.clear()
+        hidden.keys.retainAll(active.orEmpty().map { it.key }.toSet())
         clock.clear()
         active?.sortedBy { it.postTime }?.forEach { put(it, map) }
         changed()
@@ -75,6 +88,7 @@ object NotifStore {
     fun disconnect() {
         connected = false
         entries.clear()
+        hidden.clear()
         clock.clear()
         changed()
     }
@@ -86,6 +100,7 @@ object NotifStore {
 
     fun remove(key: String, map: RankingMap?) {
         entries.remove(key)
+        hidden.remove(key)
         clock.onRemoved(key)
         map?.let(::rerank)
         changed()

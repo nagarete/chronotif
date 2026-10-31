@@ -111,13 +111,13 @@ class AttachmentTest {
         withPanel { activity, list, container ->
             list.render()
             val images = all(container).filter { it.contentDescription == context.getString(R.string.view_image) }
-            assertEquals("Each message's image shows under it on the New card", 2, images.size)
-            (images[1].parent as View).performClick()
+            assertEquals("The collapsed stack shows the latest message's image", 1, images.size)
+            (images[0].parent as View).performClick()
 
             val viewer = viewer(activity)
             assertNotNull(viewer)
             val texts = all(viewer!!).filterIsInstance<TextView>().filter { it.visibility == View.VISIBLE }.map { it.text.toString() }
-            assertTrue("Opens on the tapped image, among the conversation's", texts.contains("2 of 2"))
+            assertTrue("Opens on the tapped image, among all the conversation's", texts.contains("2 of 2"))
             assertTrue(texts.containsAll(listOf("Save", "Share")))
             assertTrue("Viewing isn't a check", NotifStore.newCount() == 1)
 

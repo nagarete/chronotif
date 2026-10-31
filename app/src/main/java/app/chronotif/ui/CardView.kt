@@ -26,11 +26,12 @@ import app.chronotif.R
 import app.chronotif.Viewable
 import app.chronotif.core.Kind
 
+/** [id] names the card: a notification's key, or one of a conversation's message cards. */
 interface CardCallbacks {
     fun onTap(e: Entry, c: Content)
-    fun onToggleExpand(e: Entry)
-    fun onAction(e: Entry, index: Int)
-    fun onSendReply(e: Entry, index: Int, text: CharSequence)
+    fun onToggleExpand(e: Entry, id: String)
+    fun onAction(e: Entry, id: String, index: Int)
+    fun onSendReply(e: Entry, id: String, index: Int, text: CharSequence)
     fun onDismiss(e: Entry)
     /** Opens [items] full screen at [start], over the window that holds [anchor]. */
     fun onViewImages(anchor: View, e: Entry, items: List<Viewable>, start: Int)
@@ -48,6 +49,8 @@ class CardView(context: Context, private val cb: CardCallbacks) : LinearLayout(c
     private val avatar = ImageView(context)
     private val badge = ImageView(context)
     private val iconBox = FrameLayout(context)
+    /** How many messages a collapsed Conversation stack holds. */
+    private val count = Ui.text(context, 11f, 0xFFFFFFFF.toInt(), bold = true, lines = 1)
     private val app = Ui.text(context, 12f, pal.textSecondary, lines = 1)
     private val title = Ui.text(context, 15f, pal.text, bold = true, lines = 1)
     private val time = Ui.text(context, 13f, pal.textSecondary, lines = 1)
@@ -64,6 +67,7 @@ class CardView(context: Context, private val cb: CardCallbacks) : LinearLayout(c
     private val replySend = ImageView(context)
 
     private var entry: Entry? = null
+    private var id = ""
     private var style: Style? = null
     private var replyIndex = -1
 
@@ -90,14 +94,22 @@ class CardView(context: Context, private val cb: CardCallbacks) : LinearLayout(c
             addView(badge, FrameLayout.LayoutParams(dp(16), dp(16), Gravity.BOTTOM or Gravity.END).apply {
                 setMargins(0, 0, -dp(3), -dp(3))
             })
+            addView(count, FrameLayout.LayoutParams(LayoutParams.WRAP_CONTENT, dp(18), Gravity.TOP or Gravity.END).apply {
+                setMargins(0, -dp(5), -dp(6), 0)
+            })
             clipChildren = false
         }
+        count.gravity = Gravity.CENTER
+        count.minWidth = dp(18)
+        count.setPadding(dp(5), 0, dp(5), 0)
+        count.background = Ui.rounded(pal.accent, dp(9).toFloat())
+        count.visibility = GONE
 
         chevron.setImageResource(R.drawable.ic_chevron)
         chevron.imageTintList = ColorStateList.valueOf(pal.textSecondary)
         chevron.contentDescription = context.getString(R.string.expand)
         chevron.setPadding(dp(4), dp(2), 0, dp(2))
-        chevron.setOnClickListener { entry?.let(cb::onToggleExpand) }
+        chevron.setOnClickListener { entry?.let { cb.onToggleExpand(it, id) } }
 
         val head = LinearLayout(context).apply {
             orientation = HORIZONTAL
@@ -180,7 +192,7 @@ class CardView(context: Context, private val cb: CardCallbacks) : LinearLayout(c
         }
         setOnLongClickListener {
             val tap = tapOverride
-            if (tap != null) tap() else entry?.let(cb::onToggleExpand)
+            if (tap != null) tap() else entry?.let { cb.onToggleExpand(it, id) }
             true
         }
         setOnTouchListener(swipe)
@@ -188,13 +200,17 @@ class CardView(context: Context, private val cb: CardCallbacks) : LinearLayout(c
 
     private var current: Content? = null
 
-    /** [newSince]: a New card lists every message sent after it, not just the latest. */
+    /**
+     * [newSince]: a New card lists every message sent after it, not just the latest. A message
+     * card passes its own [id] and the message's send time as [at].
+     */
     fun bind(
         e: Entry, c: Content, style: Style, expanded: Boolean, replyIndex: Int, now: Long,
-        newSince: Long = Long.MAX_VALUE,
+        newSince: Long = Long.MAX_VALUE, id: String = e.key, at: Long = e.alertTime,
     ) {
-        val keyChanged = entry?.key != e.key
+        val keyChanged = this.id != id
         entry = e
+        this.id = id
         current = c
         if (keyChanged) swipe.reset(this)
 
@@ -224,7 +240,7 @@ class CardView(context: Context, private val cb: CardCallbacks) : LinearLayout(c
         if (showApp) app.text = listOfNotNull(c.appName, c.subText).joinToString(" · ")
 
         title.text = c.title
-        time.text = if (e.kind != Kind.NOTIFICATION) "" else Ui.relTime(context, e.alertTime, now)
+        time.text = if (e.kind != Kind.NOTIFICATION) "" else Ui.relTime(context, at, now)
 
         val acts = if (c.redacted) emptyList() else e.n.actions.orEmpty().take(3)
         val canExpand = c.expandable || acts.isNotEmpty()
@@ -316,7 +332,7 @@ class CardView(context: Context, private val cb: CardCallbacks) : LinearLayout(c
 
     private fun actionChip(a: android.app.Notification.Action, e: Entry, index: Int): View {
         val label = a.title?.takeIf { it.isNotBlank() }
-        val click = OnClickListener { cb.onAction(e, index) }
+        val click = OnClickListener { cb.onAction(e, id, index) }
         val chip: View = if (label != null) {
             Ui.text(context, 14f, pal.text, bold = true, lines = 1).apply {
                 text = label
@@ -341,7 +357,7 @@ class CardView(context: Context, private val cb: CardCallbacks) : LinearLayout(c
         val text = replyInput.text?.toString()?.trim().orEmpty()
         if (text.isEmpty() || replyIndex < 0) return
         context.getSystemService(InputMethodManager::class.java).hideSoftInputFromWindow(windowToken, 0)
-        cb.onSendReply(e, replyIndex, text)
+        cb.onSendReply(e, id, replyIndex, text)
     }
 
     /** The image sent with message [i], tappable to view it full screen with the conversation's others. */
@@ -364,13 +380,19 @@ class CardView(context: Context, private val cb: CardCallbacks) : LinearLayout(c
                 setPadding(dp(9), dp(9), dp(9), dp(9))
             }, FrameLayout.LayoutParams(dp(36), dp(36), Gravity.CENTER))
             setOnClickListener {
-                val all = c.attachments.filterNotNull()
+                val all = c.gallery
                 cb.onViewImages(this@CardView, e, all.map { Viewable(it, null) }, all.indexOf(a))
             }
         }
         lines.addView(box, Ui.lp(LayoutParams.WRAP_CONTENT).apply { topMargin = dp(6) })
         // Unreadable (the app revoked it, or never shared it): just the text, as before.
         Images.into(image, a, Images.CARD_PX) { ok -> if (!ok) box.visibility = GONE }
+    }
+
+    /** The message count on a collapsed Conversation stack's avatar; 0 hides it. */
+    fun showCount(n: Int) {
+        count.text = java.text.NumberFormat.getIntegerInstance().format(n)
+        count.visibility = if (n > 1) VISIBLE else GONE
     }
 
     private fun bindImage(v: ImageView, d: Drawable?) {

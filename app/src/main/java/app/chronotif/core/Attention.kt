@@ -8,7 +8,8 @@ package app.chronotif.core
  * Every notification carries an [Meta.alertTime]: when it last *arrived* (first post, or an
  * update that genuinely brought new content). A single watermark, the time of the user's last
  * meaningful check, splits notifications into NEW (arrived after it) and EARLIER (already seen).
- * EARLIER is folded into per-app stacks so it recedes instead of cluttering.
+ * EARLIER is folded into stacks so it recedes instead of cluttering. A conversation's messages
+ * are split the same way when it's drawn ([newMessages]).
  */
 interface Meta {
     /** Notifications sharing a stack id fold together in EARLIER (one app, one user). */
@@ -64,6 +65,13 @@ object Attention {
     }
 
     fun isNew(item: Meta, lastCheck: Long) = item.kind == Kind.NOTIFICATION && item.alertTime > lastCheck
+
+    /**
+     * How many of a New conversation's incoming messages (send times, oldest first) are New: those
+     * sent after the check, and at least the latest, since its arrival is what made it New.
+     */
+    fun newMessages(times: List<Long>, lastCheck: Long): Int =
+        times.count { it > lastCheck }.coerceIn(minOf(1, times.size), times.size)
 
     /** A check never moves the watermark backwards. */
     fun advance(lastCheck: Long, seenUpTo: Long) = maxOf(lastCheck, seenUpTo)

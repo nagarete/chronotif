@@ -37,6 +37,15 @@ class AttentionTest {
     }
 
     @Test
+    fun aConversationSplitsAtTheCheckKeepingAtLeastItsLatestMessageNew() {
+        assertEquals(2, Attention.newMessages(listOf(5, 20, 30), lastCheck = 15))
+        assertEquals(3, Attention.newMessages(listOf(20, 30, 40), lastCheck = 15))
+        // Message times come from the sender's clock; a New conversation still shows its latest.
+        assertEquals(1, Attention.newMessages(listOf(5, 10), lastCheck = 15))
+        assertEquals(0, Attention.newMessages(emptyList(), lastCheck = 15))
+    }
+
+    @Test
     fun liveKindsAreSeparateAndNeverNew() {
         val call = N("c", "dialer", 40, Kind.CALL)
         val music = N("m", "music", 50, Kind.MEDIA)
