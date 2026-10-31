@@ -51,12 +51,13 @@ class ImageViewer private constructor(
     }
 
     companion object {
-        fun show(anchor: View, items: List<Viewable>, start: Int, actions: Actions) {
-            val root = anchor.rootView as? ViewGroup ?: return
-            if (items.isEmpty() || find(root) != null) return
+        fun show(anchor: View, items: List<Viewable>, start: Int, actions: Actions): ImageViewer? {
+            val root = anchor.rootView as? ViewGroup ?: return null
+            if (items.isEmpty() || find(root) != null) return null
             val viewer = ImageViewer(anchor.context, items, start.coerceIn(items.indices), actions)
             root.addView(viewer, ViewGroup.LayoutParams(-1, -1))
             viewer.requestFocus()
+            return viewer
         }
 
         /** Closes a viewer showing in [root]'s window; false if there was none. */
@@ -135,7 +136,8 @@ class ImageViewer private constructor(
             val item = items[index]
             actions.share {
                 ImageExport.share(context, item) { intent ->
-                    if (intent != null) {
+                    // The copy can outlast the viewer; don't pop a share sheet over whatever came next.
+                    if (intent != null && isAttachedToWindow && !closing) {
                         context.startActivity(intent)
                         actions.launched()
                     }
