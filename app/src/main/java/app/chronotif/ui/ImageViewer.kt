@@ -40,7 +40,7 @@ class ImageViewer private constructor(
     private val items: List<Viewable>,
     private var index: Int,
     private val actions: Actions,
-) : FrameLayout(context) {
+) : FrameLayout(context), Overlay {
 
     interface Actions {
         /** Share needs another app on screen, so it may ask to unlock first. */
@@ -58,13 +58,6 @@ class ImageViewer private constructor(
             root.addView(viewer, ViewGroup.LayoutParams(-1, -1))
             viewer.requestFocus()
             return viewer
-        }
-
-        /** Closes a viewer showing in [root]'s window; false if there was none. */
-        fun dismissIn(root: View): Boolean {
-            val v = find(root.rootView as? ViewGroup ?: return false) ?: return false
-            v.close()
-            return true
         }
 
         private fun find(root: ViewGroup): ImageViewer? =
@@ -185,7 +178,7 @@ class ImageViewer private constructor(
         for (v in listOf(top, bottom)) v.animate().alpha(if (show) 1f else 0f).setDuration(150).start()
     }
 
-    fun close() {
+    override fun close() {
         if (closing) return
         closing = true
         animate().alpha(0f).setDuration(150).withEndAction { (parent as? ViewGroup)?.removeView(this) }.start()
@@ -205,6 +198,9 @@ class ImageViewer private constructor(
         if (Build.VERSION.SDK_INT >= 33) findOnBackInvokedDispatcher()?.unregisterOnBackInvokedCallback(back!!)
         super.onDetachedFromWindow()
     }
+
+    /** Once closing, nothing in it reacts. */
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean = closing || super.dispatchTouchEvent(ev)
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.keyCode == KeyEvent.KEYCODE_BACK) {

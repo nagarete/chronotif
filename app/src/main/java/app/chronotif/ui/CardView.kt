@@ -35,6 +35,8 @@ interface CardCallbacks {
     fun onDismiss(e: Entry)
     /** Opens [items] full screen at [start], over the window that holds [anchor]. */
     fun onViewImages(anchor: View, e: Entry, items: List<Viewable>, start: Int)
+    /** Holds the card showing [c] (sent at [at]) up on its own, over the window that holds [anchor]. */
+    fun onPreview(anchor: View, e: Entry, c: Content, at: Long)
 }
 
 /** One notification, iOS-style: app icon or avatar, title + time, body, optional large icon; expands in place. */
@@ -44,19 +46,17 @@ class CardView(context: Context, private val cb: CardCallbacks) : LinearLayout(c
     enum class Style { FULL, RECEDED, COMPACT }
 
     private val pal = Palette(context)
-    private val icon = ImageView(context)
-    /** Conversations show who they're with in the icon's place, the app shrunk to a badge on it. */
-    private val avatar = ImageView(context)
-    private val badge = ImageView(context)
-    private val iconBox = FrameLayout(context)
-    /** How many messages a collapsed Conversation stack holds. */
-    private val count = Ui.text(context, 11f, 0xFFFFFFFF.toInt(), bold = true, lines = 1)
+    private val iconBox = AvatarView(context)
     private val app = Ui.text(context, 12f, pal.textSecondary, lines = 1)
     private val title = Ui.text(context, 15f, pal.text, bold = true, lines = 1)
     private val time = Ui.text(context, 13f, pal.textSecondary, lines = 1)
     private val chevron = ImageView(context)
     private val body = Ui.text(context, 15f, pal.text)
+    /** The right-hand thumbnail: a message's Attachment, or another notification's large icon. */
     private val large = ImageView(context)
+    private val thumbPlay = ImageView(context)
+    private val morePhotos = Ui.text(context, 11f, 0xFFFFFFFF.toInt(), bold = true, lines = 1)
+    private val thumb = FrameLayout(context)
     private val more = LinearLayout(context)
     private val lines = LinearLayout(context)
     private val picture = ImageView(context)
@@ -68,6 +68,7 @@ class CardView(context: Context, private val cb: CardCallbacks) : LinearLayout(c
 
     private var entry: Entry? = null
     private var id = ""
+    private var at = 0L
     private var style: Style? = null
     private var replyIndex = -1
 
@@ -80,30 +81,6 @@ class CardView(context: Context, private val cb: CardCallbacks) : LinearLayout(c
     init {
         orientation = VERTICAL
         setPadding(dp(14), dp(12), dp(14), dp(12))
-
-        icon.scaleType = ImageView.ScaleType.FIT_CENTER
-        Ui.clipRounded(icon, dp(9).toFloat())
-        avatar.scaleType = ImageView.ScaleType.CENTER_CROP
-        Ui.clipOval(avatar)
-        badge.background = Ui.rounded(pal.card or 0xFF000000.toInt(), dp(10).toFloat())
-        badge.setPadding(dp(1), dp(1), dp(1), dp(1))
-        Ui.clipOval(badge)
-        iconBox.apply {
-            addView(icon, FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
-            addView(avatar, FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
-            addView(badge, FrameLayout.LayoutParams(dp(16), dp(16), Gravity.BOTTOM or Gravity.END).apply {
-                setMargins(0, 0, -dp(3), -dp(3))
-            })
-            addView(count, FrameLayout.LayoutParams(LayoutParams.WRAP_CONTENT, dp(18), Gravity.TOP or Gravity.END).apply {
-                setMargins(0, -dp(5), -dp(6), 0)
-            })
-            clipChildren = false
-        }
-        count.gravity = Gravity.CENTER
-        count.minWidth = dp(18)
-        count.setPadding(dp(5), 0, dp(5), 0)
-        count.background = Ui.rounded(pal.accent, dp(9).toFloat())
-        count.visibility = GONE
 
         chevron.setImageResource(R.drawable.ic_chevron)
         chevron.imageTintList = ColorStateList.valueOf(pal.textSecondary)
@@ -126,13 +103,27 @@ class CardView(context: Context, private val cb: CardCallbacks) : LinearLayout(c
         }
         Ui.clipRounded(large, dp(10).toFloat())
         large.scaleType = ImageView.ScaleType.CENTER_CROP
+        thumbPlay.setImageResource(R.drawable.ic_media_play)
+        thumbPlay.imageTintList = ColorStateList.valueOf(0xFFFFFFFF.toInt())
+        thumbPlay.background = Ui.rounded(0x80000000.toInt(), dp(10).toFloat())
+        thumbPlay.setPadding(dp(5), dp(5), dp(5), dp(5))
+        morePhotos.gravity = Gravity.CENTER
+        morePhotos.setPadding(dp(5), 0, dp(5), 0)
+        morePhotos.background = Ui.rounded(0xB3000000.toInt(), dp(8).toFloat())
+        thumb.apply {
+            addView(large, FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
+            addView(thumbPlay, FrameLayout.LayoutParams(dp(20), dp(20), Gravity.CENTER))
+            addView(morePhotos, FrameLayout.LayoutParams(LayoutParams.WRAP_CONTENT, dp(16), Gravity.BOTTOM or Gravity.END).apply {
+                setMargins(0, 0, dp(3), dp(3))
+            })
+        }
 
         val top = LinearLayout(context).apply {
             orientation = HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             addView(iconBox, Ui.lp(dp(36), dp(36)).apply { marginEnd = dp(12) })
             addView(column, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
-            addView(large, Ui.lp(dp(40), dp(40)).apply { marginStart = dp(10) })
+            addView(thumb, Ui.lp(dp(44), dp(44)).apply { marginStart = dp(10) })
             clipChildren = false
         }
         clipChildren = false
@@ -190,9 +181,11 @@ class CardView(context: Context, private val cb: CardCallbacks) : LinearLayout(c
                 e != null && current != null -> cb.onTap(e, current!!)
             }
         }
+        // Press and hold holds the card up on its own (the Preview), stacks included.
         setOnLongClickListener {
-            val tap = tapOverride
-            if (tap != null) tap() else entry?.let { cb.onToggleExpand(it, id) }
+            val e = entry
+            val c = current
+            if (e != null && c != null) cb.onPreview(this, e, c, at)
             true
         }
         setOnTouchListener(swipe)
@@ -211,6 +204,7 @@ class CardView(context: Context, private val cb: CardCallbacks) : LinearLayout(c
         val keyChanged = this.id != id
         entry = e
         this.id = id
+        this.at = at
         current = c
         if (keyChanged) swipe.reset(this)
 
@@ -227,13 +221,7 @@ class CardView(context: Context, private val cb: CardCallbacks) : LinearLayout(c
             setPadding(dp(14), vpad, dp(14), vpad)
         }
 
-        val appIcon = Apps.icon(context, e)
-        val face = if (c.redacted) null else Apps.avatar(context, e)
-        icon.setImageDrawable(if (face == null) appIcon else null)
-        icon.visibility = if (face == null) VISIBLE else GONE
-        bindImage(avatar, face)
-        bindImage(badge, if (face != null) appIcon else null)
-        iconBox.contentDescription = c.appName
+        iconBox.bind(e, c)
 
         val showApp = expanded && !c.redacted
         app.visibility = if (showApp) VISIBLE else GONE
@@ -269,10 +257,25 @@ class CardView(context: Context, private val cb: CardCallbacks) : LinearLayout(c
         }
         body.ellipsize = android.text.TextUtils.TruncateAt.END
 
-        // A conversation's large icon is its avatar, already shown on the left.
-        bindImage(large, if (c.redacted || Content.isConversation(e.n)) null else Apps.largeIcon(context, e))
+        // A conversation's large icon is its avatar, already shown on the left; its thumbnail is
+        // the latest Attachment the card shows. Tapping it opens the app, like the rest of the card.
+        val attachment = if (c.redacted) null else c.attachments.lastOrNull { it != null }
+        thumbPlay.visibility = if (attachment?.isVideo == true) VISIBLE else GONE
+        morePhotos.visibility = GONE
+        if (attachment != null) {
+            thumb.visibility = VISIBLE
+            large.contentDescription = context.getString(if (attachment.isVideo) R.string.video else R.string.view_image)
+            // Unreadable (the app revoked it, or never shared it): just the text.
+            Images.into(large, attachment, Images.CARD_PX) { ok -> if (!ok) thumb.visibility = GONE }
+        } else {
+            large.tag = null
+            large.contentDescription = null
+            val icon = if (c.redacted || Content.isConversation(e.n)) null else Apps.largeIcon(context, e)
+            large.setImageDrawable(icon)
+            thumb.visibility = if (icon != null) VISIBLE else GONE
+        }
 
-        // Expanded extras, and the messages (with their attachments) a New card lists.
+        // Expanded extras, and the messages a New card lists.
         lines.removeAllViews()
         for (i in shownLines) {
             lines.addView(Ui.text(context, 14f, pal.text).apply {
@@ -282,10 +285,7 @@ class CardView(context: Context, private val cb: CardCallbacks) : LinearLayout(c
                     ellipsize = android.text.TextUtils.TruncateAt.END
                 }
             }, Ui.lp().apply { topMargin = dp(3) })
-            addAttachment(e, c, i, expanded)
         }
-        // A single message shows as the body (if it has text); its attachment goes under it.
-        if (shownLines.isEmpty() && c.lines.isNotEmpty()) addAttachment(e, c, c.lines.lastIndex, expanded)
         lines.visibility = if (lines.childCount > 0) VISIBLE else GONE
 
         val pic = if (expanded && !c.redacted) Content.picture(context, e) else null
@@ -360,39 +360,13 @@ class CardView(context: Context, private val cb: CardCallbacks) : LinearLayout(c
         cb.onSendReply(e, id, replyIndex, text)
     }
 
-    /** The image sent with message [i], tappable to view it full screen with the conversation's others. */
-    private fun addAttachment(e: Entry, c: Content, i: Int, expanded: Boolean) {
-        val a = c.attachments.getOrNull(i) ?: return
-        val image = ImageView(context).apply {
-            adjustViewBounds = true
-            maxWidth = dp(240)
-            maxHeight = dp(if (expanded) 280 else 180)
-            scaleType = ImageView.ScaleType.CENTER_CROP
-            Ui.clipRounded(this, dp(12).toFloat())
-            contentDescription = context.getString(if (a.isVideo) R.string.video else R.string.view_image)
-        }
-        val box = FrameLayout(context).apply {
-            addView(image, FrameLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT))
-            if (a.isVideo) addView(ImageView(context).apply {
-                setImageResource(R.drawable.ic_media_play)
-                imageTintList = ColorStateList.valueOf(0xFFFFFFFF.toInt())
-                background = Ui.rounded(0x80000000.toInt(), dp(18).toFloat())
-                setPadding(dp(9), dp(9), dp(9), dp(9))
-            }, FrameLayout.LayoutParams(dp(36), dp(36), Gravity.CENTER))
-            setOnClickListener {
-                val all = c.gallery
-                cb.onViewImages(this@CardView, e, all.map { Viewable(it, null) }, all.indexOf(a))
-            }
-        }
-        lines.addView(box, Ui.lp(LayoutParams.WRAP_CONTENT).apply { topMargin = dp(6) })
-        // Unreadable (the app revoked it, or never shared it): just the text, as before.
-        Images.into(image, a, Images.CARD_PX) { ok -> if (!ok) box.visibility = GONE }
-    }
-
     /** The message count on a collapsed Conversation stack's avatar; 0 hides it. */
-    fun showCount(n: Int) {
-        count.text = java.text.NumberFormat.getIntegerInstance().format(n)
-        count.visibility = if (n > 1) VISIBLE else GONE
+    fun showCount(n: Int) = iconBox.showCount(n)
+
+    /** "+n" on the thumbnail: a collapsed stack's other photos. Reset by every [bind]. */
+    fun showMorePhotos(n: Int) {
+        morePhotos.text = context.getString(R.string.more_photos, n)
+        morePhotos.visibility = if (n > 0 && thumb.visibility == VISIBLE) VISIBLE else GONE
     }
 
     private fun bindImage(v: ImageView, d: Drawable?) {
@@ -435,5 +409,56 @@ class StackView(context: Context, cb: CardCallbacks) : FrameLayout(context) {
         (sliver1.layoutParams as LayoutParams).bottomMargin = dp(if (count > 2) 7 else 0)
         (card.layoutParams as LayoutParams).bottomMargin = dp(if (count > 2) 14 else 7)
         contentDescription = context.getString(R.string.more_in_stack, count - 1)
+    }
+}
+
+/** An app icon, or for a conversation its Avatar badged with the app icon; optionally a message count. */
+@SuppressLint("ViewConstructor")
+class AvatarView(context: Context) : FrameLayout(context) {
+    private val pal = Palette(context)
+    private val icon = ImageView(context)
+    private val avatar = ImageView(context)
+    private val badge = ImageView(context)
+    private val count = Ui.text(context, 11f, 0xFFFFFFFF.toInt(), bold = true, lines = 1)
+
+    init {
+        icon.scaleType = ImageView.ScaleType.FIT_CENTER
+        Ui.clipRounded(icon, dp(9).toFloat())
+        avatar.scaleType = ImageView.ScaleType.CENTER_CROP
+        Ui.clipOval(avatar)
+        badge.background = Ui.rounded(pal.card or 0xFF000000.toInt(), dp(10).toFloat())
+        badge.setPadding(dp(1), dp(1), dp(1), dp(1))
+        Ui.clipOval(badge)
+        count.gravity = Gravity.CENTER
+        count.minWidth = dp(18)
+        count.setPadding(dp(5), 0, dp(5), 0)
+        count.background = Ui.rounded(pal.accent, dp(9).toFloat())
+        count.visibility = GONE
+        addView(icon, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
+        addView(avatar, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
+        addView(badge, LayoutParams(dp(16), dp(16), Gravity.BOTTOM or Gravity.END).apply {
+            setMargins(0, 0, -dp(3), -dp(3))
+        })
+        addView(count, LayoutParams(LayoutParams.WRAP_CONTENT, dp(18), Gravity.TOP or Gravity.END).apply {
+            setMargins(0, -dp(5), -dp(6), 0)
+        })
+        clipChildren = false
+    }
+
+    fun bind(e: Entry, c: Content) {
+        val appIcon = Apps.icon(context, e)
+        val face = if (c.redacted) null else Apps.avatar(context, e)
+        icon.setImageDrawable(if (face == null) appIcon else null)
+        icon.visibility = if (face == null) VISIBLE else GONE
+        avatar.setImageDrawable(face)
+        avatar.visibility = if (face != null) VISIBLE else GONE
+        badge.setImageDrawable(if (face != null) appIcon else null)
+        badge.visibility = if (face != null) VISIBLE else GONE
+        contentDescription = c.appName
+    }
+
+    fun showCount(n: Int) {
+        count.text = java.text.NumberFormat.getIntegerInstance().format(n)
+        count.visibility = if (n > 1) VISIBLE else GONE
     }
 }

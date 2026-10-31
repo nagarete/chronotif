@@ -57,8 +57,10 @@ class NotifList(
     private var replying: Pair<String, Int>? = null
     private var earlierRevealed = !onLock
     private var runningRevealed = false
-    /** The open image viewer and whose images it shows. */
-    private var viewer: Pair<String, ImageViewer>? = null
+    /** An open Preview or image viewer: whose notification it shows, and whether an update still matches it. */
+    private class Open(val key: String, val overlay: Overlay, val stillShows: (Entry) -> Boolean = { true })
+
+    private val overlays = ArrayList<Open>()
 
     /** Newest arrival time the user has had on screen; feeds the last-check watermark. */
     var shownUpTo = 0L
@@ -89,13 +91,17 @@ class NotifList(
             vis[e.key] = v
             v != LockPolicy.Vis.HIDE
         }
-        // An open viewer shows only what its card may: it closes once the notification is gone,
+        // An open overlay shows only what its card may: it closes once the notification is gone,
         // or the lock screen starts hiding its content.
-        viewer?.let { (key, v) ->
-            if (!v.isAttachedToWindow) viewer = null
-            else if (all.none { it.key == key } || vis[key] == LockPolicy.Vis.REDACT) {
-                v.close()
-                viewer = null
+        overlays.removeAll { open ->
+            val now = all.firstOrNull { it.key == open.key }
+            when {
+                !(open.overlay as View).isAttachedToWindow -> true
+                now == null || vis[open.key] == LockPolicy.Vis.REDACT || !open.stillShows(now) -> {
+                    open.overlay.close()
+                    true
+                }
+                else -> false
             }
         }
         val lastCheck = Prefs.lastCheck
@@ -296,6 +302,8 @@ class NotifList(
                 v.card.swipeAllowed = { e.clearable }
                 v.card.onSwiped = { dismissAll(listOf(e)) }
                 v.card.bind(e, c.forMessage(latest), style, false, -1, now, id = "$stackId#top", at = latest.time)
+                // The thumbnail is the latest message's photo; "+n" counts the others inside.
+                if (latest.attachment != null) v.card.showMorePhotos(msgs.count { it.attachment != null } - 1)
                 if (e.key !in pendingDismiss) v.card.swipe.reset(v.card)
                 v.layoutParams = gap(8)
             }
@@ -365,14 +373,48 @@ class NotifList(
 
     override fun onDismiss(e: Entry) = dismissAll(listOf(e))
 
+    /** The notification as it is now: apps repost with fresh buttons, and an old one may no longer work. */
+    private fun live(e: Entry) = NotifStore.get(e.key) ?: e
+
     override fun onViewImages(anchor: View, e: Entry, items: List<Viewable>, start: Int) {
-        viewer = e.key to (ImageViewer.show(anchor, items, start, object : ImageViewer.Actions {
+        val viewer = ImageViewer.show(anchor, items, start, object : ImageViewer.Actions {
             override fun share(start: () -> Unit) = host.guarded(start)
 
             override fun launched() = host.launched()
 
-            override fun openInApp() = host.guarded { if (Act.open(host.context, e)) host.launched() }
-        }) ?: return)
+            override fun openInApp() = host.guarded { if (Act.open(host.context, live(e))) host.launched() }
+        }) ?: return
+        overlays += Open(e.key, viewer)
+    }
+
+    override fun onPreview(anchor: View, e: Entry, c: Content, at: Long) {
+        // A message's Preview lasts while that message does (new ones may arrive meanwhile);
+        // any other notification's, while what it shows is unchanged.
+        val message = c.messages.singleOrNull()?.id
+        val shown = Content.signature(e.n)
+        val stillShows: (Entry) -> Boolean =
+            if (message != null) { now -> message in Content.incomingIds(now.n) }
+            else { now -> Content.signature(now.n) == shown }
+        val preview = CardPreview.show(anchor, e, c, at, object : CardPreview.Actions {
+            override fun open() = onTap(live(e), c)
+
+            override fun action(index: Int) {
+                val a = live(e).n.actions?.getOrNull(index) ?: return
+                host.guarded { if (Act.action(host.context, a)) host.launched() }
+            }
+
+            override fun canReplyHere() = !onLock
+
+            override fun replyElsewhere(index: Int) = host.guarded { host.replyElsewhere(live(e), index) }
+
+            override fun sendReply(index: Int, text: CharSequence) {
+                val a = live(e).n.actions?.getOrNull(index) ?: return
+                Act.reply(host.context, a, text)
+            }
+
+            override fun viewImages(anchor: View, items: List<Viewable>, start: Int) = onViewImages(anchor, e, items, start)
+        }) ?: return
+        overlays += Open(e.key, preview, stillShows)
     }
 
     private fun dismissAll(entries: List<Entry>) {

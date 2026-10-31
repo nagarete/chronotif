@@ -234,6 +234,13 @@ class LockActivity : Activity(), NotifList.Host {
     private var tracker: VelocityTracker? = null
 
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        // A Preview or the image viewer scrolls and swipes on its own; swiping up there isn't "unlock".
+        val decor = window.decorView as android.view.ViewGroup
+        if ((0 until decor.childCount).any { decor.getChildAt(it) is Overlay }) {
+            tracker?.recycle()
+            tracker = null
+            return super.dispatchTouchEvent(ev)
+        }
         when (ev.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 downY = ev.rawY
