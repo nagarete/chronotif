@@ -33,6 +33,7 @@
     <string name="close">Close</string>
     <string name="image_counter">%1$d of %2$d</string>
     <string name="view_image">View image</string>
+    <string name="more_photos">+%d</string>
     <string name="media_play">Play</string>
     <string name="media_pause">Pause</string>
     <string name="media_previous">Previous</string>

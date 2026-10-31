@@ -25,8 +25,12 @@ The picture of the person or group a conversation is with, shown in place of the
 _Avoid_: Large icon, profile pic
 
 **Attachment**:
-An image, or a video's still frame, sent inside a message. It can be opened full screen and saved without opening the app.
+An image, or a video's still frame, sent inside a message. Its card shows it as a thumbnail; the Preview shows it large, and from there it opens full screen and can be saved without opening the app.
 _Avoid_: Picture (a non-conversation notification's single image, which opens the same way)
+
+**Preview**:
+One card held up on its own over a dimmed screen by pressing and holding it: its full text, its Attachment large, and the app's buttons. Nothing in the app is opened or marked read.
+_Avoid_: Peek, long-press menu
 
 **Wake session**:
 One continuous period from the display waking until it sleeps. Chronotif and the stock lock screen share this period.

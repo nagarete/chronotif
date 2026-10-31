@@ -57,8 +57,8 @@ class NotifList(
     private var replying: Pair<String, Int>? = null
     private var earlierRevealed = !onLock
     private var runningRevealed = false
-    /** The open image viewer and whose images it shows. */
-    private var viewer: Pair<String, ImageViewer>? = null
+    /** Open overlays (Preview, image viewer) and whose notification each shows. */
+    private val overlays = ArrayList<Pair<String, Overlay>>()
 
     /** Newest arrival time the user has had on screen; feeds the last-check watermark. */
     var shownUpTo = 0L
@@ -89,13 +89,16 @@ class NotifList(
             vis[e.key] = v
             v != LockPolicy.Vis.HIDE
         }
-        // An open viewer shows only what its card may: it closes once the notification is gone,
+        // An open overlay shows only what its card may: it closes once the notification is gone,
         // or the lock screen starts hiding its content.
-        viewer?.let { (key, v) ->
-            if (!v.isAttachedToWindow) viewer = null
-            else if (all.none { it.key == key } || vis[key] == LockPolicy.Vis.REDACT) {
-                v.close()
-                viewer = null
+        overlays.removeAll { (key, o) ->
+            when {
+                !(o as View).isAttachedToWindow -> true
+                all.none { it.key == key } || vis[key] == LockPolicy.Vis.REDACT -> {
+                    o.close()
+                    true
+                }
+                else -> false
             }
         }
         val lastCheck = Prefs.lastCheck
@@ -292,6 +295,8 @@ class NotifList(
                 v.card.swipeAllowed = { e.clearable }
                 v.card.onSwiped = { dismissAll(listOf(e)) }
                 v.card.bind(e, c.forMessage(latest), style, false, -1, now, id = "$stackId#top", at = latest.time)
+                // The thumbnail is the latest message's photo; "+n" counts the others inside.
+                if (latest.attachment != null) v.card.showMorePhotos(msgs.count { it.attachment != null } - 1)
                 if (e.key !in pendingDismiss) v.card.swipe.reset(v.card)
                 v.layoutParams = gap(8)
             }
@@ -362,12 +367,34 @@ class NotifList(
     override fun onDismiss(e: Entry) = dismissAll(listOf(e))
 
     override fun onViewImages(anchor: View, e: Entry, items: List<Viewable>, start: Int) {
-        viewer = e.key to (ImageViewer.show(anchor, items, start, object : ImageViewer.Actions {
+        overlays += e.key to (ImageViewer.show(anchor, items, start, object : ImageViewer.Actions {
             override fun share(start: () -> Unit) = host.guarded(start)
 
             override fun launched() = host.launched()
 
             override fun openInApp() = host.guarded { if (Act.open(host.context, e)) host.launched() }
+        }) ?: return)
+    }
+
+    override fun onPreview(anchor: View, e: Entry, c: Content, at: Long) {
+        overlays += e.key to (CardPreview.show(anchor, e, c, at, object : CardPreview.Actions {
+            override fun open() = onTap(e, c)
+
+            override fun action(index: Int) {
+                val a = e.n.actions?.getOrNull(index) ?: return
+                host.guarded { if (Act.action(host.context, a)) host.launched() }
+            }
+
+            override fun canReplyHere() = !onLock
+
+            override fun replyElsewhere(index: Int) = host.guarded { host.replyElsewhere(e, index) }
+
+            override fun sendReply(index: Int, text: CharSequence) {
+                val a = e.n.actions?.getOrNull(index) ?: return
+                Act.reply(host.context, a, text)
+            }
+
+            override fun viewImages(anchor: View, items: List<Viewable>, start: Int) = onViewImages(anchor, e, items, start)
         }) ?: return)
     }
 

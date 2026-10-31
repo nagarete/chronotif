@@ -37,7 +37,11 @@ Agreed in the October 2026 interview comparing Chronotif with the stock shade an
 
 A conversation card leads with its Avatar, badged with the app's icon. A group shows its picture, falling back to the latest sender's photo. A one-to-one chat shows the sender's photo, falling back to the notification's large icon. With no picture at all, the card keeps the plain app icon. Other notifications keep their large icon on the right.
 
-An Attachment shows under the message it came with, on New, Earlier and expanded cards alike. Tapping it opens a full-screen viewer over the panel or the lock-screen view, without unlocking. In the viewer you pinch or double-tap to zoom, swipe sideways through the conversation's images, and swipe down or press Back to close. Save puts the image in the gallery's Pictures/Chronotif album. Share asks to unlock first on the lock screen, because it opens another app. A video shows only its still frame, so it offers Open in app instead of Save and Share. A notification's expanded picture opens in the same viewer. Viewing doesn't count as a check. When content is hidden, there are no Avatars or Attachments.
+An Attachment shows as a thumbnail on the right of its message's card, as on iOS, on New, Earlier and open stacks alike. A video's thumbnail carries a play mark. A collapsed Conversation stack shows its latest message's thumbnail, with "+n" for the other photos inside. Tapping the thumbnail opens the app, like the rest of the card.
+
+Pressing and holding any card opens its Preview over a dimmed screen, without unlocking. It shows the card's full text, its Attachment (or a picture notification's picture) large, and the app's buttons. Reply types inside the Preview, except on the lock-screen view, where it asks to unlock and continues in the panel. Tapping outside, or Back, closes it. Nothing in the app is opened or marked read.
+
+Tapping the Preview's image opens a full-screen viewer, still without unlocking. In the viewer you pinch or double-tap to zoom, swipe sideways through the conversation's images, and swipe down or press Back to close. Save puts the image in the gallery's Pictures/Chronotif album. Share asks to unlock first on the lock screen, because it opens another app. A video shows only its still frame, so it offers Open in app instead of Save and Share. A notification's expanded picture opens in the same viewer. Viewing doesn't count as a check. When content is hidden, there are no Avatars or Attachments.
 
 Chronotif reads Attachments through the sending app's content links, which Android lets notification listeners read. Many apps send a shrunk preview rather than the original, so a saved image can be lower quality than the one in the chat. An Attachment that can't be read just isn't shown.
 
@@ -60,8 +64,9 @@ A Media player is drawn from the app's media session, like the system shade's pl
 - Check a conversation, then receive another incoming message through a silent update of its notification. The conversation returns to New.
 - Refresh a checked notification without a new incoming message. It remains in Earlier.
 - Open the panel with only always-running services active. Only the "N running" pill shows; tapping it reveals them.
-- Receive a WhatsApp photo. It shows under its message; tapping it opens the viewer, Save puts it in the gallery at once, and the card stays New.
-- Open an Attachment from the lock-screen view. The viewer shows without unlocking; Share asks to unlock.
+- Receive a photo in X or TikTok. It shows as a thumbnail on its card. Press and hold the card: the Preview shows it large with the app's buttons. Tap the image: the viewer opens, Save puts it in the gallery at once, and the card stays New. (WhatsApp sends no image, only "📷 Photo".)
+- Receive three photos in one chat. The collapsed stack's thumbnail shows "+2". In the viewer you can swipe through all three.
+- Press and hold a card on the lock-screen view. The Preview and the viewer show without unlocking; Reply and Share ask to unlock.
 - Pause music. Its player stays at the top and does not move to Earlier.
 - Play music in Spotify or YouTube Music. The player shows artwork, title, artist, transport controls and a seek bar that moves; dragging it seeks.
 - With "Hide sensitive content" on, the lock-screen view's player shows the app name and controls but not the track.
