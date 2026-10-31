@@ -55,7 +55,7 @@ headless Chromium (set `CHROME=/path/to/chrome` if `chromium` isn't on your `PAT
 
 ## Download links
 
-*Download stable* links to the APK from GitHub's latest stable release, currently v0.2.3.
+*Download stable* links to the APK from GitHub's latest stable release, currently v0.2.4.
 *Download nightly* links to the newest `nightly-<version>-<build>` APK, ordered by version
 and build number. Both buttons appear at the top and bottom of the page. Nightly release
 notes explain the changes still being tested.
