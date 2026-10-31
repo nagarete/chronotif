@@ -127,6 +127,15 @@ class NotificationBehaviorTest {
     }
 
     @Test
+    fun aTitledOneToOneChatDoesNotPrefixItsMessagesWithTheSender() {
+        // X titles one-to-one chats but marks them as not a group.
+        val n = notification("damn")
+        n.extras.putCharSequence(Notification.EXTRA_CONVERSATION_TITLE, "natan")
+        n.extras.putBoolean(Notification.EXTRA_IS_GROUP_CONVERSATION, false)
+        assertEquals(listOf("damn"), Content.of(context, post(n), false).lines.map { it.toString() })
+    }
+
+    @Test
     fun expansionRetainsAllSuppliedMessages() {
         val messages = (1..9).map { "message $it" }
         val entry = post(notification(*messages.toTypedArray()))

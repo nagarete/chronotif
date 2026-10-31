@@ -92,8 +92,7 @@ class Content(
                 .sortedBy { it.time }
             if (messages.isNotEmpty()) {
                 val conversation = x.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE)
-                val group = conversation != null ||
-                    x.getBoolean(Notification.EXTRA_IS_GROUP_CONVERSATION)
+                val group = isGroup(x)
                 title = conversation ?: title
                 lines = messages.map { message ->
                     if (group && message.sender != null) "${message.sender}: ${message.body}" else message.body
@@ -204,10 +203,16 @@ class Content(
             val x = n.extras
             (x.getParcelable(EXTRA_CONVERSATION_ICON) as? Icon)?.let { return it }
             val sender = latestIncoming(x)?.senderIcon
-            val group = x.getBoolean(Notification.EXTRA_IS_GROUP_CONVERSATION) ||
-                x.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE) != null
-            return if (group) n.getLargeIcon() ?: sender else sender ?: n.getLargeIcon()
+            return if (isGroup(x)) n.getLargeIcon() ?: sender else sender ?: n.getLargeIcon()
         }
+
+        /**
+         * Apps state it explicitly (X titles its one-to-one chats yet says they aren't groups);
+         * older ones only hint at it with a conversation title, as Android itself falls back to.
+         */
+        private fun isGroup(x: Bundle): Boolean =
+            if (x.containsKey(Notification.EXTRA_IS_GROUP_CONVERSATION)) x.getBoolean(Notification.EXTRA_IS_GROUP_CONVERSATION)
+            else x.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE) != null
 
         @Suppress("DEPRECATION")
         private fun latestIncoming(x: Bundle): Message? {
