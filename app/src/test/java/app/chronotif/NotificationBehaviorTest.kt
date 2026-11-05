@@ -11,6 +11,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Looper
 import android.os.Process
+import android.media.session.PlaybackState
 import android.service.notification.NotificationListenerService.RankingMap
 import android.service.notification.NotificationListenerService.Ranking
 import android.service.notification.StatusBarNotification
@@ -307,6 +308,352 @@ class NotificationBehaviorTest {
         val s = Attention.sections(NotifStore.visible(), lastCheck = 0)
         assertEquals(listOf(paused.key), s.media.map { it.key })
         assertTrue(s.earlier.isEmpty() && s.fresh.isEmpty())
+    }
+
+    @Test
+    fun inactiveMediaCanUseRealSystemOrAppDismissalButActiveMediaCannot() {
+        fun playback(state: Int) = PlaybackState.Builder()
+            .setState(state, 0L, 1f).build()
+        val paused = playback(PlaybackState.STATE_PAUSED)
+        val stopped = playback(PlaybackState.STATE_STOPPED)
+        val playing = playback(PlaybackState.STATE_PLAYING)
+        val buffering = playback(PlaybackState.STATE_BUFFERING)
+
+        val clearable = post(Notification.Builder(context, "media")
+            .setSmallIcon(android.R.drawable.ic_media_play)
+            .setContentTitle("Paused track")
+            .setStyle(Notification.MediaStyle())
+            .build(), 2000, id = 12)
+        assertEquals(Kind.MEDIA, clearable.kind)
+        assertTrue(clearable.clearable)
+        assertTrue(MediaDismiss.canSwipe(clearable, paused))
+        assertTrue(MediaDismiss.canSwipe(clearable, stopped))
+        assertFalse(MediaDismiss.canSwipe(clearable, playing))
+        assertFalse(MediaDismiss.canSwipe(clearable, buffering))
+        // Preserve the upstream clearable-media behaviour even without a session.
+        assertTrue(MediaDismiss.canSwipe(clearable, null))
+
+        val ongoing = post(Notification.Builder(context, "media")
+            .setSmallIcon(android.R.drawable.ic_media_play)
+            .setContentTitle("Ongoing track")
+            .setStyle(Notification.MediaStyle())
+            .setOngoing(true)
+            .build(), 2000, id = 13)
+        assertFalse(ongoing.clearable)
+        assertFalse("No deleteIntent: never pretend an ongoing media card is dismissible",
+            MediaDismiss.canSwipe(ongoing, paused))
+        assertFalse(MediaDismiss.canSwipe(ongoing, stopped))
+
+        val noClear = Notification.Builder(context, "media")
+            .setSmallIcon(android.R.drawable.ic_media_play)
+            .setContentTitle("Protected track")
+            .setStyle(Notification.MediaStyle())
+            .build().apply { flags = flags or Notification.FLAG_NO_CLEAR }
+        val protectedEntry = post(noClear, 2000, id = 14)
+        assertFalse(protectedEntry.clearable)
+        assertFalse(MediaDismiss.canSwipe(protectedEntry, paused))
+
+        // Media3 apps including Apple Music may expose a deleteIntent despite
+        // setting NO_CLEAR: the app itself can process an explicit user dismissal.
+        val pendingDelete = android.app.PendingIntent.getBroadcast(
+            context, 404, Intent("app.chronotif.test.EXPLICIT_MEDIA_DISMISS"),
+            android.app.PendingIntent.FLAG_IMMUTABLE
+        )
+        val protectedWithDelete = post(Notification.Builder(context, "media")
+            .setSmallIcon(android.R.drawable.ic_media_play)
+            .setContentTitle("Protected but app-dismissable")
+            .setStyle(Notification.MediaStyle())
+            .setDeleteIntent(pendingDelete)
+            .build().apply { flags = flags or Notification.FLAG_NO_CLEAR }, 2000, id = 15)
+        assertFalse(protectedWithDelete.clearable)
+        assertTrue(MediaDismiss.canSwipe(protectedWithDelete, paused))
+        assertTrue(MediaDismiss.canSwipe(protectedWithDelete, stopped))
+        assertFalse(MediaDismiss.canSwipe(protectedWithDelete, playing))
+        assertFalse(MediaDismiss.canSwipe(protectedWithDelete, buffering))
+        assertFalse(MediaDismiss.canSwipe(protectedWithDelete, null))
+
+        // Apple Music leaves a Play action on a stale NO_CLEAR media notification
+        // even when a MediaSession controller is no longer available.
+        val play = Notification.Action.Builder(null, "Play", pendingDelete).build()
+        val pause = Notification.Action.Builder(null, "Pause", pendingDelete).build()
+        val stalePaused = post(Notification.Builder(context, "media")
+            .setSmallIcon(android.R.drawable.ic_media_play)
+            .setContentTitle("Paused Apple Music")
+            .setStyle(Notification.MediaStyle())
+            .setDeleteIntent(pendingDelete)
+            .addAction(play)
+            .build().apply { flags = flags or Notification.FLAG_NO_CLEAR }, 2000, id = 16)
+        assertTrue(MediaDismiss.canSwipe(stalePaused, null))
+        assertFalse(MediaDismiss.canSwipe(stalePaused, playing))
+        val playingActions = post(Notification.Builder(context, "media")
+            .setSmallIcon(android.R.drawable.ic_media_pause)
+            .setContentTitle("Playing Apple Music")
+            .setStyle(Notification.MediaStyle())
+            .setDeleteIntent(pendingDelete)
+            .addAction(pause)
+            .build().apply { flags = flags or Notification.FLAG_NO_CLEAR }, 2000, id = 17)
+        assertFalse(MediaDismiss.canSwipe(playingActions, null))
+        // Only the Play action is accepted as a fallback: both Play and Pause
+        // indicate ambiguous state, which must not permit dismissal.
+        val ambiguousActions = post(Notification.Builder(context, "media")
+            .setSmallIcon(android.R.drawable.ic_media_play)
+            .setContentTitle("Ambiguous media")
+            .setStyle(Notification.MediaStyle())
+            .setDeleteIntent(pendingDelete)
+            .addAction(play)
+            .addAction(pause)
+            .build().apply { flags = flags or Notification.FLAG_NO_CLEAR }, 2000, id = 19)
+        assertFalse(MediaDismiss.canSwipe(ambiguousActions, null))
+    }
+
+    @Test
+    fun inactiveMediaCanInterceptSwipeStartingOnItsChildren() {
+        val pending = android.app.PendingIntent.getBroadcast(
+            context, 408, Intent("app.chronotif.test.MEDIA_DISMISS"),
+            android.app.PendingIntent.FLAG_IMMUTABLE
+        )
+        post(Notification.Builder(context, "media")
+            .setSmallIcon(android.R.drawable.ic_media_play)
+            .setContentTitle("Paused player")
+            .setStyle(Notification.MediaStyle())
+            .setDeleteIntent(pending)
+            .addAction(Notification.Action.Builder(null, "Play", pending).build())
+            .build().apply { flags = flags or Notification.FLAG_NO_CLEAR }, 2000, id = 18)
+
+        withPanelList { list, container ->
+            list.render()
+            val card = views(container).filterIsInstance<MediaPlayerView>().single()
+            val width = View.MeasureSpec.makeMeasureSpec(400, View.MeasureSpec.EXACTLY)
+            val height = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+            card.measure(width, height)
+            card.layout(0, 0, 400, card.measuredHeight)
+            fun event(action: Int, x: Float, y: Float) =
+                android.view.MotionEvent.obtain(0, 25, action, x, y, 0)
+            val down = event(android.view.MotionEvent.ACTION_DOWN, 40f, 32f)
+            val move = event(android.view.MotionEvent.ACTION_MOVE, 180f, 34f)
+            try {
+                assertFalse(card.onInterceptTouchEvent(down))
+                assertTrue("Horizontal gesture over media content must be intercepted",
+                    card.onInterceptTouchEvent(move))
+            } finally {
+                down.recycle()
+                move.recycle()
+            }
+        }
+    }
+
+    @Test
+    fun mediaSwipeLeavesVerticalScrollingAndPlayingControlsUnintercepted() {
+        val pending = android.app.PendingIntent.getBroadcast(
+            context, 409, Intent("app.chronotif.test.MEDIA_VERTICAL"),
+            android.app.PendingIntent.FLAG_IMMUTABLE
+        )
+        post(Notification.Builder(context, "media")
+            .setSmallIcon(android.R.drawable.ic_media_play)
+            .setContentTitle("Paused player")
+            .setStyle(Notification.MediaStyle())
+            .setDeleteIntent(pending)
+            .addAction(Notification.Action.Builder(null, "Play", pending).build())
+            .build().apply { flags = flags or Notification.FLAG_NO_CLEAR }, 2000, id = 20)
+
+        withPanelList { list, container ->
+            list.render()
+            val card = views(container).filterIsInstance<MediaPlayerView>().single()
+            val width = View.MeasureSpec.makeMeasureSpec(400, View.MeasureSpec.EXACTLY)
+            val height = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+            card.measure(width, height)
+            card.layout(0, 0, 400, card.measuredHeight)
+            fun event(action: Int, x: Float, y: Float) =
+                android.view.MotionEvent.obtain(0, 25, action, x, y, 0)
+            val down = event(android.view.MotionEvent.ACTION_DOWN, 40f, 32f)
+            val move = event(android.view.MotionEvent.ACTION_MOVE, 44f, 172f)
+            try {
+                assertFalse(card.onInterceptTouchEvent(down))
+                assertFalse("Vertical scrolling must not become media dismissal",
+                    card.onInterceptTouchEvent(move))
+            } finally {
+                down.recycle()
+                move.recycle()
+            }
+        }
+    }
+
+
+    @Test
+    fun mediaButtonTapAndSwipeFromButtonUseFullDispatchedGestures() {
+        val pending = android.app.PendingIntent.getBroadcast(
+            context, 415, Intent("app.chronotif.test.MEDIA_BUTTON"),
+            android.app.PendingIntent.FLAG_IMMUTABLE,
+        )
+        post(Notification.Builder(context, "media")
+            .setSmallIcon(android.R.drawable.ic_media_play)
+            .setContentTitle("Inactive player")
+            .setStyle(Notification.MediaStyle())
+            .setDeleteIntent(pending)
+            .addAction(Notification.Action.Builder(null, "Play", pending).build())
+            .build().apply { flags = flags or Notification.FLAG_NO_CLEAR }, 2000, id = 45)
+
+        val controller = Robolectric.buildActivity(Activity::class.java).setup()
+        try {
+            val activity = controller.get()
+            val container = LinearLayout(activity)
+            activity.setContentView(container)
+            val list = NotifList(object : NotifList.Host {
+                override val context: Context = activity
+                override fun launched() {}
+                override fun guarded(action: () -> Unit) = action()
+            }, container, onLock = false)
+            list.render()
+            val card = views(container).filterIsInstance<MediaPlayerView>().single()
+            card.measure(View.MeasureSpec.makeMeasureSpec(400, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED))
+            card.layout(0, 0, 400, card.measuredHeight)
+            val button = views(card).filterIsInstance<android.widget.ImageView>()
+                .first { it.contentDescription == "Play" }
+            fun center(child: View): Pair<Float, Float> {
+                var x = child.width / 2f
+                var y = child.height / 2f
+                var v = child
+                while (v !== card) {
+                    x += v.left
+                    y += v.top
+                    v = v.parent as View
+                }
+                return x to y
+            }
+            fun dispatch(action: Int, x: Float, y: Float, time: Long) {
+                val e = android.view.MotionEvent.obtain(0, time, action, x, y, 0)
+                try { card.dispatchTouchEvent(e) } finally { e.recycle() }
+            }
+            val (x, y) = center(button)
+            val count = shadowOf(context as Application).broadcastIntents.size
+            dispatch(android.view.MotionEvent.ACTION_DOWN, x, y, 50)
+            dispatch(android.view.MotionEvent.ACTION_UP, x, y, 75)
+            shadowOf(Looper.getMainLooper()).idle()
+            assertEquals("A tap on the media action must still send it",
+                count + 1, shadowOf(context as Application).broadcastIntents.size)
+            assertFalse(card.swipe.dismissing)
+
+            dispatch(android.view.MotionEvent.ACTION_DOWN, x, y, 100)
+            dispatch(android.view.MotionEvent.ACTION_MOVE, x + 100, y, 125)
+            dispatch(android.view.MotionEvent.ACTION_MOVE, x + 270, y, 145)
+            dispatch(android.view.MotionEvent.ACTION_UP, x + 270, y, 165)
+            assertTrue("Horizontal swipe beginning on a media action must dismiss",
+                card.swipe.dismissing)
+            assertEquals("Swipe must not click the control again",
+                count + 1, shadowOf(context as Application).broadcastIntents.size)
+        } finally {
+            controller.pause().stop().destroy()
+        }
+    }
+
+    @Test
+    fun seekBarDragViaDispatchTouchEventDoesNotDismissTheMediaPlayer() {
+        val pending = android.app.PendingIntent.getBroadcast(
+            context, 416, Intent("app.chronotif.test.MEDIA_SEEK"),
+            android.app.PendingIntent.FLAG_IMMUTABLE,
+        )
+        post(Notification.Builder(context, "media")
+            .setSmallIcon(android.R.drawable.ic_media_play)
+            .setContentTitle("Paused player")
+            .setStyle(Notification.MediaStyle())
+            .setDeleteIntent(pending)
+            .addAction(Notification.Action.Builder(null, "Play", pending).build())
+            .build().apply { flags = flags or Notification.FLAG_NO_CLEAR }, 2000, id = 46)
+
+        withPanelList { list, container ->
+            list.render()
+            val card = views(container).filterIsInstance<MediaPlayerView>().single()
+            // No session in this test, so expose a seekable UI to exercise the
+            // actual nested touch routing without relying on Robolectric media.
+            val row: LinearLayout = ReflectionHelpers.getField(card, "seekRow")
+            val seek: android.widget.SeekBar = ReflectionHelpers.getField(card, "seek")
+            row.visibility = View.VISIBLE
+            seek.visibility = View.VISIBLE
+            seek.isEnabled = true
+            seek.max = 1000
+            card.measure(View.MeasureSpec.makeMeasureSpec(400, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED))
+            card.layout(0, 0, 400, card.measuredHeight)
+
+            var x = seek.left.toFloat()
+            var y = seek.height / 2f
+            var parent = seek.parent as View
+            while (parent !== card) {
+                x += parent.left
+                y += parent.top
+                parent = parent.parent as View
+            }
+            fun dispatch(action: Int, px: Float, time: Long) {
+                val e = android.view.MotionEvent.obtain(0, time, action, px, y, 0)
+                try { card.dispatchTouchEvent(e) } finally { e.recycle() }
+            }
+            val start = x + seek.width * 0.2f
+            val finish = x + seek.width * 0.8f
+            val before = seek.progress
+            dispatch(android.view.MotionEvent.ACTION_DOWN, start, 200)
+            dispatch(android.view.MotionEvent.ACTION_MOVE, finish, 225)
+            dispatch(android.view.MotionEvent.ACTION_UP, finish, 250)
+            assertTrue("SeekBar must receive the drag", seek.progress > before)
+            assertFalse("Seeking must not trigger media dismissal", card.swipe.dismissing)
+        }
+    }
+
+    @Test
+    fun successfulSendWithoutNotificationRemovalRestoresCardAfterTimeout() {
+        val pending = android.app.PendingIntent.getBroadcast(
+            context, 417, Intent("app.chronotif.test.MEDIA_NO_REMOVAL"),
+            android.app.PendingIntent.FLAG_IMMUTABLE,
+        )
+        val entry = post(Notification.Builder(context, "media")
+            .setSmallIcon(android.R.drawable.ic_media_play)
+            .setContentTitle("Persistent player")
+            .setStyle(Notification.MediaStyle())
+            .setDeleteIntent(pending)
+            .addAction(Notification.Action.Builder(null, "Play", pending).build())
+            .build().apply { flags = flags or Notification.FLAG_NO_CLEAR }, 2000, id = 47)
+
+        val controller = Robolectric.buildActivity(Activity::class.java).setup()
+        try {
+            val activity = controller.get()
+            val container = LinearLayout(activity)
+            activity.setContentView(container)
+            var dispatched = 0
+            val gateway = object : MediaDismiss.Gateway {
+                override fun current(key: String) = NotifStore.get(key)
+                override fun playbackState(
+                    context: Context, token: android.media.session.MediaSession.Token,
+                ): Int? = null
+                override fun listenerConnected() = true
+                override fun cancel(entry: Entry) = fail("Protected media must not use listener cancel")
+                override fun send(intent: android.app.PendingIntent) {
+                    intent.send() // Real successful PendingIntent, no Android removal callback.
+                    dispatched++
+                }
+            }
+            val list = NotifList(object : NotifList.Host {
+                override val context: Context = activity
+                override fun launched() {}
+                override fun guarded(action: () -> Unit) = action()
+            }, container, onLock = false, mediaDismiss = { ctx, e ->
+                MediaDismiss.dismiss(ctx, e, gateway)
+            })
+            list.render()
+            val card = views(container).filterIsInstance<MediaPlayerView>().single()
+            ReflectionHelpers.setField(card.swipe, "dismissing", true)
+            card.translationX = 300f
+            card.alpha = 0f
+            list.onDismiss(entry)
+            assertEquals(1, dispatched)
+            assertNotNull(NotifStore.get(entry.key))
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(950))
+            assertSame(card, views(container).filterIsInstance<MediaPlayerView>().single())
+            assertEquals(0f, card.translationX, 0.01f)
+            assertEquals(1f, card.alpha, 0.01f)
+            assertFalse(card.swipe.dismissing)
+        } finally {
+            controller.pause().stop().destroy()
+        }
     }
 
     @Test

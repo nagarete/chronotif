@@ -17,6 +17,8 @@ import android.os.Build
 import android.os.SystemClock
 import android.text.format.DateUtils
 import android.view.Gravity
+import android.view.MotionEvent
+import android.view.ViewConfiguration
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -24,7 +26,9 @@ import android.widget.SeekBar
 import app.chronotif.Apps
 import app.chronotif.Content
 import app.chronotif.Entry
+import app.chronotif.MediaDismiss
 import app.chronotif.R
+import kotlin.math.abs
 
 /**
  * A media notification drawn as a player, like the system shade's: artwork, title and artist,
@@ -52,8 +56,11 @@ class MediaPlayerView(context: Context, private val cb: CardCallbacks) : LinearL
     private var content: Content? = null
     private var controller: MediaController? = null
     private var seeking = false
+    private var swipeInterceptArmed = false
+    private var swipeDownX = 0f
+    private var swipeDownY = 0f
 
-    val swipe = SwipeDismiss({ entry?.clearable == true && !playing() }, { entry?.let(cb::onDismiss) })
+    val swipe = SwipeDismiss({ entry?.let { MediaDismiss.canSwipe(it, controller?.playbackState, context) } == true }, { entry?.let(cb::onDismiss) })
 
     private val callback = object : MediaController.Callback() {
         override fun onPlaybackStateChanged(state: PlaybackState?) = refresh()
@@ -124,6 +131,44 @@ class MediaPlayerView(context: Context, private val cb: CardCallbacks) : LinearL
 
         setOnClickListener { val e = entry; val c = content; if (e != null && c != null) cb.onTap(e, c) }
         setOnTouchListener(swipe)
+    }
+
+    /**
+     * ViewGroup children (media buttons, artwork, titles) can consume DOWN before the
+     * parent's OnTouchListener sees it. Track DOWN here and intercept only an actual
+     * horizontal swipe; taps still go to children and the seek bar keeps its drag.
+     */
+    override fun onInterceptTouchEvent(event: MotionEvent): Boolean {
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                swipeDownX = event.rawX
+                swipeDownY = event.rawY
+                swipeInterceptArmed = !swipe.dismissing &&
+                    entry?.let { MediaDismiss.canSwipe(it, controller?.playbackState, context) } == true &&
+                    !touchesSeekBar(event)
+                if (swipeInterceptArmed) swipe.onTouch(this, event)
+            }
+            MotionEvent.ACTION_MOVE -> {
+                if (swipeInterceptArmed &&
+                    entry?.let { MediaDismiss.canSwipe(it, controller?.playbackState, context) } == true
+                ) {
+                    val dx = event.rawX - swipeDownX
+                    val dy = event.rawY - swipeDownY
+                    val slop = ViewConfiguration.get(context).scaledTouchSlop
+                    if (abs(dx) > slop && abs(dx) > abs(dy) * 1.5f) return true
+                }
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> swipeInterceptArmed = false
+        }
+        return super.onInterceptTouchEvent(event)
+    }
+
+    private fun touchesSeekBar(event: MotionEvent): Boolean {
+        if (seekRow.visibility != VISIBLE || seek.visibility != VISIBLE || seek.width == 0) return false
+        val screen = IntArray(2)
+        seek.getLocationOnScreen(screen)
+        return event.rawX >= screen[0] && event.rawX < screen[0] + seek.width &&
+            event.rawY >= screen[1] && event.rawY < screen[1] + seek.height
     }
 
     fun bind(e: Entry, c: Content) {

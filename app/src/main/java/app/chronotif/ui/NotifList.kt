@@ -17,11 +17,13 @@ import app.chronotif.Apps
 import app.chronotif.Content
 import app.chronotif.Entry
 import app.chronotif.LockPolicy
+import app.chronotif.MediaDismiss
 import app.chronotif.NotifStore
 import app.chronotif.Prefs
 import app.chronotif.R
 import app.chronotif.Viewable
 import app.chronotif.core.Attention
+import app.chronotif.core.Kind
 
 /**
  * Renders calls, media, NEW / EARLIER and the collapsed Running group into a [LinearLayout], shared by the panel and the
@@ -32,6 +34,7 @@ class NotifList(
     private val host: Host,
     private val container: LinearLayout,
     private val onLock: Boolean,
+    private val mediaDismiss: (Context, Entry) -> Boolean = MediaDismiss::dismiss,
 ) : CardCallbacks {
 
     interface Host {
@@ -399,7 +402,25 @@ class NotifList(
         render()
     }
 
-    override fun onDismiss(e: Entry) = dismissAll(listOf(e))
+    override fun onDismiss(e: Entry) {
+        if (e.kind != Kind.MEDIA) {
+            dismissAll(listOf(e))
+            return
+        }
+        // Recheck the current session before attempting the system dismissal:
+        // playback may have resumed after the swipe began.
+        if (!mediaDismiss(ctx, e)) {
+            render()
+            return
+        }
+        // The listener must confirm removal. If Android refuses to cancel the
+        // notification, restore the card instead of leaving a phantom dismissal.
+        pendingDismiss += e.key
+        container.postDelayed({
+            pendingDismiss -= e.key
+            if (NotifStore.get(e.key) != null) render()
+        }, 900)
+    }
 
     /** The notification as it is now: apps repost with fresh buttons, and an old one may no longer work. */
     private fun live(e: Entry) = NotifStore.get(e.key) ?: e

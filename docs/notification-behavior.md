@@ -61,7 +61,7 @@ Ongoing calls come first, then Media players, then New and Earlier. Every other 
 
 A media player stays a Media player while paused, even though apps drop the ongoing flag when they pause. It never falls into Earlier. Calls, Media players and Running never count as New, and none of them bring up the lock-screen view by themselves. Running never appears on the lock-screen view.
 
-A Media player is drawn from the app's media session, like the system shade's player: artwork, title and artist, previous / play-pause / next, and a seek bar you can drag with elapsed and total time. It has no output (cast) button, because Android offers apps no public way to open the output picker. Apps that share no session fall back to their notification actions. When several apps have players, all of them show, newest first. A player can be swiped away only while paused, and only if the app allows dismissal. On the lock-screen view, players follow the same privacy rules as other cards: when content is hidden, only the app name and controls show.
+A Media player is drawn from the app's media session, like the system shade's player: artwork, title and artist, previous / play-pause / next, and a seek bar you can drag with elapsed and total time. It has no output (cast) button, because Android offers apps no public way to open the output picker. Apps that share no session fall back to their notification actions. When several apps have players, all of them show, newest first. Paused or stopped Media players can be swiped left or right when the app allows it. A playing player cannot be swiped away. If Android keeps the notification after a swipe, the card returns. On the lock-screen view, players follow the same privacy rules as other cards: when content is hidden, only the app name and controls show.
 
 ## Verification cases
 
@@ -73,6 +73,7 @@ A Media player is drawn from the app's media session, like the system shade's pl
 - Check a conversation, then receive another incoming message through a silent update of its notification. The conversation returns to New.
 - Refresh a checked notification without a new incoming message. It remains in Earlier.
 - Open the panel with only always-running services active. Only the "N running" pill shows; tapping it reveals them.
+- On Android 15 / HyperOS, pause Apple Music, leave its NO_CLEAR Media player with deleteIntent visible, and swipe it in Chronotif. The player disappears from the stock shade and Android's active notifications too, not just Chronotif. Active or buffering playback must resist swipes; a protected Media player without deleteIntent must also resist. A rejected dismissal restores the card. Vertical scrolling, playback buttons and the seek bar keep working.
 - Receive a photo in X or TikTok. It shows as a thumbnail on its card. Press and hold the card: the Preview shows it large with the app's buttons. Tap the image: the viewer opens, Save puts it in the gallery at once, and the card stays New. (WhatsApp sends no image, only "📷 Photo".)
 - Receive three photos in one chat. The collapsed stack's thumbnail shows "+2". In the viewer you can swipe through all three.
 - Press and hold a card on the lock-screen view. The Preview and the viewer show without unlocking; Reply and Share ask to unlock.

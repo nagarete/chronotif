@@ -44,7 +44,7 @@ Chronotif's standing surfaces (the edge handle, the status-bar swipe and the loc
 _Avoid_: Disabled, Paused
 
 **Media player**:
-A playback control for an app that is playing or paused, shown above everything else. It stays while paused, until the app removes it, and never counts as New.
+A playback control for an app that is playing or paused, shown above everything else and never counted as New. A paused or stopped Media player may be swiped away using Android's normal cancellation for clearable notifications, or the sending app's deleteIntent for protected media. The player stays visible if no real dismissal occurs. Active playback cannot be dismissed.
 _Avoid_: Now playing card
 
 **Running**:
