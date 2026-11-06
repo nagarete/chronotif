@@ -44,8 +44,12 @@ class PanelView(
     companion object {
         private const val CHECK_DWELL_MS = 1500L
 
-        /** How dark the backdrop is: lighter over a blur. */
-        fun scrimAlpha(blur: Boolean) = if (blur) 0x8C / 255f else 0xD9 / 255f
+        /**
+         * How dark the backdrop is. Over a blur it's a light tint, like the stock shade, so the
+         * wallpaper or app behind keeps its brightness; without a blur it dims hard so the list
+         * doesn't compete with what's behind.
+         */
+        fun scrimAlpha(blur: Boolean) = if (blur) 0x33 / 255f else 0xD9 / 255f
 
         /** Only an unmoving tap that begins and ends below the list may dismiss it. */
         internal fun isEmptySpaceTap(
@@ -82,7 +86,7 @@ class PanelView(
     init {
         scrim = View(context).apply {
             // When the host window dims, this only catches outside taps.
-            if (!windowDims) setBackgroundColor(if (blur) 0x8C000000.toInt() else 0xD9000000.toInt())
+            if (!windowDims) setBackgroundColor((scrimAlpha(blur) * 255).toInt() shl 24)
             setOnClickListener { close() }
         }
         addView(scrim, LayoutParams(-1, -1))
@@ -92,13 +96,14 @@ class PanelView(
             setPadding(dp(12), 0, dp(12), dp(24))
         }
         val pal = Palette(context)
-        date = Ui.text(context, 15f, pal.onScrimSecondary, bold = true, lines = 1)
+        date = Ui.text(context, 15f, pal.onScrimSecondary, bold = true, lines = 1).also(Ui::shadow)
         val header = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             // Match the horizontal inset of notification and media cards.
             setPadding(dp(12), dp(8), dp(12), dp(4))
             addView(Ui.text(context, 30f, pal.onScrim, bold = true, lines = 1).apply {
                 setText(R.string.tile_label)
+                Ui.shadow(this)
             })
             addView(date, Ui.lp().apply { topMargin = dp(2) })
         }
