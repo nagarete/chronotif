@@ -88,8 +88,19 @@
     <string name="lock_privacy">Hide sensitive content</string>
     <string name="lock_privacy_desc">Always hide content on the lock screen. When off, Chronotif follows the system setting and each app\'s privacy choice. Opening, replying and actions always require unlocking.</string>
 
+    <string name="setup_notifications">Notifications</string>
+    <string name="excluded_title">Excluded apps</string>
+    <string name="excluded_desc">Choose apps or channels Chronotif leaves out. Android\'s own notifications stay as they are.</string>
+    <string name="excluded_intro">Turn an app or one of its channels off to leave it out of Chronotif. Tap an app to see its channels. Only apps and channels that have posted a notification are listed.</string>
+    <string name="excluded_stock_note">Excluded apps still appear in Android\'s notifications and can still wake the screen and show on Android\'s lock screen.</string>
+    <string name="excluded_empty">Apps appear here after they post a notification.</string>
+    <plurals name="excluded_channels">
+        <item quantity="one">%d channel</item>
+        <item quantity="other">%d channels</item>
+    </plurals>
+
     <string name="setup_privacy">Privacy</string>
-    <string name="privacy_body">No accounts, no analytics. Notifications never leave this device. Only the time of your last check and these settings are stored. The only network use is the optional update check below, which downloads from GitHub and sends nothing.</string>
+    <string name="privacy_body">No accounts, no analytics. Notifications never leave this device. Only the time of your last check, these settings and the names of apps and channels that have posted (for Excluded apps) are stored. The only network use is the optional update check below, which downloads from GitHub and sends nothing.</string>
 
     <string name="setup_updates">Updates</string>
     <string name="update_auto">Update automatically</string>

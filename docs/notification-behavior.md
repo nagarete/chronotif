@@ -63,6 +63,14 @@ A media player stays a Media player while paused, even though apps drop the ongo
 
 A Media player is drawn from the app's media session, like the system shade's player: artwork, title and artist, previous / play-pause / next, and a seek bar you can drag with elapsed and total time. It has no output (cast) button, because Android offers apps no public way to open the output picker. Apps that share no session fall back to their notification actions. When several apps have players, all of them show, newest first. Paused or stopped Media players can be swiped left or right when the app allows it. A playing player cannot be swiped away. If Android keeps the notification after a swipe, the card returns. On the lock-screen view, players follow the same privacy rules as other cards: when content is hidden, only the app name and controls show.
 
+## Excluded apps
+
+Agreed in the November 2026 interview (ADR 0005). Under Settings → Notifications → Excluded apps, any app, or one of its channels, can be switched off. Chronotif then leaves it out entirely: no card in the panel or the lock-screen view, never New, and it never brings up the lock-screen view. Nothing is exempt: calls, Media players and Running are excluded along with their app. Android's own notifications are not touched, so the stock shade, heads-up banners, sound, vibration and the screen wake carry on. When only excluded notifications arrive while locked, the screen still wakes and Android's lock screen shows them.
+
+The list holds only apps that have posted a notification since Chronotif was installed, alphabetically, with apps that have anything excluded first. Tapping an app shows the channels Chronotif has seen from it. Android doesn't let a notification listener read an app's full channel list. While a whole app is excluded, its channel switches are greyed and keep their own choice, and any channel it adds later is excluded too. A conversation's own channel counts as the channel it was split from. A work-profile copy of an app is a separate entry with the work badge.
+
+Excluding takes effect at once, and including an app again brings back its still-active notifications in their places. Neither counts as a check, so a notification that was New is still New. Clearing in Chronotif never dismisses an excluded notification. An excluded app's incoming call or full-screen alarm still keeps the lock-screen view from covering it.
+
 ## Verification cases
 
 - Leave a notification wake untouched. Chronotif remains visible and the display sleeps after the stock lock-screen timeout (about ten seconds), not the normal screen timeout, without an extra stock lock-screen interval.
@@ -80,6 +88,8 @@ A Media player is drawn from the app's media session, like the system shade's pl
 - Pause music. Its player stays at the top and does not move to Earlier.
 - Play music in Spotify or YouTube Music. The player shows artwork, title, artist, transport controls and a seek bar that moves; dragging it seeks.
 - With "Hide sensitive content" on, the lock-screen view's player shows the app name and controls but not the track.
+- Exclude an app in Settings → Notifications → Excluded apps. Its cards leave the panel at once and the New count drops; the stock shade still shows them. Switch it back on: unread ones are New again. Lock the phone and let only that app post: Chronotif's lock-screen view doesn't come up.
+- Exclude one channel of an app, such as Gmail's promotions. Other channels from that app keep showing.
 
 ## Automated verification
 

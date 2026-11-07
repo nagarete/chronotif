@@ -50,6 +50,8 @@ class NotificationBehaviorTest {
     fun setup() {
         context.getSharedPreferences("chronotif", Context.MODE_PRIVATE).edit().clear().commit()
         Prefs.init(context)
+        context.getSharedPreferences("exclusions", Context.MODE_PRIVATE).edit().clear().commit()
+        Exclusions.init(context)
         LockSession.reset()
         ranking = ReflectionHelpers.callConstructor(RankingMap::class.java,
             ReflectionHelpers.ClassParameter.from(Array<Ranking>::class.java, emptyArray<Ranking>()))
@@ -138,6 +140,64 @@ class NotificationBehaviorTest {
             assertTrue("The checked message sits in its own Earlier stack", shown.contains("seen"))
             assertTrue(shown.indexOf("Jiah") < shown.indexOf("seen"))
         }
+    }
+
+    private fun plain(title: String, channel: String = "messages") =
+        Notification.Builder(context, channel).setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle(title).build()
+
+    @Test
+    fun anExcludedAppLeavesChronotifUntouchedAndComesBackStillNew() {
+        val e = post(plain("Sale today"), 2000)
+        assertEquals(1, NotifStore.newCount())
+
+        Exclusions.setApp(e.appId, excluded = true)
+        shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(0, NotifStore.newCount())
+        withPanelList { list, container ->
+            list.render()
+            assertFalse(texts(container).contains("Sale today"))
+        }
+        assertNotNull("Android's notification is not touched", NotifStore.get(e.key))
+
+        Exclusions.setApp(e.appId, excluded = false)
+        assertEquals("Excluding is never a check", 1, NotifStore.newCount())
+    }
+
+    @Test
+    fun anExcludedChannelLeavesOnlyThatChannelOut() {
+        val promo = post(plain("Sale today", channel = "promos"), 2000, id = 1)
+        post(plain("Your parcel", channel = "orders"), 2100, id = 2)
+        assertEquals(listOf("orders", "promos"), Exclusions.seenApps()[promo.appId]!!.map { it.id }.sorted())
+
+        Exclusions.setChannel(promo.appId, "promos", excluded = true)
+        withPanelList { list, container ->
+            list.render()
+            val shown = texts(container)
+            assertTrue(shown.contains("Your parcel"))
+            assertFalse(shown.contains("Sale today"))
+        }
+        Exclusions.init(context)
+        assertTrue("Exclusions and seen channels persist", Exclusions.channelExcluded(promo.appId, "promos"))
+        assertEquals(2, Exclusions.seenApps()[promo.appId]!!.size)
+    }
+
+    @Test
+    fun anExcludedAppNeverBringsUpTheLockViewButItsAlarmStillKeepsItAway() {
+        shadowOf(context.getSystemService(KeyguardManager::class.java)).setKeyguardLocked(true)
+        val promo = post(plain("Sale today"), 2000, id = 1, pkg = "example.shop")
+        assertTrue(LockPolicy.shouldShow(context))
+        Exclusions.setApp(promo.appId, excluded = true)
+        assertFalse(LockPolicy.shouldShow(context))
+
+        Exclusions.setApp(promo.appId, excluded = false)
+        val alarm = post(Notification.Builder(context, "alarms").setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle("Wake up").setCategory(Notification.CATEGORY_ALARM)
+            .setFullScreenIntent(android.app.PendingIntent.getBroadcast(context, 0, Intent("alarm"),
+                android.app.PendingIntent.FLAG_IMMUTABLE), true).build(),
+            System.currentTimeMillis(), id = 2, pkg = "example.clock")
+        Exclusions.setApp(alarm.appId, excluded = true)
+        assertFalse("An excluded alarm still rings on screen; Chronotif mustn't cover it", LockPolicy.shouldShow(context))
     }
 
     @Test
