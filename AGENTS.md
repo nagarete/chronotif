@@ -1,6 +1,6 @@
 # Chronotif
 
-Android notification panel and lock-screen view built around one rule: newest first, split into New (since the last check) and Earlier (already checked). The user compares it with iOS/iPadOS and wants that behaviour wherever Android allows.
+Android notification panel and lock-screen view built around one rule: newest first, split into New (since the last check) and Earlier (already checked). Chronotif started from how iOS handles notifications, but it isn't an iOS copy. Behaviour is decided here, recorded in `docs/notification-behavior.md` and the ADRs, and argued on its own merit.
 
 ## Sources of truth
 
