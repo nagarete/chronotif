@@ -215,6 +215,11 @@ class SetupActivity : Activity() {
             Prefs.lockHideContent = it
         }
 
+        section(R.string.setup_notifications)
+        permission(R.string.excluded_title, R.string.excluded_desc, granted = null) {
+            startActivity(Intent(this, ExcludedAppsActivity::class.java))
+        }
+
         section(R.string.setup_updates)
         body.addView(text(getString(R.string.update_channel_label), 15f), gap(4))
         radios(
