@@ -842,4 +842,120 @@ class NotificationBehaviorTest {
         is ViewGroup -> (0 until view.childCount).flatMap { texts(view.getChildAt(it)) }
         else -> emptyList()
     }
+
+    // --- Panel header ---
+
+    private fun <T> withPanelHeader(block: (app.chronotif.ui.PanelActivity, LinearLayout) -> T): T {
+        val controller = Robolectric.buildActivity(app.chronotif.ui.PanelActivity::class.java).create()
+        try {
+            val root = controller.get().findViewById<ViewGroup>(android.R.id.content).getChildAt(0) as ViewGroup
+            val scroll = (0 until root.childCount).map { root.getChildAt(it) }
+                .filterIsInstance<android.widget.ScrollView>().single()
+            val header = (scroll.getChildAt(0) as ViewGroup).getChildAt(0) as LinearLayout
+            return block(controller.get(), header)
+        } finally {
+            controller.destroy()
+        }
+    }
+
+    private fun measure(v: View, width: Int) {
+        v.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED))
+        v.layout(0, 0, width, v.measuredHeight)
+    }
+
+    @Test
+    fun thePanelHeaderShowsAClockWithTheDateUnderItInsteadOfTheTitle() = withPanelHeader { _, header ->
+        assertFalse(texts(header).toString(), texts(header).contains(context.getString(R.string.tile_label)))
+        val row = header.getChildAt(0) as app.chronotif.ui.ClockDateRow
+        val clock = row.getChildAt(0) as android.widget.TextClock
+        assertEquals("h:mm", clock.format12Hour)
+        assertEquals("H:mm", clock.format24Hour)
+        val sp48 = android.util.TypedValue.applyDimension(
+            android.util.TypedValue.COMPLEX_UNIT_SP, 48f, context.resources.displayMetrics)
+        assertEquals(sp48, clock.textSize, 0.01f)
+        measure(header, 1080)
+        assertFalse(row.beside)
+        val date = row.getChildAt(1)
+        assertTrue("The date sits under the clock", date.top >= clock.bottom)
+    }
+
+    @Test
+    fun withTheClockOffThePanelHeaderShowsOnlyTheDate() {
+        Prefs.headerClock = false
+        Prefs.headerWeekday = false
+        withPanelHeader { _, header ->
+            assertEquals(1, header.childCount)
+            val date = header.getChildAt(0) as android.widget.TextClock
+            assertEquals(app.chronotif.ui.PanelHeader.datePattern(), date.format24Hour.toString())
+            assertFalse("No weekday", date.format24Hour.contains("E"))
+        }
+    }
+
+    @Test
+    fun aDateBesideTheClockMovesUnderItWhenItDoesNotFit() {
+        Prefs.headerDateBeside = true
+        Prefs.headerDateAlign = Prefs.DATE_ALIGN_BOTTOM
+        withPanelHeader { _, header ->
+            val row = header.getChildAt(0) as app.chronotif.ui.ClockDateRow
+            val clock = row.getChildAt(0)
+            val date = row.getChildAt(1)
+            measure(header, 4000)
+            assertTrue(row.beside)
+            assertTrue("Beside the clock", date.left >= clock.right)
+            assertEquals("Bottom lines up with the clock's baseline",
+                clock.top + clock.baseline, date.top + date.baseline)
+            measure(header, clock.measuredWidth + 40)
+            assertFalse(row.beside)
+            assertTrue("Under the clock, not cut off", date.top >= clock.bottom)
+        }
+    }
+
+    @Test
+    fun theHeaderDateFollowsTheLocalesOrder() {
+        Prefs.headerYear = true
+        assertEquals("EEEE, MMMM d, y", app.chronotif.ui.PanelHeader.datePattern(java.util.Locale.US))
+        assertEquals("EEEE, d. MMMM y", app.chronotif.ui.PanelHeader.datePattern(java.util.Locale.GERMANY))
+    }
+
+    @Test
+    fun tappingTheClockOpensAlarmsAndTheDateOpensTheCalendarThenThePanelCloses() {
+        withPanelHeader { activity, header ->
+            val row = header.getChildAt(0) as ViewGroup
+            assertTrue(row.getChildAt(0).performClick())
+            assertEquals(android.provider.AlarmClock.ACTION_SHOW_ALARMS,
+                shadowOf(activity).nextStartedActivity.action)
+            assertTrue(activity.isFinishing)
+        }
+        withPanelHeader { activity, header ->
+            val row = header.getChildAt(0) as ViewGroup
+            row.getChildAt(1).performClick()
+            val opened = shadowOf(activity).nextStartedActivity
+            assertEquals(Intent.ACTION_VIEW, opened.action)
+            assertTrue(opened.data.toString(), opened.data.toString().startsWith("content://com.android.calendar/time/"))
+            assertTrue(activity.isFinishing)
+        }
+    }
+
+    @Test
+    fun tappingTheClockWithNoClockAppDoesNothing() {
+        withPanelHeader { activity, header ->
+            shadowOf(activity.application).checkActivities(true)
+            val row = header.getChildAt(0) as ViewGroup
+            row.getChildAt(0).performClick()
+            assertFalse("The panel stays open", activity.isFinishing)
+        }
+    }
+
+    @Test
+    fun theHeaderClockAndDateReadAsButtonsToTalkBack() = withPanelHeader { _, header ->
+        val row = header.getChildAt(0) as ViewGroup
+        listOf(0 to R.string.header_open_alarms, 1 to R.string.header_open_calendar).forEach { (i, label) ->
+            val info = android.view.accessibility.AccessibilityNodeInfo.obtain()
+            row.getChildAt(i).onInitializeAccessibilityNodeInfo(info)
+            assertEquals(android.widget.Button::class.java.name, info.className)
+            assertTrue(info.actionList.any { it.id == android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK &&
+                it.label == context.getString(label) })
+        }
+    }
 }
