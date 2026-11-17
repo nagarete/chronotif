@@ -185,6 +185,7 @@ class SetupActivity : Activity() {
             Prefs.handleHideLandscape = it
             applyHandle()
         }
+        header()
         body.addView(text(getString(R.string.tile_hint), 13f, secondary = true), gap(12))
         val buttons = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         buttons.addView(Button(this).apply {
@@ -254,6 +255,62 @@ class SetupActivity : Activity() {
         body.addView(text(getString(R.string.privacy_body), 15f, secondary = true), gap(4))
         body.addView(text(getString(R.string.version, BuildConfig.VERSION_NAME), 13f, secondary = true), gap(12))
     }
+
+    /** The panel header's clock and date. Changes show the next time the panel opens. */
+    private fun header() {
+        body.addView(text(getString(R.string.header_title), 16f, bold = true), gap(20))
+        body.addView(text(getString(R.string.header_desc), 13f, secondary = true))
+        val clockOptions = group()
+        val besideOptions = group()
+        fun refresh() {
+            clockOptions.visibility = if (Prefs.headerClock) View.VISIBLE else View.GONE
+            besideOptions.visibility = if (Prefs.headerDateBeside) View.VISIBLE else View.GONE
+        }
+        toggle(R.string.header_clock, null, { Prefs.headerClock }) {
+            Prefs.headerClock = it
+            refresh()
+        }
+        body.addView(clockOptions)
+        val sizeLabel = text("", 15f)
+        fun showSize() { sizeLabel.text = getString(R.string.header_clock_size, Prefs.headerClockSize) }
+        showSize()
+        clockOptions.addView(sizeLabel, gap(12))
+        clockOptions.addView(SeekBar(this).apply {
+            max = Prefs.CLOCK_SIZE_MAX - Prefs.CLOCK_SIZE_MIN
+            progress = Prefs.headerClockSize - Prefs.CLOCK_SIZE_MIN
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(s: SeekBar, p: Int, fromUser: Boolean) {
+                    if (!fromUser) return
+                    Prefs.headerClockSize = Prefs.CLOCK_SIZE_MIN + p
+                    showSize()
+                }
+                override fun onStartTrackingTouch(s: SeekBar) {}
+                override fun onStopTrackingTouch(s: SeekBar) {}
+            })
+        }, gap(4))
+        clockOptions.addView(text(getString(R.string.header_date_position), 15f), gap(12))
+        radios(
+            listOf(R.string.header_date_under, R.string.header_date_beside),
+            selected = if (Prefs.headerDateBeside) 1 else 0,
+            into = clockOptions,
+        ) {
+            Prefs.headerDateBeside = it == 1
+            refresh()
+        }
+        clockOptions.addView(besideOptions)
+        besideOptions.addView(text(getString(R.string.header_date_align), 15f), gap(12))
+        radios(
+            listOf(R.string.header_align_top, R.string.header_align_center, R.string.header_align_bottom),
+            selected = Prefs.headerDateAlign,
+            into = besideOptions,
+        ) { Prefs.headerDateAlign = it }
+        toggle(R.string.header_weekday, null, { Prefs.headerWeekday }) { Prefs.headerWeekday = it }
+        toggle(R.string.header_year, null, { Prefs.headerYear }) { Prefs.headerYear = it }
+        toggle(R.string.header_short_names, null, { Prefs.headerShortNames }) { Prefs.headerShortNames = it }
+        refresh()
+    }
+
+    private fun group() = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
 
     private fun applyHandle() {
         ListenerService.instance?.refreshHandle()
@@ -366,7 +423,13 @@ class SetupActivity : Activity() {
         if (desc != null) body.addView(text(getString(desc), 13f, secondary = true))
     }
 
-    private fun radios(labels: List<Int>, selected: Int, vertical: Boolean = false, onPick: (Int) -> Unit) {
+    private fun radios(
+        labels: List<Int>,
+        selected: Int,
+        vertical: Boolean = false,
+        into: LinearLayout = body,
+        onPick: (Int) -> Unit,
+    ) {
         val group = RadioGroup(this).apply {
             orientation = if (vertical) RadioGroup.VERTICAL else RadioGroup.HORIZONTAL
         }
@@ -379,6 +442,6 @@ class SetupActivity : Activity() {
                 setOnClickListener { onPick(i) }
             })
         }
-        body.addView(group)
+        into.addView(group)
     }
 }

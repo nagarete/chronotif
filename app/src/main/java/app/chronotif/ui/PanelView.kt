@@ -18,12 +18,8 @@ import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
-import android.widget.TextView
 import app.chronotif.NotifStore
 import app.chronotif.Prefs
-import app.chronotif.R
-import java.text.DateFormat
-import java.util.Date
 import kotlin.math.abs
 
 /**
@@ -35,7 +31,7 @@ import kotlin.math.abs
 @SuppressLint("ViewConstructor")
 class PanelView(
     context: Context,
-    host: NotifList.Host,
+    private val host: NotifList.Host,
     blur: Boolean,
     windowDims: Boolean = false,
     private val onClose: () -> Unit,
@@ -65,7 +61,7 @@ class PanelView(
     private val scrim: View
     private val scroll: ScrollView
     private val content: LinearLayout
-    private val date: TextView
+    private val header: LinearLayout
     private val list: NotifList
     private val main = Handler(Looper.getMainLooper())
     private var shownAt = 0L
@@ -95,18 +91,12 @@ class PanelView(
             orientation = LinearLayout.VERTICAL
             setPadding(dp(12), 0, dp(12), dp(24))
         }
-        val pal = Palette(context)
-        date = Ui.text(context, 15f, pal.onScrimSecondary, bold = true, lines = 1).also(Ui::shadow)
-        val header = LinearLayout(context).apply {
+        header = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             // Match the horizontal inset of notification and media cards.
             setPadding(dp(12), dp(8), dp(12), dp(4))
-            addView(Ui.text(context, 30f, pal.onScrim, bold = true, lines = 1).apply {
-                setText(R.string.tile_label)
-                Ui.shadow(this)
-            })
-            addView(date, Ui.lp().apply { topMargin = dp(2) })
         }
+        PanelHeader.fill(header, host)
         val column = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             addView(header)
@@ -184,7 +174,8 @@ class PanelView(
     /** The panel is on screen: start following notifications. */
     fun shown() {
         shownAt = System.currentTimeMillis()
-        date.text = DateFormat.getDateInstance(DateFormat.FULL).format(Date())
+        // Picks up header settings changed since the panel was built.
+        PanelHeader.fill(header, host)
         NotifStore.addListener(render)
         list.render()
         main.removeCallbacks(ticker)

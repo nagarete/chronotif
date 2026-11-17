@@ -203,6 +203,13 @@ To open Chronotif in fullscreen, use the Quick Settings tile, or turn off the ed
   display timeout, which can be longer than the stock lock-screen timeout.
   *Settings → Lock screen* chooses Off / *When something is new* (default) /
   *Whenever there are notifications*.
+- **Header**: the clock and date at the top of the panel. Tap the clock to open your alarms, or
+  the date to open your calendar; tapping elsewhere in the header closes the panel.
+  *Settings → Panel → Header* turns the clock off (then only the date shows), sets its size
+  (32–64 sp, growing with the system font size), puts the date under or beside the clock (lined
+  up at the top, center or bottom), and chooses whether the weekday and year show and whether
+  names are full or short. 12/24-hour time follows Android's setting, and the date's order
+  follows your language. A date that doesn't fit beside the clock moves under it.
 - **Turn it off**: switch off *Settings → Chronotif is on* to hide the edge handle, status-bar
   swipe and lock-screen view without uninstalling. Your handle and lock-screen settings are kept for when
   you turn it back on. The Quick Settings tile shows "Off" and still opens the panel.

@@ -77,6 +77,22 @@
     <string name="side_right">Right</string>
     <string name="handle_position">Position</string>
     <string name="handle_landscape">Hide in landscape</string>
+    <string name="header_title">Header</string>
+    <string name="header_desc">The clock and date at the top of the panel. Tap the clock to open your alarms, or the date to open your calendar. 12/24-hour time and the date\'s order follow your phone\'s settings.</string>
+    <string name="header_clock">Clock</string>
+    <string name="header_clock_size">Clock size: %1$d</string>
+    <string name="header_date_position">Date</string>
+    <string name="header_date_under">Under the clock</string>
+    <string name="header_date_beside">Beside the clock</string>
+    <string name="header_date_align">Line up with the clock</string>
+    <string name="header_align_top">Top</string>
+    <string name="header_align_center">Center</string>
+    <string name="header_align_bottom">Bottom</string>
+    <string name="header_weekday">Show weekday</string>
+    <string name="header_year">Show year</string>
+    <string name="header_short_names">Short names</string>
+    <string name="header_open_alarms">Open alarms</string>
+    <string name="header_open_calendar">Open calendar</string>
     <string name="tile_hint">You can also add the “Chronotif” tile to Quick Settings.</string>
     <string name="open_panel">Open panel now</string>
 

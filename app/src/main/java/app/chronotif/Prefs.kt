@@ -64,6 +64,46 @@ object Prefs {
         get() = sp.getBoolean("lock_hide_content", false)
         set(v) = sp.edit().putBoolean("lock_hide_content", v).apply()
 
+    // --- Panel header. Android decides what the time and date say; these choose what shows,
+    // where and how big (ADR 0005).
+
+    const val DATE_ALIGN_TOP = 0
+    const val DATE_ALIGN_CENTER = 1
+    const val DATE_ALIGN_BOTTOM = 2
+    const val CLOCK_SIZE_MIN = 32
+    const val CLOCK_SIZE_MAX = 64
+
+    var headerClock: Boolean
+        get() = sp.getBoolean("header_clock", true)
+        set(v) = sp.edit().putBoolean("header_clock", v).apply()
+
+    /** In sp, so it still grows with the system font size. */
+    var headerClockSize: Int
+        get() = sp.getInt("header_clock_size", 48).coerceIn(CLOCK_SIZE_MIN, CLOCK_SIZE_MAX)
+        set(v) = sp.edit().putInt("header_clock_size", v.coerceIn(CLOCK_SIZE_MIN, CLOCK_SIZE_MAX)).apply()
+
+    /** The date beside the clock instead of under it. */
+    var headerDateBeside: Boolean
+        get() = sp.getBoolean("header_date_beside", false)
+        set(v) = sp.edit().putBoolean("header_date_beside", v).apply()
+
+    /** How the date lines up with the clock beside it. */
+    var headerDateAlign: Int
+        get() = sp.getInt("header_date_align", DATE_ALIGN_BOTTOM)
+        set(v) = sp.edit().putInt("header_date_align", v).apply()
+
+    var headerWeekday: Boolean
+        get() = sp.getBoolean("header_weekday", true)
+        set(v) = sp.edit().putBoolean("header_weekday", v).apply()
+
+    var headerYear: Boolean
+        get() = sp.getBoolean("header_year", false)
+        set(v) = sp.edit().putBoolean("header_year", v).apply()
+
+    var headerShortNames: Boolean
+        get() = sp.getBoolean("header_short_names", false)
+        set(v) = sp.edit().putBoolean("header_short_names", v).apply()
+
     /** Opt-in: check GitHub Releases daily and install newer versions. */
     var autoUpdate: Boolean
         get() = sp.getBoolean("auto_update", false)
