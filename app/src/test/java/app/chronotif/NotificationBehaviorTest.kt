@@ -938,6 +938,24 @@ class NotificationBehaviorTest {
     }
 
     @Test
+    fun aClockAppThatRefusesItsAlarmsScreenIsOpenedPlainInstead() {
+        val pm = shadowOf(context.packageManager)
+        val alarms = android.content.ComponentName("com.example.clock", "com.example.clock.Alarms")
+        val main = android.content.ComponentName("com.example.clock", "com.example.clock.Main")
+        pm.addActivityIfNotPresent(alarms)
+        pm.addIntentFilterForActivity(alarms, android.content.IntentFilter(android.provider.AlarmClock.ACTION_SHOW_ALARMS)
+            .apply { addCategory(Intent.CATEGORY_DEFAULT) })
+        pm.addActivityIfNotPresent(main)
+        pm.addIntentFilterForActivity(main, android.content.IntentFilter(Intent.ACTION_MAIN)
+            .apply { addCategory(Intent.CATEGORY_LAUNCHER) })
+
+        val intents = app.chronotif.ui.PanelHeader.alarmsIntents(context)
+        assertEquals(android.provider.AlarmClock.ACTION_SHOW_ALARMS, intents[0].action)
+        assertEquals("com.example.clock", intents[1].`package` ?: intents[1].component?.packageName)
+        assertTrue(intents[1].hasCategory(Intent.CATEGORY_LAUNCHER))
+    }
+
+    @Test
     fun tappingTheClockWithNoClockAppDoesNothing() {
         withPanelHeader { activity, header ->
             shadowOf(activity.application).checkActivities(true)

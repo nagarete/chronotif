@@ -11,6 +11,10 @@
     <!-- "Update ready" / "Updated" notifications. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- Clock apps only open their alarms screen (tapping the panel clock) for apps that hold
+         this. Chronotif never sets an alarm. -->
+    <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
+
     <!-- Edge handle overlay + launching the lock-screen view when the screen turns on. -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <!-- Resolve app names/icons for every package that posts notifications (local only). -->

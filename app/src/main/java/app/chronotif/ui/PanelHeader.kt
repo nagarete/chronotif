@@ -38,19 +38,31 @@ internal object PanelHeader {
         val ctx = header.context
         header.removeAllViews()
         val date = date(ctx).apply {
-            tapTarget(host, R.string.header_open_calendar) { calendarIntent(System.currentTimeMillis()) }
+            tapTarget(host, R.string.header_open_calendar) { listOf(calendarIntent(System.currentTimeMillis())) }
         }
         if (!Prefs.headerClock) {
             header.addView(date, Ui.lp(-2))
             return
         }
         val clock = clock(ctx, Prefs.headerClockSize.toFloat()).apply {
-            tapTarget(host, R.string.header_open_alarms, ::alarmsIntent)
+            tapTarget(host, R.string.header_open_alarms) { alarmsIntents(ctx) }
         }
         header.addView(ClockDateRow(ctx, clock, date, Prefs.headerDateBeside, Prefs.headerDateAlign))
     }
 
     fun alarmsIntent() = Intent(AlarmClock.ACTION_SHOW_ALARMS)
+
+    /**
+     * The alarms screen, then the clock app's own start screen. Clock apps guard the alarms
+     * screen with SET_ALARM, which the manifest asks for; one that still refuses (or that some
+     * ROM guards with something else) is opened the plain way instead of the tap doing nothing.
+     */
+    fun alarmsIntents(ctx: Context): List<Intent> {
+        val pm = ctx.packageManager
+        val clockApp = pm.resolveActivity(alarmsIntent(), 0)?.activityInfo?.packageName
+            ?.let { pm.getLaunchIntentForPackage(it) }
+        return listOfNotNull(alarmsIntent(), clockApp)
+    }
 
     fun calendarIntent(now: Long) = Intent(
         Intent.ACTION_VIEW,
@@ -87,17 +99,22 @@ internal object PanelHeader {
         Ui.shadow(this)
     }
 
-    /** A button for TalkBack ("Open alarms"); does nothing when no app handles [intent]. */
-    private fun TextView.tapTarget(host: NotifList.Host, label: Int, intent: () -> Intent) {
+    /**
+     * A button for TalkBack ("Open alarms") that opens the first of [intents] Android lets it
+     * start; does nothing when none can be opened.
+     */
+    private fun TextView.tapTarget(host: NotifList.Host, label: Int, intents: () -> List<Intent>) {
         background = Ui.pressable(0, dp(8).toFloat(), Palette(context).pill)
         setOnClickListener {
-            val opened = try {
-                host.context.startActivity(intent().addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                true
-            } catch (_: ActivityNotFoundException) {
-                false
-            } catch (_: SecurityException) {
-                false
+            val opened = intents().any { intent ->
+                try {
+                    host.context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                    true
+                } catch (_: ActivityNotFoundException) {
+                    false
+                } catch (_: SecurityException) {
+                    false
+                }
             }
             if (opened) host.launched()
         }
