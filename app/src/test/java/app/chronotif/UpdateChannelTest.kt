@@ -4,8 +4,6 @@ package app.chronotif
 
 import android.app.Application
 import android.content.Context
-import org.json.JSONArray
-import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
@@ -33,40 +31,40 @@ class UpdateChannelTest {
     }
 
     @Test
-    fun stableIgnoresNightliesDraftsAndPrereleases() {
-        val releases = JSONArray()
-            .put(release("nightly-0.2.4-100", prerelease = true))
-            .put(release("v0.2.4", prerelease = true))
-            .put(release("v0.2.5", draft = true))
-            .put(release("v0.2.3"))
-        assertEquals("0.2.3", Updater.selectRelease(releases, nightly = false)?.version)
+    fun stableIgnoresNightlyTags() {
+        val tags = listOf("nightly-0.2.4-100", "v0.2.3")
+        assertEquals("0.2.3", Updater.selectRelease(tags, nightly = false)?.version)
     }
 
     @Test
     fun nightlySelectsNewestBuildWithoutCrossingToStable() {
-        val releases = JSONArray()
-            .put(release("v0.3.0"))
-            .put(release("nightly-0.2.3-9", prerelease = true))
-            .put(release("nightly-0.2.3-11", draft = true))
-            .put(release("nightly-0.2.3-10", prerelease = true))
-        assertEquals("0.2.3-nightly.10", Updater.selectRelease(releases, nightly = true)?.version)
+        val tags = listOf("v0.3.0", "nightly-0.2.3-9", "nightly-0.2.3-10")
+        assertEquals("0.2.3-nightly.10", Updater.selectRelease(tags, nightly = true)?.version)
     }
 
     @Test
-    fun incompleteAssetsCannotBecomeAnUpdate() {
-        val incomplete = release("nightly-0.2.3-11", prerelease = true)
-        incomplete.getJSONArray("assets").getJSONObject(1).put("name", "other.apk.sha256")
-        val releases = JSONArray().put(incomplete).put(release("nightly-0.2.3-10", prerelease = true))
-        val selected = Updater.selectRelease(releases, nightly = true)!!
-        assertEquals("0.2.3-nightly.10", selected.version)
-        assertEquals("https://example.com/app.apk", selected.apkUrl)
-        assertEquals("https://example.com/app.apk.sha256", selected.sumUrl)
-        assertNull(Updater.selectRelease(JSONArray().put(incomplete), nightly = true))
+    fun downloadUrlsFollowTheTag() {
+        val selected = Updater.selectRelease(listOf("nightly-0.2.5-172"), nightly = true)!!
+        val apk = "https://github.com/nagarete/chronotif/releases/download/nightly-0.2.5-172/chronotif-nightly-0.2.5-172.apk"
+        assertEquals(apk, selected.apkUrl)
+        assertEquals("$apk.sha256", selected.sumUrl)
+        assertNull(Updater.selectRelease(listOf("nightly-broken", "v0.2.3-rc1"), nightly = true))
     }
 
-    private fun release(tag: String, prerelease: Boolean = false, draft: Boolean = false) =
-        JSONObject().put("tag_name", tag).put("prerelease", prerelease).put("draft", draft)
-            .put("assets", JSONArray(listOf("app.apk", "app.apk.sha256").map { name ->
-                JSONObject().put("name", name).put("browser_download_url", "https://example.com/$name")
-            }))
+    @Test
+    fun feedTagsComeFromEntryLinksNotReleaseNotes() {
+        val atom = """
+            <feed>
+              <link type="text/html" rel="alternate" href="https://github.com/nagarete/chronotif/releases"/>
+              <entry>
+                <link rel="alternate" type="text/html" href="https://github.com/nagarete/chronotif/releases/tag/nightly-0.2.5-172"/>
+                <content type="html">&lt;a href=&quot;https://github.com/nagarete/chronotif/releases/tag/v9.9.9&quot;&gt;</content>
+              </entry>
+              <entry>
+                <link rel="alternate" type="text/html" href="https://github.com/nagarete/chronotif/releases/tag/v0.2.4"/>
+              </entry>
+            </feed>
+        """.trimIndent()
+        assertEquals(listOf("nightly-0.2.5-172", "v0.2.4"), Updater.feedTags(atom))
+    }
 }
