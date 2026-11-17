@@ -96,8 +96,9 @@ a day. When there's a newer version it downloads the APK, checks it against the 
   silently and you get an "updated" notification.
 - Otherwise you get an "update available" notification. Tap it to confirm the install.
 
-*Check for updates* does the same thing on demand. The check reads the public release list
-and sends nothing about you or your notifications. Android only accepts an update signed with
+*Check for updates* does the same thing on demand. The check reads the public release pages
+on github.com and sends nothing about you or your notifications. If GitHub is limiting
+requests from your network, the check says so; try again later or on another network. Android only accepts an update signed with
 the same key as the installed app, so a tampered APK can't install.
 
 Updating from **v0.1.0** has to be done by hand once: uninstall it, then install the new
@@ -264,7 +265,9 @@ so losing it means every user has to uninstall and reinstall.
 `.github/workflows/build.yml` builds and tests pushes to main and pull requests. Published
 APKs require these repository secrets: `KEYSTORE_B64` (`base64 -w0 release.jks`),
 `KEYSTORE_PASSWORD`, `KEY_ALIAS`, and `KEY_PASSWORD`. Both channels use this same signing key.
-Each release includes an APK and its SHA-256 checksum.
+Each release includes an APK and its SHA-256 checksum, named `chronotif-<tag>.apk` and
+`chronotif-<tag>.apk.sha256`. The in-app updater builds the download URLs from the tag, so keep
+these names.
 
 `versionName` in `app/build.gradle.kts` is the next stable version. Nightlies append
 `-nightly.<build>` and use tags `nightly-<version>-<build>`. Their version codes increase with

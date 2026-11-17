@@ -121,6 +121,7 @@
     <string name="update_downloading">Downloading %s…</string>
     <string name="update_installing">Installing %s…</string>
     <string name="update_error">Update check failed: %s</string>
+    <string name="update_rate_limited">GitHub is limiting requests from this network. Try again later.</string>
     <string name="update_ready_title">Chronotif %s is available</string>
     <string name="update_ready_body">Tap to install the update.</string>
     <string name="update_done_title">Chronotif updated to %s</string>

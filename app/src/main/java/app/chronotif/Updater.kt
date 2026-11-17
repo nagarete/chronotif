@@ -20,8 +20,6 @@ import android.os.Handler
 import android.os.Looper
 import app.chronotif.core.Version
 import app.chronotif.ui.SetupActivity
-import org.json.JSONArray
-import org.json.JSONObject
 import java.io.File
 import java.io.IOException
 import java.net.HttpURLConnection
@@ -32,15 +30,19 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 
 /**
- * Opt-in self-update from GitHub Releases. The only network code in the app: it reads the release
- * list from api.github.com and downloads the APK plus its `.sha256`. Nothing is sent.
+ * Opt-in self-update from GitHub Releases. The only network code in the app: it finds the newest
+ * release tag on github.com and downloads the APK plus its `.sha256`. Nothing is sent.
+ *
+ * It reads github.com pages, not api.github.com, whose anonymous quota of 60 requests an hour is
+ * shared by everyone behind the same IP address (ADR 0006). CI names the assets after the tag, so
+ * the tag alone gives both download URLs.
  *
  * Installs go through PackageInstaller. On Android 12+ a self-update can be silent once
  * "Install unknown apps" is allowed for Chronotif; otherwise the system asks for confirmation.
  * Android itself refuses an APK not signed with the same key as the installed app.
  */
 object Updater {
-    private const val RELEASES = "https://api.github.com/repos/nagarete/chronotif/releases"
+    private const val REPO = "https://github.com/nagarete/chronotif"
     private const val MAX_APK_BYTES = 50L shl 20
     private const val JOB_ID = 1
     private const val CHANNEL = "updates"
@@ -48,6 +50,9 @@ object Updater {
     const val EXTRA_VERSION = "version"
 
     class Release(val version: String, val apkUrl: String, val sumUrl: String)
+
+    /** GitHub refused the request, most often because this IP address made too many. */
+    class RateLimited : IOException("rate limited")
 
     /** True while the setup screen is visible, so install prompts open directly instead of notifying. */
     @Volatile var foreground = false
@@ -99,6 +104,8 @@ object Updater {
                         install(app, apk, r.version)
                     }
                 }
+            } catch (e: RateLimited) {
+                status(R.string.update_rate_limited)
             } catch (e: Exception) {
                 status(R.string.update_error, e.message ?: e.javaClass.simpleName)
             } finally {
@@ -108,33 +115,44 @@ object Updater {
         }
     }
 
-    /** Stable uses /latest so frequent nightlies cannot hide it from the release list. */
+    /**
+     * Stable follows the /releases/latest redirect, which skips prereleases, so frequent nightlies
+     * cannot hide it. Nightly reads the releases feed, which lists recent releases without drafts.
+     */
     private fun latest(): Release? {
         val nightly = Prefs.nightlyUpdates
-        val endpoint = if (nightly) "$RELEASES?per_page=100" else "$RELEASES/latest"
-        val json = get(endpoint, api = true).use { it.readBytes().decodeToString() }
-        val list = if (nightly) JSONArray(json) else JSONArray().put(JSONObject(json))
-        return selectRelease(list, nightly)
+        val tags = if (nightly) {
+            feedTags(get("$REPO/releases.atom").use { it.readBytes().decodeToString() })
+        } else {
+            listOfNotNull(latestTag())
+        }
+        return selectRelease(tags, nightly)
     }
 
-    internal fun selectRelease(list: JSONArray, nightly: Boolean): Release? {
+    /** The tag that /releases/latest redirects to, or null when there's no stable release yet. */
+    private fun latestTag(): String? {
+        val c = open("$REPO/releases/latest")
+        c.instanceFollowRedirects = false
+        try {
+            val code = c.responseCode
+            if (code !in 300..399) throw failure(code)
+            return c.getHeaderField("Location")?.substringAfter("/releases/tag/", "")?.ifBlank { null }
+        } finally {
+            c.disconnect()
+        }
+    }
+
+    /** Release tags in the Atom feed. Release notes are escaped there, so their links can't match. */
+    internal fun feedTags(atom: String): List<String> =
+        Regex("\"${Regex.escape(REPO)}/releases/tag/([^\"]+)\"").findAll(atom).map { it.groupValues[1] }.toList()
+
+    internal fun selectRelease(tags: List<String>, nightly: Boolean): Release? {
         var best: Release? = null
-        for (i in 0 until list.length()) {
-            val rel = list.getJSONObject(i)
-            if (rel.optBoolean("draft")) continue
-            if (!nightly && rel.optBoolean("prerelease")) continue
-            val version = Version.releaseVersion(rel.optString("tag_name"), nightly) ?: continue
-            val assets = rel.optJSONArray("assets") ?: continue
-            val downloads = mutableMapOf<String, String>()
-            for (j in 0 until assets.length()) {
-                val a = assets.getJSONObject(j)
-                val name = a.optString("name")
-                val url = a.optString("browser_download_url")
-                if (url.isNotBlank()) downloads[name] = url
-            }
-            val apk = downloads.keys.firstOrNull { it.endsWith(".apk") && "$it.sha256" in downloads } ?: continue
+        for (tag in tags) {
+            val version = Version.releaseVersion(tag, nightly) ?: continue
             if (best == null || Version.isNewer(version, best.version)) {
-                best = Release(version, downloads.getValue(apk), downloads.getValue("$apk.sha256"))
+                val apk = "$REPO/releases/download/$tag/chronotif-$tag.apk"
+                best = Release(version, apk, "$apk.sha256")
             }
         }
         return best
@@ -198,18 +216,25 @@ object Updater {
         apk.delete()
     }
 
-    private fun get(url: String, api: Boolean = false): java.io.InputStream {
+    private fun open(url: String): HttpURLConnection {
         val c = URL(url).openConnection() as HttpURLConnection
         c.connectTimeout = 15_000
         c.readTimeout = 30_000
         c.setRequestProperty("User-Agent", "Chronotif/${BuildConfig.VERSION_NAME}")
-        if (api) c.setRequestProperty("Accept", "application/vnd.github+json")
+        return c
+    }
+
+    private fun get(url: String): java.io.InputStream {
+        val c = open(url)
         if (c.responseCode != HttpURLConnection.HTTP_OK) {
+            val code = c.responseCode
             c.disconnect()
-            throw IOException("HTTP ${c.responseCode}")
+            throw failure(code)
         }
         return c.inputStream
     }
+
+    private fun failure(code: Int) = if (code == 403 || code == 429) RateLimited() else IOException("HTTP $code")
 
     // --- Notifications ---
 
