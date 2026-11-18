@@ -102,10 +102,16 @@ class NotificationBehaviorTest {
 
     @Test
     fun demoModeShowsOnlyTheMadeUpDemoAppsAndStaysOnAfterARestart() {
-        post(notification("real chat"), time = 1000, id = 1, pkg = "example.chat")
+        val real = post(notification("real chat"), time = 1000, id = 1, pkg = "example.chat")
         post(notification("demo chat"), time = 2000, id = 2, pkg = DemoMode.PREFIX + "chat")
         DemoMode.set(context, true)
         DemoMode.init(context)
+        assertNull("Real notifications aren't even kept", NotifStore.get(real.key))
+        @Suppress("DEPRECATION")
+        val arriving = StatusBarNotification("example.mail", "example.mail", 3, null, 1000, 0, 0,
+            notification("another real one"), Process.myUserHandle(), 3000)
+        NotifStore.post(arriving, ranking)
+        assertNull("One arriving in demo mode isn't kept either", NotifStore.get(arriving.key))
         withLockList { list, container ->
             list.render()
             val shown = shownTexts(container)
@@ -114,7 +120,6 @@ class NotificationBehaviorTest {
         }
         assertEquals(1, NotifStore.newCount())
         DemoMode.set(context, false)
-        assertEquals(2, NotifStore.newCount())
     }
 
     @Test

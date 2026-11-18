@@ -134,7 +134,14 @@ object NotifStore {
         }
     }
 
+    /** Demo mode: forgets everything it hides, so nothing can draw a real notification. */
+    fun dropDemoHidden() {
+        entries.values.removeAll { DemoMode.hides(it.pkg) }
+        changed()
+    }
+
     private fun put(sbn: StatusBarNotification, map: RankingMap) {
+        if (DemoMode.hides(sbn.packageName)) return
         val n = sbn.notification
         val live = Content.kind(sbn) != Kind.NOTIFICATION
         val quiet = n.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0 || live

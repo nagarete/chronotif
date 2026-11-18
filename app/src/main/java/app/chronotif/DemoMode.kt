@@ -8,7 +8,7 @@ import android.content.Context
 /**
  * Debug builds only: while on, Chronotif shows nothing but notifications from the made-up apps
  * used to record the promo video (packages under [PREFIX]), so real notifications can't end up
- * in a recording. Kept on across restarts, so a killed process can't let them back in.
+ * in a recording. They're dropped as they arrive, not only hidden when drawn. Kept on across restarts, so a killed process can't let them back in.
  * Switched over adb by the debug build's DemoModeReceiver (see website/video/README.md).
  */
 object DemoMode {
@@ -30,7 +30,8 @@ object DemoMode {
         if (!BuildConfig.DEBUG) return
         context.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit().putBoolean(KEY, value).commit()
         on = value
-        NotifStore.changed()
+        // On: real notifications aren't even kept in memory. Off: read them back from Android.
+        if (value) NotifStore.dropDemoHidden() else ListenerService.instance?.resync()
     }
 
     fun hides(pkg: String): Boolean = on && !pkg.startsWith(PREFIX)
