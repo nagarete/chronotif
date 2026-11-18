@@ -73,3 +73,15 @@ own page on 2026-11-18. The files are kept in `raw/music/`, not in git.
 
 Trailer: `node trailer/render.mjs raw/trailer-silent.mp4 && ./mux.sh raw/trailer-silent.mp4 raw/music/tranquil.mp3 out/chronotif-trailer.mp4`.
 Features: `MUSIC=raw/music/bubbles.mp3 ./edit.sh features`.
+
+## On the website
+
+The site plays a smaller copy of the trailer, kept in git at `../public/video/` (720×1280, about
+1.4 MB) with a still from 15 s as its poster. After re-rendering the trailer, rebuild both:
+
+```sh
+ffmpeg -i out/chronotif-trailer.mp4 -vf scale=720:1280 -c:v libx264 -preset slow -crf 26 \
+  -pix_fmt yuv420p -movflags +faststart -c:a aac -b:a 96k ../public/video/trailer.mp4
+ffmpeg -ss 15 -i out/chronotif-trailer.mp4 -frames:v 1 -c:v libwebp -quality 80 \
+  -vf scale=720:-1 ../public/video/trailer-poster.webp
+```

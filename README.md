@@ -14,14 +14,37 @@ stay accessible without competing for the same attention.
 [Website & interactive demo](https://chronotif.com) ·
 [Setup help](docs/guide.md#install)
 
-<p align="center">
-  <img src="website/public/screens/panel-480.webp" width="220" alt="Notification panel with a music player at the top, then notifications under Earlier.">
-  &nbsp;
-  <img src="website/public/screens/lock-new-480.webp" width="220" alt="Lock-screen view showing five new notifications, newest first.">
-  &nbsp;
-  <img src="website/public/screens/lock-earlier-480.webp" width="220" alt="Lock-screen view with Earlier expanded to show previously checked notifications.">
-</p>
-<p align="center"><sub>The panel, the lock-screen view, and Earlier expanded. Screenshots from a Xiaomi 17T Pro; personal content is blurred.</sub></p>
+<table align="center">
+  <tr>
+    <td align="center" valign="top" width="33%">
+      <img src="website/public/screens/panel-480.webp" width="220" alt="Notification panel: a music player, New 2 with a calendar reminder and a chat, then Earlier from 57 minutes to 1 hour ago."><br>
+      <b>The panel</b><br><sub>New since your last check, then Earlier, newest first.</sub>
+    </td>
+    <td align="center" valign="top" width="33%">
+      <img src="website/public/screens/lock-chat-480.webp" width="220" alt="Lock-screen view with a three-message chat opened under New and a 6 earlier pill."><br>
+      <b>The lock screen</b><br><sub>What's new, up front. A chat opens into its messages.</sub>
+    </td>
+    <td align="center" valign="top" width="33%">
+      <img src="website/public/screens/arrive-480.webp" width="220" alt="The panel with a group chat back at the top of New after a new message."><br>
+      <b>A new message</b><br><sub>Its chat comes back to the top of New.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" valign="top" width="33%">
+      <img src="website/public/screens/check-480.webp" width="220" alt="The panel after a check: everything under Earlier, newest first."><br>
+      <b>After a check</b><br><sub>Everything you saw moves to Earlier, still in order.</sub>
+    </td>
+    <td align="center" valign="top" width="33%">
+      <img src="website/public/screens/panel-earlier-480.webp" width="220" alt="Earlier with an opened stack of three parcel updates, and a 1 running pill at the bottom."><br>
+      <b>Stacks and Running</b><br><sub>A burst from one app folds into a stack; ongoing items wait behind a pill.</sub>
+    </td>
+    <td align="center" valign="top" width="33%">
+      <img src="website/public/screens/preview-480.webp" width="220" alt="A Preview of a chat message with its photo shown large."><br>
+      <b>Press and hold</b><br><sub>Preview the message and its photo without opening the app.</sub>
+    </td>
+  </tr>
+</table>
+<p align="center"><sub>Screenshots from a Xiaomi 17T Pro. The apps, people and messages are made up, posted by demo apps for these pictures.</sub></p>
 
 ## Why I built it
 

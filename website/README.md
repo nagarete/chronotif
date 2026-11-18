@@ -14,8 +14,8 @@ vite.config.js           resolves the newest release for the download links
 src/main.js              masthead + scroll reveal (skipped with reduced motion)
 src/demo.js              the interactive NEW / EARLIER illustration, modelled on core/Attention.kt
 public/                  copied as-is: favicons, og.png, robots.txt, sitemap.xml
-public/screens/          blurred, metadata-stripped screenshots (generated)
-scripts/redact-screenshots.sh   raw screenshots → public/screens/
+public/screens/          screenshots, metadata stripped (generated)
+scripts/redact-screenshots.sh   promo takes and install screenshots → public/screens/
 scripts/og.html, og-image.mjs   source and renderer for public/og.png
 screenshots-raw/         original device screenshots (git-ignored, never published)
 ```
@@ -41,14 +41,16 @@ npm run preview    # serve dist/ at http://localhost:4173 to check it
 
 ## Screenshots and privacy
 
-Raw screenshots show real notifications, including other people's names, photos and messages.
-Keep them in `screenshots-raw/`, which is git-ignored and never copied to `dist/`. To publish
-them, `npm run screens` blurs the personal parts of each card, strips EXIF metadata and writes
-480 px and 800 px WebP files to `public/screens/` (needs ImageMagick 7).
+The app screenshots are frames from the promo takes in `video/raw/takes/`, recorded in demo mode
+(see `video/README.md`). They show only made-up notifications from the demo apps, so nothing is
+blurred. To add or replace one, edit the `frames` list in `scripts/redact-screenshots.sh` with a
+take and a time inside its safe range, then run `npm run screens` (needs ffmpeg and ImageMagick 7).
+It writes 480 px and 800 px WebP files to `public/screens/`.
 
-To add or replace a screenshot, edit the `shots` list in `scripts/redact-screenshots.sh`. Each
-entry gives the regions to blur in the raw image's pixel coordinates. Always look at the output
-before committing it.
+The install-guide screenshots are real captures. Keep them in `screenshots-raw/`, which is
+git-ignored and never copied to `dist/`. The same script crops them and blurs the account details.
+
+Always look at the output before committing it.
 
 `npm run og` regenerates the 1200×630 social image `public/og.png` from `scripts/og.html` using
 headless Chromium (set `CHROME=/path/to/chrome` if `chromium` isn't on your `PATH`).
