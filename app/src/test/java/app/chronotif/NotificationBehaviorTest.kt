@@ -54,6 +54,7 @@ class NotificationBehaviorTest {
         ranking = ReflectionHelpers.callConstructor(RankingMap::class.java,
             ReflectionHelpers.ClassParameter.from(Array<Ranking>::class.java, emptyArray<Ranking>()))
         NotifStore.connect(emptyArray(), ranking)
+        DemoMode.set(context, false)
     }
 
     @After
@@ -97,6 +98,23 @@ class NotificationBehaviorTest {
             n, Process.myUserHandle(), time)
         NotifStore.post(sbn, ranking)
         return NotifStore.get(sbn.key)!!
+    }
+
+    @Test
+    fun demoModeShowsOnlyTheMadeUpDemoAppsAndStaysOnAfterARestart() {
+        post(notification("real chat"), time = 1000, id = 1, pkg = "example.chat")
+        post(notification("demo chat"), time = 2000, id = 2, pkg = DemoMode.PREFIX + "chat")
+        DemoMode.set(context, true)
+        DemoMode.init(context)
+        withLockList { list, container ->
+            list.render()
+            val shown = shownTexts(container)
+            assertTrue(shown.contains("demo chat"))
+            assertFalse("A real notification must never reach a recording", shown.contains("real chat"))
+        }
+        assertEquals(1, NotifStore.newCount())
+        DemoMode.set(context, false)
+        assertEquals(2, NotifStore.newCount())
     }
 
     @Test
