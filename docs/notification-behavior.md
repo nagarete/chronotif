@@ -43,7 +43,7 @@ For structured conversations, incoming message timestamps identify arrivals. A c
 
 Agreed in the October 2026 interview comparing Chronotif with the stock shade and iOS.
 
-A conversation card leads with its Avatar, badged with the app's icon. A group shows its picture, falling back to the latest sender's photo. A one-to-one chat shows the sender's photo, falling back to the notification's large icon. With no picture at all, the card keeps the plain app icon. Other notifications keep their large icon on the right.
+A conversation card leads with its Avatar, badged with the app's icon. A group shows its picture, falling back to the latest sender's photo. A one-to-one chat shows the sender's photo, falling back to the notification's large icon. With no picture at all, the card keeps the plain app icon. Other notifications keep their large icon on the right. An app that draws its own layout and gives no large icon (TikTok's LIVE alerts carry the host's photo only there) gets the biggest photo it put into that layout instead. Images built into the layout itself, such as the app's logo, don't count.
 
 An Attachment shows as a thumbnail on the right of its message's card, as on iOS, on New, Earlier and open stacks alike. A video's thumbnail carries a play mark. A collapsed Conversation stack shows its latest message's thumbnail, with "+n" for the other photos inside. Tapping the thumbnail opens the app, like the rest of the card.
 
@@ -75,6 +75,7 @@ A Media player is drawn from the app's media session, like the system shade's pl
 - Open the panel with only always-running services active. Only the "N running" pill shows; tapping it reveals them.
 - On Android 15 / HyperOS, pause Apple Music, leave its NO_CLEAR Media player with deleteIntent visible, and swipe it in Chronotif. The player disappears from the stock shade and Android's active notifications too, not just Chronotif. Active or buffering playback must resist swipes; a protected Media player without deleteIntent must also resist. A rejected dismissal restores the card. Vertical scrolling, playback buttons and the seek bar keep working.
 - Receive a photo in X or TikTok. It shows as a thumbnail on its card. Press and hold the card: the Preview shows it large with the app's buttons. Tap the image: the viewer opens, Save puts it in the gallery at once, and the card stays New. (WhatsApp sends no image, only "📷 Photo".)
+- Get a TikTok LIVE alert. Its card shows the host's profile photo on the right, not the TikTok logo.
 - Receive three photos in one chat. The collapsed stack's thumbnail shows "+2". In the viewer you can swipe through all three.
 - Press and hold a card on the lock-screen view. The Preview and the viewer show without unlocking; Reply and Share ask to unlock.
 - Pause music. Its player stays at the top and does not move to Earlier.
