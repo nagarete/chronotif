@@ -116,10 +116,11 @@ case ${1:-} in
     echo "raw/takes/$2.mp4"
     ;;
   restore)
-    adb shell am broadcast -n $DEBUG/app.chronotif.DemoModeReceiver --ez on false | tail -1
-    adb shell am stopservice -n app.chronotif.demo.music/app.chronotif.demo.Player >/dev/null || true
-    for a in chat parcel calendar bank music steps; do post $a --es do reset; done
+    # The stable app comes back first, so a failing clean-up step can't leave it switched off.
     adb shell cmd notification allow_listener app.chronotif/app.chronotif.ListenerService
+    adb shell am broadcast -n $DEBUG/app.chronotif.DemoModeReceiver --ez on false | tail -1 || true
+    adb shell am stopservice -n app.chronotif.demo.music/app.chronotif.demo.Player >/dev/null || true
+    for a in chat parcel calendar bank music steps; do post $a --es do reset || true; done
     ;;
   *) sed -n '2,15p' "$0"; exit 1 ;;
 esac
