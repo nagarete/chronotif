@@ -5,7 +5,9 @@
 #   ./scenes.sh setup     install-time setup: demo mode on, stable Chronotif's listener paused
 #   ./scenes.sh earlier   post the Earlier notifications, then check them (run ~40 min before takes)
 #   ./scenes.sh player    start the pretend music player
-#   ./scenes.sh lock      screen off, new messages arrive, screen wakes: the lock-screen view
+#   ./scenes.sh fresh     Maya's messages and a reminder arrive (New), screen stays on
+#   ./scenes.sh lock [NAME SECS]   screen off, they arrive, screen wakes: the lock-screen view
+#                                  (records NAME from the wake when given)
 #   ./scenes.sh arrive    a new message from the hiking group while the panel is open
 #   ./scenes.sh panel     open the debug panel from its edge handle
 #   ./scenes.sh rec NAME SECONDS   record the screen into raw/takes/NAME.mp4 (runs in background:
@@ -19,6 +21,12 @@ post() { local app=$1; shift; adb shell am broadcast -f 32 -n "app.chronotif.dem
 q() { printf "'%s'" "${1//\'/\'\\\'\'}"; }   # quote for the device shell
 msg() { post chat --es do msg --es conv "$1" --es from "$(q "$2")" --es text "$(q "$3")" "${@:4}"; }
 note() { post "$1" --es do note --ei id "$2" --es title "$(q "$3")" --es text "$(q "$4")" "${@:5}"; }
+
+# The demo apps use a conversation id's Java hashCode as its notification id.
+java_hash() { python3 -c 'import sys
+h = 0
+for c in sys.argv[1]: h = (31 * h + ord(c)) & 0xFFFFFFFF
+print(h - (1 << 32) if h >= 1 << 31 else h)' "$1"; }
 
 handle() {
   adb shell dumpsys window windows | awk -v pkg="package=$DEBUG " '
@@ -66,18 +74,29 @@ case ${1:-} in
     ;;
   player)
     adb shell am start-foreground-service -n app.chronotif.demo.music/app.chronotif.demo.Player \
-      --es title "$(q "Slow Light")" --es artist "$(q "The Quiet Hours")" --ei at 48 >/dev/null
+      --es title "$(q "Slow Light")" --es artist "$(q "The Quiet Hours")" --ei at 40 >/dev/null
     ;;
-  lock)
-    adb shell input keyevent KEYCODE_SLEEP; sleep 2
-    msg maya "Maya Chen" "Found a table by the window"
+  fresh|lock)
+    # Each take starts Maya's chat afresh under a new id; the last take's chat and reminder go.
+    state="$(dirname "$0")/raw/maya.conv"
+    mkdir -p "$(dirname "$state")"
+    if [[ -f $state ]]; then post chat --es do cancel --ei id "$(java_hash "$(cat "$state")")"; fi
+    post calendar --es do cancel --ei id 2
+    conv="maya$(date +%s)"; echo "$conv" >"$state"
+    "$0" player
+    [[ $1 == lock ]] && { adb shell input keyevent KEYCODE_SLEEP; sleep 2; }
+    msg "$conv" "Maya Chen" "Found a table by the window"
     sleep 1
-    msg maya "Maya Chen" "Ordered you a flat white"
+    msg "$conv" "Maya Chen" "Ordered you a flat white"
     sleep 1
-    msg maya "Maya Chen" "Look at this view" --es photo lake
+    msg "$conv" "Maya Chen" "Look at this view" --es photo lake
     note calendar 2 "Design review in 15 min" "11:00 · Room 4" --es channel reminders
-    sleep 1
-    adb shell input keyevent KEYCODE_WAKEUP
+    if [[ $1 == lock ]]; then
+      sleep 1
+      adb shell input keyevent KEYCODE_WAKEUP
+      # screenrecord can't start while the display is off, so a take starts here.
+      if [[ -n ${2:-} ]]; then "$0" rec "$2" "${3:-14}" & fi
+    fi
     ;;
   arrive)
     msg crew "Sam Ortiz" "Forecast says clear skies, we’re on" --es photo morning
@@ -86,7 +105,12 @@ case ${1:-} in
   tap) adb shell input tap "$2" "$3" ;;
   rec)
     mkdir -p "$(dirname "$0")/raw/takes"
-    adb shell screenrecord --time-limit "$3" --bit-rate 24000000 "/sdcard/Movies/take.mp4"
+    # Right after a wake the display may not be ready yet; retry until screenrecord starts.
+    for _ in $(seq 20); do
+      out=$(adb shell screenrecord --time-limit "$3" --bit-rate 24000000 "/sdcard/Movies/take.mp4" 2>&1) || true
+      [[ $out == *INVALID_LAYER_STACK* ]] || break
+      sleep 0.15
+    done
     adb pull /sdcard/Movies/take.mp4 "$(dirname "$0")/raw/takes/$2.mp4" >/dev/null
     adb shell rm /sdcard/Movies/take.mp4
     echo "raw/takes/$2.mp4"
