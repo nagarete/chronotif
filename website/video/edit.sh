@@ -1,14 +1,18 @@
 #!/usr/bin/env bash
-# Cuts the promo from raw/takes (phone), raw/demo (website demo) and raw/captions into
-# out/chronotif-promo.mp4, 1080x1920 at 30 fps. Optional: MUSIC=path/to/track.mp3 ./edit.sh
+# Cuts a video from raw/takes (phone), raw/demo (website demo) and its captions, 1080x1920 at
+# 30 fps. The cut is cuts/NAME.sh (segments) with cuts/NAME.json (captions):
+#   ./edit.sh promo            -> out/chronotif-promo.mp4
+#   MUSIC=raw/music/x.mp3 MUSIC_START=12 ./edit.sh features
 #
 # Phone footage is cropped before anything else: the top 150 px (status bar, whose icons belong to
 # the phone's real apps) and 28 px on each side (the HyperOS Sidebar handle). Segment start times
 # are chosen to skip moments where a take shows the home screen; keep it that way when re-cutting.
 set -euo pipefail
 cd "$(dirname "$0")"
-raw=raw; tmp=raw/edit; out=out
+cut=${1:?usage: ./edit.sh NAME}
+raw=raw; tmp=raw/edit/$cut; out=out; caps=raw/captions/$cut
 mkdir -p "$tmp" "$out"
+PLAYWRIGHT_CORE=${PLAYWRIGHT_CORE:-/tmp/promo-tools/node_modules/playwright-core} node captions.mjs "cuts/$cut.json" "$caps" >/dev/null
 
 W=1080 H=1920 FPS=30 XF=0.35
 PW=672 PH=1440 PX=204 PY=440 R=48   # the phone screen inside the frame
@@ -26,7 +30,7 @@ segments=()
 phone() {
   local name=$1 take=$2 ss=$3 dur=$4 cap=$5
   ffmpeg -loglevel error -y -ss "$ss" -t "$dur" -i "$raw/takes/$take.mp4" -loop 1 -i "$tmp/bg.png" \
-    -loop 1 -i "$tmp/bezel.png" -loop 1 -i "$tmp/mask.png" -loop 1 -i "$raw/captions/$cap.png" -filter_complex "
+    -loop 1 -i "$tmp/bezel.png" -loop 1 -i "$tmp/mask.png" -loop 1 -i "$caps/$cap.png" -filter_complex "
       [0:v]fps=$FPS,crop=1224:2622:28:150,scale=$PW:$PH:flags=lanczos,format=rgba[s];
       [3:v]format=gray[m]; [s][m]alphamerge[screen];
       [1:v][2:v]overlay=$((PX-12)):$((PY-12))[b]; [b][screen]overlay=$PX:$PY[p];
@@ -37,7 +41,7 @@ phone() {
 
 # card NAME IMAGE DUR
 card() {
-  ffmpeg -loglevel error -y -loop 1 -t "$3" -i "$raw/captions/$2.png" -vf "fps=$FPS,format=yuv420p" \
+  ffmpeg -loglevel error -y -loop 1 -t "$3" -i "$caps/$2.png" -vf "fps=$FPS,format=yuv420p" \
     -c:v libx264 -crf 16 -preset slow "$tmp/$1.mp4"
   segments+=("$1:$3")
 }
@@ -46,21 +50,14 @@ card() {
 # device frame covered by the empty background from a still.
 demo() {
   ffmpeg -loglevel error -y -ss "$2" -t "$3" -i "$raw/demo/demo.mp4" -loop 1 -i "$raw/demo/still.png" \
-    -loop 1 -i "$raw/captions/$4.png" -filter_complex "
+    -loop 1 -i "$caps/$4.png" -filter_complex "
       [1:v]crop=$W:$((H-1560)):0:1560[floor]; [0:v][floor]overlay=0:1560[d];
       [2:v]$caption_in[c]; [d][c]overlay=0:0,format=yuv420p[v]" \
     -map "[v]" -t "$3" -r $FPS -c:v libx264 -crf 16 -preset slow "$tmp/$1.mp4"
   segments+=("$1:$3")
 }
 
-card  s1 title 2.4
-phone s2 lock  0.2 4.1 new
-phone s3 lock  4.3 3.7 chat
-phone s4 panel 1.6 3.2 earlier
-phone s5 panel 17.0 4.0 burst
-phone s7 arrive 1.2 4.3 arrive
-demo  s8 3.4 3.9 check
-card  s9 end 3.4
+source "cuts/$cut.sh"
 
 # Chain with short crossfades.
 inputs=() chain="" prev="0:v" offset=0 i=0
@@ -71,12 +68,9 @@ for s in "${segments[@]:1}"; do
   chain+="[$prev][$i:v]xfade=transition=fade:duration=$XF:offset=$offset[x$i];"; prev="x$i"
 done
 total=$(python3 -c "print(round($offset + ${segments[-1]#*:}, 3))")
-audio=()
-if [[ -n ${MUSIC:-} ]]; then
-  audio=(-i "$MUSIC")
-  chain+="[$((i + 1)):a]atrim=0:$total,afade=t=in:d=0.5,afade=t=out:st=$(python3 -c "print($total - 2)"):d=2[a];"
-fi
-ffmpeg -loglevel error -y "${inputs[@]}" "${audio[@]}" -filter_complex "${chain%;}" -map "[$prev]" \
-  ${MUSIC:+-map "[a]" -c:a aac -b:a 192k} -c:v libx264 -crf 18 -preset slow -pix_fmt yuv420p -movflags +faststart \
-  "$out/chronotif-promo.mp4"
-echo "$out/chronotif-promo.mp4 (${total}s)"
+final="$out/chronotif-$cut.mp4"
+silent="$tmp/silent.mp4"
+ffmpeg -loglevel error -y "${inputs[@]}" -filter_complex "${chain%;}" -map "[$prev]" \
+  -c:v libx264 -crf 18 -preset slow -pix_fmt yuv420p -movflags +faststart "$silent"
+if [[ -n ${MUSIC:-} ]]; then ./mux.sh "$silent" "$MUSIC" "$final" "${MUSIC_START:-0}" >/dev/null; else cp "$silent" "$final"; fi
+echo "$final (${total}s)"

@@ -54,6 +54,14 @@
   .cap em { font-style: normal; color: var(--accent-soft); }
   .sub { left: 70px; width: 940px; text-align: center; font: 400 42px/1.3 var(--serif); color: var(--text-2); }
 
+  #code { left: 60px; width: 960px; padding: 40px 44px; border-radius: 36px; background: rgba(18,19,24,.92);
+          border: 2px solid rgba(235,235,245,.08); font: 400 25px/1.6 "Noto Sans Mono", ui-monospace, monospace; color: #d6d6de;
+          box-shadow: 0 30px 90px rgba(0,0,0,.5); }
+  #code .file { font: 500 24px var(--sans); color: var(--text-3); margin-bottom: 18px; letter-spacing: .02em; }
+  #code .ln { white-space: pre; }
+  #code .k { color: #ff7ab2; } #code .f { color: #8fbcff; } #code .c { color: var(--text-3); } #code .h { color: #ffd479; }
+  #gh, #gh2 { width: 1080px; text-align: center; font: 500 40px "Noto Sans Mono", ui-monospace, monospace; color: var(--accent-soft); }
+  #gh2 { font-size: 34px; color: var(--text-2); }
   #logo { left: 390px; width: 300px; height: 300px; }
   #word { width: 1080px; text-align: center; font: 600 170px/1 var(--serif); letter-spacing: -.03em; }
   #tag { width: 1080px; text-align: center; font: 400 50px var(--serif); color: var(--text-2); }
@@ -79,9 +87,25 @@
   <path id="lgBar1" fill="#FFF" fill-opacity=".6" d="M38,64h32a3,3 0,0 1,0 6H38a3,3 0,0 1,0 -6z"/>
   <path id="lgBar2" fill="#FFF" fill-opacity=".3" d="M43,73h22a2,2 0,0 1,0 4H43a2,2 0,0 1,0 -4z"/>
 </svg>
+<div id="code" class="abs">
+  <div class="file">app/src/main/java/app/chronotif/core/Attention.kt</div>
+  <div class="ln"><span class="k">fun</span> &lt;T : Meta&gt; <span class="f">sections</span>(</div>
+  <div class="ln">    items: Collection&lt;T&gt;, lastCheck: Long,</div>
+  <div class="ln">): Sections&lt;T&gt; {</div>
+  <div class="ln">    <span class="k">val</span> byRecent = items.<span class="f">sortedByDescending</span> { it.alertTime }</div>
+  <div class="ln c">    …</div>
+  <div class="ln">    <span class="k">for</span> (item <span class="k">in</span> byRecent) <span class="k">when</span> (item.kind) {</div>
+  <div class="ln c">        …</div>
+  <div class="ln">        Kind.NOTIFICATION -&gt;</div>
+  <div class="ln">            <span class="k">if</span> (<span class="h">item.alertTime &gt; lastCheck</span>) fresh += item</div>
+  <div class="ln">            <span class="k">else</span> earlier += item</div>
+  <div class="ln">    }</div>
+</div>
+<div id="gh" class="abs">github.com/nagarete/chronotif</div>
 <div id="word" class="abs">Chronotif</div>
 <div id="tag" class="abs">Free and open source, for Android</div>
 <div id="url" class="abs">chronotif.com</div>
+<div id="gh2" class="abs">github.com/nagarete/chronotif</div>
 
 <script>
 // --- made-up apps, the same ones the screen recording uses ---
@@ -127,6 +151,7 @@ const CAPS = [
   [13.85, 16.45, "A burst from one app folds into a stack."],
   [16.95, 19.85, "On the lock screen, too."],
   [20.15, 22.95, "Your notifications never leave your phone.", "No accounts. No analytics. No backend."],
+  [23.35, 27.0, "Free and <em>open source.</em>", "Read every line. Change it. Build it yourself."],
 ];
 for (const [i, [, , text, sub]] of CAPS.entries()) {
   $("caps").insertAdjacentHTML("beforeend", `<div class="abs cap" id="cap${i}">${text}</div>` + (sub ? `<div class="abs sub" id="sub${i}">${sub}</div>` : ""));
@@ -236,25 +261,32 @@ function render(t) {
   // Captions.
   CAPS.forEach(([t0, t1, , sub], i) => {
     const o = k(t, t0, t0 + 0.4, out) * (1 - k(t, t1 - 0.35, t1));
-    const y = i === 6 ? 760 : i === 5 ? 170 : 250;
+    const y = i === 6 ? 760 : i === 7 ? 230 : i === 5 ? 170 : 250;
     set($("cap" + i), { y: y + (1 - k(t, t0, t0 + 0.5, out)) * 30, o });
     if (sub) set($("sub" + i), { y: y + 230 + (1 - k(t, t0 + 0.3, t0 + 0.8, out)) * 30, o: k(t, t0 + 0.3, t0 + 0.7) * (1 - k(t, t1 - 0.35, t1)) });
   });
 
+  // Open source: real lines from the app's core, revealed line by line.
+  const codeIn = k(t, 23.6, 24.1, out), codeOut = k(t, 26.6, 27.0);
+  set($("code"), { y: 560 + (1 - codeIn) * 40, o: codeIn * (1 - codeOut) });
+  [...$("code").querySelectorAll(".ln")].forEach((ln, i) => (ln.style.opacity = k(t, 23.9 + i * 0.16, 24.2 + i * 0.16)));
+  set($("gh"), { y: 1340 + (1 - k(t, 25.3, 25.8, out)) * 24, o: k(t, 25.3, 25.7) * (1 - codeOut) });
+
   // The logo builds itself: box, then the New card, its dot, and the two receding Earlier bars.
-  const lg = k(t, 23.3, 24.0, back);
-  set($("logo"), { y: 520, s: mix(0.6, 1, lg), o: k(t, 23.3, 23.6) });
-  set($("lgCard"), { y: (1 - k(t, 23.6, 24.1, back)) * -14, o: k(t, 23.6, 23.9) });
+  const lg = k(t, 26.9, 27.6, back);
+  set($("logo"), { y: 520, s: mix(0.6, 1, lg), o: k(t, 26.9, 27.2) });
+  set($("lgCard"), { y: (1 - k(t, 27.2, 27.7, back)) * -14, o: k(t, 27.2, 27.5) });
   $("lgCard").style.transformOrigin = "54px 47px";
-  set($("lgDot"), { s: k(t, 24.0, 24.4, back), o: k(t, 24.0, 24.2) });
+  set($("lgDot"), { s: k(t, 27.6, 28.0, back), o: k(t, 27.6, 27.8) });
   $("lgDot").style.transformBox = "fill-box"; $("lgDot").style.transformOrigin = "center";
-  set($("lgBar1"), { y: (1 - k(t, 24.2, 24.7, out)) * 8, o: k(t, 24.2, 24.6) });
-  set($("lgBar2"), { y: (1 - k(t, 24.4, 24.9, out)) * 8, o: k(t, 24.4, 24.8) });
-  set($("word"), { y: 900 + (1 - k(t, 24.3, 24.9, out)) * 30, o: k(t, 24.3, 24.8) });
-  set($("tag"), { y: 1110 + (1 - k(t, 24.7, 25.3, out)) * 24, o: k(t, 24.7, 25.2) });
-  set($("url"), { y: 1250 + (1 - k(t, 25.1, 25.6, out)) * 24, o: k(t, 25.1, 25.5) });
+  set($("lgBar1"), { y: (1 - k(t, 27.8, 28.3, out)) * 8, o: k(t, 27.8, 28.2) });
+  set($("lgBar2"), { y: (1 - k(t, 28.0, 28.5, out)) * 8, o: k(t, 28.0, 28.4) });
+  set($("word"), { y: 900 + (1 - k(t, 27.9, 28.5, out)) * 30, o: k(t, 27.9, 28.4) });
+  set($("tag"), { y: 1110 + (1 - k(t, 28.3, 28.9, out)) * 24, o: k(t, 28.3, 28.8) });
+  set($("gh2"), { y: 1330 + (1 - k(t, 29.0, 29.5, out)) * 24, o: k(t, 29.0, 29.4) });
+  set($("url"), { y: 1250 + (1 - k(t, 28.7, 29.2, out)) * 24, o: k(t, 28.7, 29.1) });
 }
 window.render = render;
-window.DURATION = 27.5;
+window.DURATION = 31.2;
 render(Number(new URLSearchParams(location.search).get("t") ?? 0));
 </script>

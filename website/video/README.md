@@ -25,7 +25,8 @@ only made-up notifications posted by the demo apps in `poster/`.
 4. `node demo-capture.mjs raw/demo` records the website demo from `../dist` (run `vite build` first).
    `node captions.mjs raw/captions` renders `captions.json` as overlays. Both need
    `PLAYWRIGHT_CORE` pointing at an installed `playwright-core` and use `/usr/bin/chromium`.
-5. `./edit.sh` cuts `out/chronotif-promo.mp4` (add `MUSIC=track.mp3` for sound). Then `./scenes.sh restore` and uninstall the demo apps.
+5. `./edit.sh NAME` cuts `out/chronotif-NAME.mp4` from `cuts/NAME.sh` (segments) and `cuts/NAME.json`
+   (captions). Add `MUSIC=raw/music/x.mp3` (and `MUSIC_START=seconds`) for sound; `mux.sh` levels it. Then `./scenes.sh restore` and uninstall the demo apps.
 
 ## Motion-graphics trailer
 
@@ -58,3 +59,17 @@ automatic group summary after its child goes, and Chronotif shows it.
 Driving the panel over adb: a swipe up closes the panel once its list is short, so don't scroll with
 `input swipe` unless the list is long. Screenshot only after checking that the panel or lock view is
 the window in front, or a missed step captures the home screen.
+
+## Music
+
+Both tracks are by HoliznaCC0, from the album "Public Domain Lofi" on the Free Music Archive, released
+under CC0 1.0 (public domain; no credit needed, use anywhere). The licence was checked on each track's
+own page on 2026-11-18. The files are kept in `raw/music/`, not in git.
+
+| Video | Track | Source |
+|---|---|---|
+| Trailer | Tranquil Mindscape | freemusicarchive.org/music/holiznacc0/public-domain-lofi/tranquil-mindscape-lofi-happy-reflection/ |
+| Features | Bubbles | freemusicarchive.org/music/holiznacc0/public-domain-lofi/bubbles-lofi-bright-relaxed/ |
+
+Trailer: `node trailer/render.mjs raw/trailer-silent.mp4 && ./mux.sh raw/trailer-silent.mp4 raw/music/tranquil.mp3 out/chronotif-trailer.mp4`.
+Features: `MUSIC=raw/music/bubbles.mp3 ./edit.sh features`.
