@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Chronotif trailer</title>
+<!-- A motion-graphics trailer, drawn frame by frame: render(t) sets every element from the time t
+     in seconds, so render.mjs can step through it exactly. Everything shown is made up. -->
+<style>
+  :root {
+    --bg: #0b0c0e; --card: #2c2c2e; --text: #f4f4f6; --text-2: rgba(235,235,245,.66);
+    --text-3: rgba(235,235,245,.46); --accent: #0a84ff; --accent-soft: #8fbcff;
+    --serif: "Newsreader", Georgia, serif; --sans: "Noto Sans", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; width: 1080px; height: 1920px; overflow: hidden; background: var(--bg); }
+  body { font-family: var(--sans); color: var(--text); }
+  #glow { position: absolute; inset: 0; background: radial-gradient(90% 55% at 50% 40%, #1b2236 0%, #0b0c10 70%); }
+  .abs { position: absolute; left: 0; top: 0; will-change: transform, opacity; }
+
+  #stage { position: absolute; inset: 0; transform-origin: 540px 980px; }
+  #bezel { left: 540px; top: 0; border-radius: 120px; border: 14px solid #2a2d36; box-shadow: 0 0 0 4px #08090c inset, 0 40px 120px rgba(0,0,0,.6);
+           background: linear-gradient(160deg, #273152, #141826 60%); }
+
+  .card { width: 880px; left: 100px; min-height: 156px; padding: 26px 30px; border-radius: 40px; background: var(--card);
+          display: grid; grid-template-columns: 92px 1fr auto; column-gap: 26px; align-items: center;
+          transform-origin: 50% 0; box-shadow: 0 18px 50px rgba(0,0,0,.35);
+          background: color-mix(in srgb, #2c2c2e calc(100% - var(--dim, 0) * 100%), #1e1e21); }
+  .card > * { opacity: calc(1 - var(--dim, 0) * 0.42); transition: none; }
+  .card.tucked > * { opacity: 0; }
+  .card.tucked { background: var(--sliver, #3a3a3f); box-shadow: 0 10px 30px rgba(0,0,0,.4); }
+  .icon { width: 92px; height: 92px; border-radius: 26px; display: grid; place-items: center; position: relative; }
+  .icon svg { width: 52px; height: 52px; fill: #fff; }
+  .avatar { border-radius: 50%; font: 600 36px var(--sans); color: #fff; }
+  .badge-app { position: absolute; right: -6px; bottom: -6px; width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; border: 4px solid var(--card); }
+  .badge-app svg { width: 20px; height: 20px; }
+  .count { position: absolute; right: -10px; top: -10px; min-width: 42px; height: 42px; border-radius: 21px; background: #6c8fe0;
+           font: 600 26px/42px var(--sans); text-align: center; color: #fff; border: 4px solid var(--card); }
+  .row { display: flex; justify-content: space-between; gap: 20px; }
+  .title { font: 600 36px/1.2 var(--sans); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .time { font: 400 30px/1.2 var(--sans); color: var(--text-3); white-space: nowrap; }
+  .body { font: 400 32px/1.3 var(--sans); color: var(--text-2); margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .thumb { width: 92px; height: 92px; border-radius: 20px; background:
+           radial-gradient(circle at 70% 32%, #fff4cc 0 10%, transparent 11%),
+           linear-gradient(transparent 55%, #3e5470 56%), linear-gradient(#4e8fd1, #bfe0f5); }
+
+  .head { left: 120px; font: 600 30px var(--sans); letter-spacing: .12em; color: var(--text-2); }
+  .head b { color: var(--text); margin-left: 14px; }
+  #checkline { left: 100px; width: 880px; height: 3px; background: linear-gradient(90deg, transparent, var(--accent-soft), transparent); transform-origin: 50% 50%; }
+  #checklabel { left: 100px; width: 880px; text-align: center; font: 500 24px var(--sans); letter-spacing: .16em; color: var(--accent-soft); }
+
+  #clock { width: 1080px; text-align: center; font: 300 230px/1 var(--sans); letter-spacing: -.02em; }
+  #date { width: 1080px; text-align: center; font: 400 44px var(--sans); color: var(--text-2); }
+
+  .cap { left: 70px; width: 940px; text-align: center; font: 500 76px/1.15 var(--serif); letter-spacing: -.015em; text-wrap: balance; }
+  .cap em { font-style: normal; color: var(--accent-soft); }
+  .sub { left: 70px; width: 940px; text-align: center; font: 400 42px/1.3 var(--serif); color: var(--text-2); }
+
+  #logo { left: 390px; width: 300px; height: 300px; }
+  #word { width: 1080px; text-align: center; font: 600 170px/1 var(--serif); letter-spacing: -.03em; }
+  #tag { width: 1080px; text-align: center; font: 400 50px var(--serif); color: var(--text-2); }
+  #url { width: 1080px; text-align: center; font: 600 46px var(--sans); color: var(--accent-soft); letter-spacing: .03em; }
+</style>
+<body>
+<div id="glow"></div>
+<div id="stage">
+  <div id="bezel" class="abs"></div>
+  <div id="clock" class="abs">9:41</div>
+  <div id="date" class="abs">Wednesday, 18 November</div>
+  <div id="hNew" class="abs head">NEW<b id="newCount">2</b></div>
+  <div id="checkline" class="abs"></div>
+  <div id="checklabel" class="abs">LAST CHECK</div>
+  <div id="hEarlier" class="abs head">EARLIER</div>
+  <div id="cards"></div>
+</div>
+<div id="caps"></div>
+<svg id="logo" class="abs" viewBox="18 18 72 72">
+  <rect id="lgBox" x="18" y="18" width="72" height="72" rx="16" fill="#1C1C1E"/>
+  <path id="lgCard" fill="#FFF" d="M36,34h36a6,6 0,0 1,6 6v14a6,6 0,0 1,-6 6H36a6,6 0,0 1,-6 -6V40a6,6 0,0 1,6 -6z"/>
+  <path id="lgDot" fill="#0A84FF" d="M41,40.5a4.5,4.5 0,1 1,0 9a4.5,4.5 0,1 1,0 -9z"/>
+  <path id="lgBar1" fill="#FFF" fill-opacity=".6" d="M38,64h32a3,3 0,0 1,0 6H38a3,3 0,0 1,0 -6z"/>
+  <path id="lgBar2" fill="#FFF" fill-opacity=".3" d="M43,73h22a2,2 0,0 1,0 4H43a2,2 0,0 1,0 -4z"/>
+</svg>
+<div id="word" class="abs">Chronotif</div>
+<div id="tag" class="abs">Free and open source, for Android</div>
+<div id="url" class="abs">chronotif.com</div>
+
+<script>
+// --- made-up apps, the same ones the screen recording uses ---
+const GLYPH = {
+  chat: "M4,3h16a2,2 0,0 1,2 2v10a2,2 0,0 1,-2 2H9l-5,4v-4a2,2 0,0 1,-2 -2V5a2,2 0,0 1,2 -2z",
+  parcel: "M12,2l9,4.5v11L12,22l-9,-4.5v-11L12,2zM12,4.2L6.2,7.1 12,10l5.8,-2.9L12,4.2zM5,8.7v7.6l6,3v-7.6l-6,-3zM19,8.7l-6,3v7.6l6,-3V8.7z",
+  calendar: "M7,2h2v2h6V2h2v2h2a2,2 0,0 1,2 2v14a2,2 0,0 1,-2 2H5a2,2 0,0 1,-2 -2V6a2,2 0,0 1,2 -2h2V2zM5,9v11h14V9H5zM7,11h4v4H7v-4z",
+  bank: "M12,2L21,7v2H3V7l9,-5zM5,10h2v7H5v-7zM9,10h2v7H9v-7zM13,10h2v7h-2v-7zM17,10h2v7h-2v-7zM3,18h18v3H3v-3z",
+};
+const COLOR = { chat: "#2EAD6B", parcel: "#E8813A", calendar: "#4C6FE0", bank: "#14806F" };
+const svg = (app) => `<svg viewBox="0 0 24 24"><path d="${GLYPH[app]}"/></svg>`;
+
+const CARDS = [
+  { id: "m3", app: "chat", person: ["MC", "#F06292"], title: "Maya Chen", body: "Look at this view", time: "now", thumb: true },
+  { id: "m2", app: "chat", person: ["MC", "#F06292"], title: "Maya Chen", body: "Ordered you a flat white", time: "now" },
+  { id: "m1", app: "chat", person: ["MC", "#F06292"], title: "Maya Chen", body: "Found a table by the window", time: "now" },
+  { id: "a", app: "calendar", title: "Design review in 15 min", body: "11:00 · Room 4", time: "now" },
+  { id: "b", app: "bank", title: "You paid Corner Café", body: "€4.20 · Main account", time: "4m" },
+  { id: "c", app: "parcel", title: "Out for delivery", body: "Arriving today, 2–4 PM", time: "31m" },
+  { id: "d", app: "parcel", title: "Packed and on its way", body: "Tracking PX-2048-1187", time: "38m" },
+  { id: "e", app: "parcel", title: "Order confirmed", body: "Trail runners, size 42", time: "44m" },
+  { id: "f", app: "chat", person: ["H", "#64B5F6"], title: "Hiking crew", body: "Emma Wilson: I’ll drive, room for three", time: "1h" },
+];
+const $ = (id) => document.getElementById(id);
+const el = {};
+for (const c of CARDS) {
+  const icon = c.person
+    ? `<div class="icon avatar" style="background:${c.person[1]}">${c.person[0]}<span class="badge-app" style="background:${COLOR[c.app]}">${svg(c.app)}</span>${c.id === "m3" ? '<span class="count" id="count">2</span>' : ""}</div>`
+    : `<div class="icon" style="background:${COLOR[c.app]}">${svg(c.app)}</div>`;
+  $("cards").insertAdjacentHTML("beforeend", `<div class="abs card" id="${c.id}">${icon}
+    <div style="min-width:0"><div class="row"><span class="title">${c.title}</span><span class="time">${c.time}</span></div><div class="body">${c.body}</div></div>
+    ${c.thumb ? '<div class="thumb"></div>' : "<span></span>"}</div>`);
+  el[c.id] = $(c.id);
+}
+// Card stacking order: the chat's newest message on top, then down the list.
+CARDS.forEach((c, i) => (el[c.id].style.zIndex = 100 - i));
+
+const CAPS = [
+  [0.35, 2.9, "Notifications pile up."],
+  [3.35, 6.05, "Chronotif puts them in order. <em>Newest first.</em>"],
+  [6.45, 9.65, "What’s <em>new</em> stays in front. The rest steps back."],
+  [9.95, 13.45, "A chat stacks up, newest on top."],
+  [13.85, 16.45, "A burst from one app folds into a stack."],
+  [16.95, 19.85, "On the lock screen, too."],
+  [20.15, 22.95, "Your notifications never leave your phone.", "No accounts. No analytics. No backend."],
+];
+for (const [i, [, , text, sub]] of CAPS.entries()) {
+  $("caps").insertAdjacentHTML("beforeend", `<div class="abs cap" id="cap${i}">${text}</div>` + (sub ? `<div class="abs sub" id="sub${i}">${sub}</div>` : ""));
+}
+
+// --- timing helpers ---
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const inOut = (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+const out = (x) => 1 - Math.pow(1 - x, 3);
+const back = (x) => 1 + 2.2 * Math.pow(x - 1, 3) + 1.2 * Math.pow(x - 1, 2);
+const k = (t, t0, t1, e = inOut) => e(clamp((t - t0) / (t1 - t0)));
+const mix = (a, b, p) => a + (b - a) * p;
+const set = (node, { x = 0, y = 0, s = 1, r = 0, o = 1 }) => {
+  node.style.transform = `translate(${x}px, ${y}px) rotate(${r}deg) scale(${s})`;
+  node.style.opacity = o;
+};
+// Deterministic scatter for the pile-up.
+const rand = (n) => { const v = Math.sin(n * 12.9898) * 43758.5453; return v - Math.floor(v); };
+
+// Layouts, as y of each card's top. Earlier cards are scaled down and dimmed.
+const TOP = 560, STEP = 176, ESTEP = 146;
+function layout(t) {
+  const L = {};
+  // order: column without sections
+  "a b c d e f".split(" ").forEach((id, i) => (L[id] = { y: TOP + i * STEP, s: 1, o: 1 }));
+  const sections = k(t, 6.7, 7.6);
+  const maya = k(t, 9.9, 10.5);
+  const fold = k(t, 14.0, 14.9);
+  const newTop = TOP + 40;
+  const shift = maya * (STEP + 40);                  // Maya's stack joins New
+  const eTop = newTop + 2 * STEP + 150 + shift;       // first Earlier card
+  if (sections > 0) {
+    L.a = { y: mix(L.a.y, newTop + shift, sections), s: 1, o: 1 };
+    L.b = { y: mix(L.b.y, newTop + STEP + shift, sections), s: 1, o: 1 };
+    const ey = { c: eTop, d: eTop + ESTEP, e: eTop + 2 * ESTEP, f: eTop + 3 * ESTEP };
+    // fold: d and e tuck under c; f moves up beneath the stack.
+    ey.d = mix(ey.d, eTop + 22, fold); ey.e = mix(ey.e, eTop + 42, fold); ey.f = mix(ey.f, eTop + ESTEP + 50, fold);
+    for (const id of "cdef") {
+      const tucked = id === "d" ? fold : id === "e" ? fold : 0;
+      L[id] = { y: mix(L[id].y, ey[id], sections), s: mix(1, 0.9 - tucked * (id === "d" ? 0.04 : 0.08), sections),
+                o: 1, dim: sections + tucked * (id === "d" ? 0.4 : 0.8), tucked: tucked > 0.5 };
+    }
+  }
+  return { L, newTop, eTop, sections, shift };
+}
+
+function render(t) {
+  const { L, newTop, eTop, sections } = layout(t);
+
+  // Pile-up, then into order.
+  "a b c d e f".split(" ").forEach((id, i) => {
+    const n = i + 1;
+    const land = k(t, 0.15 + i * 0.22, 0.75 + i * 0.22, out);
+    const sx = (rand(n) - 0.5) * 240, sy = 520 + rand(n + 9) * 900, sr = (rand(n + 3) - 0.5) * 28;
+    const from = { x: (rand(n + 5) - 0.5) * 1600, y: -500 - rand(n + 7) * 400, r: sr * 2 };
+    const order = k(t, 3.0 + i * 0.09, 4.1 + i * 0.09);
+    const x = mix(mix(from.x, sx, land), 0, order);
+    const y = mix(mix(from.y, sy, land), L[id].y, order);
+    const r = mix(mix(from.r, sr, land), 0, order);
+    set(el[id], { x, y, r, s: order < 1 ? 1 : L[id].s, o: Math.min(land * 1.4, 1) });
+    el[id].style.setProperty("--dim", Math.min(L[id].dim ?? 0, 1.6) / 1.6 * 1.25);
+    el[id].classList.toggle("tucked", !!L[id].tucked);
+    el[id].style.setProperty("--sliver", id === "e" ? "#2f2f33" : "#3a3a3f");
+  });
+
+  // Maya's three messages drop in one at a time and stack, the newest on top.
+  const arrivals = [["m1", 10.25], ["m2", 11.05], ["m3", 11.85]];
+  let shown = 0;
+  arrivals.forEach(([id, t0], i) => {
+    const p = k(t, t0, t0 + 0.55, back);
+    if (t >= t0) shown = i + 1;
+    // How far this card has been pushed under by later ones (0 = on top).
+    const depth = arrivals.slice(i + 1).reduce((d, [, t1]) => d + k(t, t1, t1 + 0.45), 0);
+    const y = mix(newTop - 140, newTop + Math.min(depth, 2) * 20, p);
+    set(el[id], { y, s: 1 - Math.min(depth, 2) * 0.045, o: clamp(p * 2) });
+    el[id].style.setProperty("--dim", Math.min(depth, 2) * 0.35);
+    el[id].classList.toggle("tucked", depth > 0.5);
+    el[id].style.setProperty("--sliver", depth > 1.5 ? "#36363a" : "#434348");
+  });
+  $("count").textContent = Math.max(shown, 2);
+  $("count").style.opacity = k(t, 11.05, 11.4);
+  $("newCount").textContent = shown ? 3 : 2;
+
+  // Section heads and the last-check line.
+  set($("hNew"), { y: newTop - 64 + (t > 9.9 ? 0 : 0), o: k(t, 6.4, 6.9) });
+  const lineY = eTop - 64;
+  const gapMid = newTop + 2 * STEP + (lineY - newTop - 2 * STEP) / 2 + 10;
+  set($("checkline"), { y: gapMid, s: 1, o: k(t, 6.5, 6.9) * (1 - k(t, 8.8, 9.4)) });
+  $("checkline").style.transform += ` scaleX(${k(t, 6.5, 7.1)})`;
+  set($("checklabel"), { y: gapMid - 40, o: k(t, 6.7, 7.0) * (1 - k(t, 8.8, 9.4)) });
+  set($("hEarlier"), { y: lineY, o: k(t, 7.0, 7.5) });
+
+  // Zoom out into a phone, wake to the lock screen.
+  const zoom = k(t, 16.7, 17.8);
+  const S = mix(1, 0.6, zoom);
+  $("stage").style.transform = `translateY(${mix(0, 210, zoom)}px) scale(${S})`;
+  const bw = 1080 / 0.6 * 0.66, bh = 1920 / 0.6 * 0.74;
+  $("bezel").style.width = bw + "px"; $("bezel").style.height = bh + "px";
+  set($("bezel"), { x: -bw / 2, y: 980 - bh / 2 - 60, o: zoom });
+  set($("clock"), { y: newTop - 420, o: k(t, 17.4, 18.0) });
+  set($("date"), { y: newTop - 170, o: k(t, 17.5, 18.1) });
+  // Privacy: the phone dims behind the words. End: it goes.
+  const hush = k(t, 20.0, 20.6);
+  $("stage").style.opacity = mix(1, 0.2, hush) * (1 - k(t, 22.9, 23.4));
+  $("stage").style.filter = hush > 0 ? `blur(${hush * 10}px)` : "none";
+
+  // Captions.
+  CAPS.forEach(([t0, t1, , sub], i) => {
+    const o = k(t, t0, t0 + 0.4, out) * (1 - k(t, t1 - 0.35, t1));
+    const y = i === 6 ? 760 : i === 5 ? 170 : 250;
+    set($("cap" + i), { y: y + (1 - k(t, t0, t0 + 0.5, out)) * 30, o });
+    if (sub) set($("sub" + i), { y: y + 230 + (1 - k(t, t0 + 0.3, t0 + 0.8, out)) * 30, o: k(t, t0 + 0.3, t0 + 0.7) * (1 - k(t, t1 - 0.35, t1)) });
+  });
+
+  // The logo builds itself: box, then the New card, its dot, and the two receding Earlier bars.
+  const lg = k(t, 23.3, 24.0, back);
+  set($("logo"), { y: 520, s: mix(0.6, 1, lg), o: k(t, 23.3, 23.6) });
+  set($("lgCard"), { y: (1 - k(t, 23.6, 24.1, back)) * -14, o: k(t, 23.6, 23.9) });
+  $("lgCard").style.transformOrigin = "54px 47px";
+  set($("lgDot"), { s: k(t, 24.0, 24.4, back), o: k(t, 24.0, 24.2) });
+  $("lgDot").style.transformBox = "fill-box"; $("lgDot").style.transformOrigin = "center";
+  set($("lgBar1"), { y: (1 - k(t, 24.2, 24.7, out)) * 8, o: k(t, 24.2, 24.6) });
+  set($("lgBar2"), { y: (1 - k(t, 24.4, 24.9, out)) * 8, o: k(t, 24.4, 24.8) });
+  set($("word"), { y: 900 + (1 - k(t, 24.3, 24.9, out)) * 30, o: k(t, 24.3, 24.8) });
+  set($("tag"), { y: 1110 + (1 - k(t, 24.7, 25.3, out)) * 24, o: k(t, 24.7, 25.2) });
+  set($("url"), { y: 1250 + (1 - k(t, 25.1, 25.6, out)) * 24, o: k(t, 25.1, 25.5) });
+}
+window.render = render;
+window.DURATION = 27.5;
+render(Number(new URLSearchParams(location.search).get("t") ?? 0));
+</script>

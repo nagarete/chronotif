@@ -26,3 +26,12 @@ only made-up notifications posted by the demo apps in `poster/`.
    `node captions.mjs raw/captions` renders `captions.json` as overlays. Both need
    `PLAYWRIGHT_CORE` pointing at an installed `playwright-core` and use `/usr/bin/chromium`.
 5. `./edit.sh` cuts `out/chronotif-promo.mp4` (add `MUSIC=track.mp3` for sound). Then `./scenes.sh restore` and uninstall the demo apps.
+
+## Motion-graphics trailer
+
+`trailer/trailer.html` is a self-contained animation: `render(t)` sets every element from the time
+in seconds, so `trailer/render.mjs` steps through it frame by frame into `out/chronotif-trailer.mp4`.
+`node trailer/render.mjs out/x.mp4 --stills 2,8.5` writes stills next to the output to check a
+change. It shows the same made-up apps and people as the phone takes, and must follow the same
+ordering rules as the app (`docs/notification-behavior.md`): newest first, Conversation stacks,
+and App stacks only in Earlier.
