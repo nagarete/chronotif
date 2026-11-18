@@ -14,6 +14,8 @@ stay accessible without competing for the same attention.
 [Website & interactive demo](https://chronotif.com) ·
 [Setup help](docs/guide.md#install)
 
+https://github.com/user-attachments/assets/a6969ada-f4b3-4fdb-90fc-033a17cc3a1f
+
 <table align="center">
   <tr>
     <td align="center" valign="top" width="33%">
