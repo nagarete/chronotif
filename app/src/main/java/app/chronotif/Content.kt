@@ -339,14 +339,71 @@ object Apps {
         return d
     }
 
-    /** Contact photo / sender avatar etc. Keyed by post time so updates refresh it. */
+    /**
+     * Contact photo / sender avatar etc. Keyed by post time so updates refresh it. With no large icon,
+     * the photo inside the app's custom layout stands in for it (see [customPicture]).
+     */
     fun largeIcon(context: Context, e: Entry): Drawable? {
         val k = "${e.key}@${e.sbn.postTime}"
         large.get(k)?.let { return it }
-        val d = runCatching { e.n.getLargeIcon()?.loadDrawable(context) }.getOrNull() ?: return null
+        val d = runCatching { e.n.getLargeIcon()?.loadDrawable(context) }.getOrNull()
+            ?: return customPicture(context, e, k)
         large.put(k, d)
         return d
     }
+
+    /** Keys whose custom layout has been searched and held no picture. */
+    private val noPicture = HashSet<String>()
+
+    /**
+     * The biggest photo inside a notification's custom layout. TikTok draws a LIVE host's profile
+     * photo only there, with no large icon. The layout is inflated once, on a later main-thread
+     * pass so binding a card never waits on it; the card redraws once the photo is in.
+     */
+    private fun customPicture(context: Context, e: Entry, k: String): Drawable? {
+        val rv = e.n.contentView ?: e.n.bigContentView ?: return null
+        if (k in noPicture || !loading.add(k)) return null
+        val app = context.applicationContext
+        main.post {
+            loading.remove(k)
+            val d = runCatching { biggestPhoto(app, rv) }.getOrNull()
+            if (d == null) {
+                noPicture.add(k)
+            } else {
+                large.put(k, d)
+                NotifStore.changed()
+            }
+        }
+        return null
+    }
+
+    /**
+     * A photo, not decoration: the largest bitmap the app set when posting, at least [MIN_PICTURE_PX]
+     * on its short side. An image already in the bare layout (TikTok's logo, bigger than the photo)
+     * is part of the design, so it doesn't count.
+     */
+    private fun biggestPhoto(context: Context, rv: android.widget.RemoteViews): Drawable? {
+        val parent = android.widget.FrameLayout(context)
+        val bare = HashMap<Int, Bitmap>()
+        runCatching {
+            val pkg = context.createPackageContext(rv.`package`, 0)
+            images(android.view.LayoutInflater.from(pkg).inflate(rv.layoutId, parent, false)) { v, d -> (d as? BitmapDrawable)?.bitmap?.let { bare[v.id] = it } }
+        }
+        var best: BitmapDrawable? = null
+        images(rv.apply(context, parent)) { v, d ->
+            val b = (d as? BitmapDrawable)?.bitmap
+            if (b == null || bare[v.id]?.sameAs(b) == true || minOf(b.width, b.height) < MIN_PICTURE_PX) return@images
+            if (best == null || b.width * b.height > best!!.bitmap.width * best!!.bitmap.height) best = d
+        }
+        return best
+    }
+
+    private fun images(v: android.view.View, f: (android.widget.ImageView, Drawable) -> Unit) {
+        if (v is android.view.ViewGroup) for (i in 0 until v.childCount) images(v.getChildAt(i), f)
+        if (v is android.widget.ImageView) v.drawable?.let { f(v, it) }
+    }
+
+    private const val MIN_PICTURE_PX = 64
 
     /**
      * The conversation's [Content.avatar], keyed by post time like [largeIcon]. A photo behind

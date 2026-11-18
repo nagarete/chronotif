@@ -236,6 +236,7 @@ works **alongside** them:
 - On stock Android 8+, the system posts "Chronotif is displaying over other apps". Long-press it
   to turn that notification off.
 - Custom notification layouts (RemoteViews) are rendered from their text, not pixel-for-pixel.
+  When such a notification has no large icon, the biggest photo inside its layout shows instead.
 - Apps that refuse input while *any* overlay is on screen (rare, mostly banking) may complain.
   Disable the edge handle and the status-bar swipe, and use the tile instead.
 
