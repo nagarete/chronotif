@@ -38,7 +38,14 @@ class Player : Service() {
             .setState(PlaybackState.STATE_PLAYING, intent?.getIntExtra("at", 62) ?.times(1000L) ?: 62_000L, 1f,
                 SystemClock.elapsedRealtime())
             .build())
-        s.setCallback(object : MediaSession.Callback() {})
+        // Buttons and the seek bar work, so a take can show them; there's still no audio.
+        s.setCallback(object : MediaSession.Callback() {
+            override fun onPlay() = state(s, PlaybackState.STATE_PLAYING)
+            override fun onPause() = state(s, PlaybackState.STATE_PAUSED)
+            override fun onSeekTo(pos: Long) = state(s, s.controller.playbackState?.state ?: PlaybackState.STATE_PLAYING, pos)
+            override fun onSkipToNext() = state(s, PlaybackState.STATE_PLAYING, 0)
+            override fun onSkipToPrevious() = state(s, PlaybackState.STATE_PLAYING, 0)
+        })
         s.isActive = true
         val n = Post.builder(this, "playback")
             .setContentTitle(title)
@@ -49,6 +56,15 @@ class Player : Service() {
             .build()
         startForeground(7, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
         return START_NOT_STICKY
+    }
+
+    private fun state(s: MediaSession, state: Int, pos: Long? = null) {
+        val old = s.controller.playbackState
+        val now = SystemClock.elapsedRealtime()
+        val at = pos ?: old?.let { o ->
+            if (o.state == PlaybackState.STATE_PLAYING) o.position + (now - o.lastPositionUpdateTime) else o.position
+        } ?: 0L
+        s.setPlaybackState(PlaybackState.Builder(old).setState(state, at, 1f, now).build())
     }
 
     override fun onDestroy() {

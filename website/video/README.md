@@ -35,3 +35,26 @@ in seconds, so `trailer/render.mjs` steps through it frame by frame into `out/ch
 change. It shows the same made-up apps and people as the phone takes, and must follow the same
 ordering rules as the app (`docs/notification-behavior.md`): newest first, Conversation stacks,
 and App stacks only in Earlier.
+
+## Takes in raw/takes (17T Pro, 18 Nov 2026)
+
+Kept locally only. Two takes pass through the real home screen: never use those ranges.
+
+| Take | Shows | Safe range |
+|---|---|---|
+| `lock` | Lock-screen view: New, then Maya's stack opened | 0–14 s |
+| `panel` | Panel overview, Maya's stack opened, parcel stack opened, running pill | 1.6–40 s (**home screen before 1.5 s**) |
+| `arrive` | A message brings Hiking crew back to the top of New | all |
+| `check` | Panel reopened after a check: everything in Earlier | 4.0–10 s (**home screen 2.0–3.5 s**) |
+| `preview` | Press and hold: Preview, then the photo viewer with zoom | all |
+| `player` | Pause, play, dragging the seek bar | all |
+| `swipe` | One message swiped out of a stack, then a card | all (a bare "Daybook" card appears after the card swipe; see below) |
+| `running` | The running pill opening | all |
+| `clear` | Clear sweeps Earlier; the player and Running stay | all |
+
+Swiping a card can leave an empty card titled with the app's name: Android 16 keeps the
+automatic group summary after its child goes, and Chronotif shows it.
+
+Driving the panel over adb: a swipe up closes the panel once its list is short, so don't scroll with
+`input swipe` unless the list is long. Screenshot only after checking that the panel or lock view is
+the window in front, or a missed step captures the home screen.
