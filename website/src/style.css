@@ -751,10 +751,87 @@ q {
 }
 .d-progress i {
   display: block;
-  width: 40%;
+  position: relative;
   height: 100%;
   border-radius: inherit;
   background: var(--accent-soft);
+}
+
+/* The Media player, laid out like the app's. */
+.d-player {
+  display: block;
+  padding: 0.75rem 0.85rem 0.6rem;
+}
+.d-player__top {
+  display: grid;
+  grid-template-columns: 2.9rem minmax(0, 1fr);
+  gap: 0.75rem;
+  align-items: center;
+}
+.d-art {
+  position: relative;
+  width: 2.9rem;
+  height: 2.9rem;
+  border-radius: 0.6rem;
+  background: radial-gradient(circle at 50% 62%, #fff 0 8%, transparent 9%),
+    repeating-radial-gradient(circle at 50% 62%, rgba(255, 255, 255, 0.28) 0 2px, transparent 2px 7px),
+    linear-gradient(135deg, #f0a35e, #8e4ec6);
+}
+.d-art__badge {
+  position: absolute;
+  right: -0.2rem;
+  bottom: -0.2rem;
+  display: grid;
+  place-items: center;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 0.3rem;
+  color: #fff;
+  font-size: 0.55rem;
+  font-weight: 700;
+}
+.d-player__controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1.6rem;
+  margin: 0.45rem 0 0.2rem;
+}
+.d-player__controls svg {
+  width: 1rem;
+  height: 1rem;
+  fill: currentColor;
+}
+.d-player__play {
+  display: grid;
+  place-items: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+}
+.d-seek {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 0.6rem;
+  align-items: center;
+  color: var(--muted, rgba(255, 255, 255, 0.6));
+  font-size: 0.65rem;
+  font-variant-numeric: tabular-nums;
+}
+.d-seek .d-progress {
+  margin: 0;
+}
+.d-seek .d-progress i::after {
+  content: "";
+  position: absolute;
+  right: -0.3rem;
+  top: 50%;
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  background: #fff;
+  transform: translateY(-50%);
 }
 
 /* EARLIER: receded cards, still newest first. */
