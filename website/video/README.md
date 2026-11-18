@@ -21,8 +21,8 @@ only made-up notifications posted by the demo apps in `poster/`.
    then `adb install` each APK in `poster/build/outputs/apk/*/debug/`.
 2. `./scenes.sh setup`, then `./scenes.sh earlier` about 40 minutes before the takes. Cards that
    aren't chats show their real posting time, so they have to age.
-3. Record the takes (`adb shell screenrecord`), driving them with `./scenes.sh player|lock|arrive|panel`.
+3. Record the takes (`./scenes.sh rec NAME SECS` while driving them with `./scenes.sh lock|fresh|panel|arrive|tap`). A take can start or pass through the home screen: check every take and pick cut points that skip it.
 4. `node demo-capture.mjs raw/demo` records the website demo from `../dist` (run `vite build` first).
    `node captions.mjs raw/captions` renders `captions.json` as overlays. Both need
    `PLAYWRIGHT_CORE` pointing at an installed `playwright-core` and use `/usr/bin/chromium`.
-5. `./scenes.sh restore` when done, then uninstall the demo apps.
+5. `./edit.sh` cuts `out/chronotif-promo.mp4` (add `MUSIC=track.mp3` for sound). Then `./scenes.sh restore` and uninstall the demo apps.
