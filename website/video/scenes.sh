@@ -8,6 +8,9 @@
 #   ./scenes.sh lock      screen off, new messages arrive, screen wakes: the lock-screen view
 #   ./scenes.sh arrive    a new message from the hiking group while the panel is open
 #   ./scenes.sh panel     open the debug panel from its edge handle
+#   ./scenes.sh rec NAME SECONDS   record the screen into raw/takes/NAME.mp4 (runs in background:
+#                                  start it, then drive the take)
+#   ./scenes.sh tap X Y   tap, in screen pixels
 #   ./scenes.sh restore   demo mode off, stable listener back, demo notifications cleared
 set -euo pipefail
 
@@ -37,7 +40,6 @@ case ${1:-} in
   setup)
     adb shell am broadcast -n $DEBUG/app.chronotif.DemoModeReceiver --ez on true | tail -1
     adb shell cmd notification disallow_listener app.chronotif/app.chronotif.ListenerService
-    adb shell svc power stayon usb
     for a in chat parcel calendar bank music steps; do
       adb shell pm grant app.chronotif.demo.$a android.permission.POST_NOTIFICATIONS
       post $a --es do reset
@@ -47,7 +49,7 @@ case ${1:-} in
     # Oldest first. The group chat is backdated through its message times; other cards can't be,
     # so they're posted for real and simply age until the takes.
     msg crew "Leo Park" "Trailhead at 8, bring layers" --es title "$(q "Hiking crew")" --ez group true --ei ago 52
-    msg crew "Priya Nair" "I’ll drive, room for three" --ei ago 49
+    msg crew "Emma Wilson" "I’ll drive, room for three" --ei ago 49
     note steps 1 "4,812 steps" "Goal 8,000 · 60% there" --ez ongoing true --ei progress 60
     note calendar 1 "Standup moved to 10:30" "Today · Room 2"
     sleep 60
@@ -81,12 +83,19 @@ case ${1:-} in
     msg crew "Sam Ortiz" "Forecast says clear skies, we’re on" --es photo morning
     ;;
   panel) open_panel ;;
+  tap) adb shell input tap "$2" "$3" ;;
+  rec)
+    mkdir -p "$(dirname "$0")/raw/takes"
+    adb shell screenrecord --time-limit "$3" --bit-rate 24000000 "/sdcard/Movies/take.mp4"
+    adb pull /sdcard/Movies/take.mp4 "$(dirname "$0")/raw/takes/$2.mp4" >/dev/null
+    adb shell rm /sdcard/Movies/take.mp4
+    echo "raw/takes/$2.mp4"
+    ;;
   restore)
     adb shell am broadcast -n $DEBUG/app.chronotif.DemoModeReceiver --ez on false | tail -1
     adb shell am stopservice -n app.chronotif.demo.music/app.chronotif.demo.Player >/dev/null || true
     for a in chat parcel calendar bank music steps; do post $a --es do reset; done
     adb shell cmd notification allow_listener app.chronotif/app.chronotif.ListenerService
-    adb shell svc power stayon false
     ;;
   *) sed -n '2,15p' "$0"; exit 1 ;;
 esac
