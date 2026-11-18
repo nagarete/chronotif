@@ -1,0 +1,11 @@
+{
+  "title":   { "kind": "title", "big": "Chronotif", "small": "Your notifications, newest first." },
+  "new":     { "text": "<b>New</b> is everything since you last looked." },
+  "chat":    { "text": "A chat stacks up. Tap to read every message." },
+  "earlier": { "text": "What you’ve seen steps back to <b>Earlier</b>. Still in order." },
+  "burst":   { "text": "A burst from one app folds into a stack." },
+  "arrive":  { "text": "A new message brings its chat back to <b>New</b>." },
+  "running": { "text": "Music stays on top. Background work folds into one pill." },
+  "check":   { "text": "Look once, and it all steps back." },
+  "end":     { "kind": "end", "big": "Chronotif", "small": "Free and open source, for Android 11+", "url": "chronotif.com" }
+}

@@ -6,3 +6,7 @@ local.properties
 *.jks
 *.keystore
 .kotlin/
+# Promo video footage and renders: made-up content, but recordings can still catch the device's
+# own status bar or banners. Kept out of git; see website/video/README.md.
+website/video/raw/
+website/video/out/

@@ -1,0 +1,92 @@
+#!/usr/bin/env bash
+# Drives the promo-video takes on a phone over adb. Everything shown is made up and posted by the
+# demo apps in poster/; the debug build's demo mode keeps real notifications out of the panel.
+#
+#   ./scenes.sh setup     install-time setup: demo mode on, stable Chronotif's listener paused
+#   ./scenes.sh earlier   post the Earlier notifications, then check them (run ~40 min before takes)
+#   ./scenes.sh player    start the pretend music player
+#   ./scenes.sh lock      screen off, new messages arrive, screen wakes: the lock-screen view
+#   ./scenes.sh arrive    a new message from the hiking group while the panel is open
+#   ./scenes.sh panel     open the debug panel from its edge handle
+#   ./scenes.sh restore   demo mode off, stable listener back, demo notifications cleared
+set -euo pipefail
+
+DEBUG=app.chronotif.debug
+post() { local app=$1; shift; adb shell am broadcast -f 32 -n "app.chronotif.demo.$app/app.chronotif.demo.Post" "$@" >/dev/null; }
+q() { printf "'%s'" "${1//\'/\'\\\'\'}"; }   # quote for the device shell
+msg() { post chat --es do msg --es conv "$1" --es from "$(q "$2")" --es text "$(q "$3")" "${@:4}"; }
+note() { post "$1" --es do note --ei id "$2" --es title "$(q "$3")" --es text "$(q "$4")" "${@:5}"; }
+
+handle() {
+  adb shell dumpsys window windows | awk -v pkg="package=$DEBUG " '
+    /Window #.*Chronotif handle/ { h = 1; next }
+    h && index($0, pkg) { mine = 1 }
+    h && mine && /frame=\[/ { match($0, /frame=\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]/); print substr($0, RSTART + 6, RLENGTH - 6); exit }
+    /Window #/ { h = 0; mine = 0 }'
+}
+
+open_panel() {
+  local f; f=$(handle)
+  [[ -n $f ]] || { echo "debug edge handle not found" >&2; exit 1; }
+  local x1 y1 x2 y2; IFS="[],"; read -r _ x1 y1 _ x2 y2 <<<"$f"; unset IFS
+  local y=$(((y1 + y2) / 2))
+  if ((x1 > 640)); then adb shell input swipe $((x2 - 10)) $y 500 $y 250; else adb shell input swipe $((x1 + 10)) $y 780 $y 250; fi
+}
+
+case ${1:-} in
+  setup)
+    adb shell am broadcast -n $DEBUG/app.chronotif.DemoModeReceiver --ez on true | tail -1
+    adb shell cmd notification disallow_listener app.chronotif/app.chronotif.ListenerService
+    adb shell svc power stayon usb
+    for a in chat parcel calendar bank music steps; do
+      adb shell pm grant app.chronotif.demo.$a android.permission.POST_NOTIFICATIONS
+      post $a --es do reset
+    done
+    ;;
+  earlier)
+    # Oldest first. The group chat is backdated through its message times; other cards can't be,
+    # so they're posted for real and simply age until the takes.
+    msg crew "Leo Park" "Trailhead at 8, bring layers" --es title "$(q "Hiking crew")" --ez group true --ei ago 52
+    msg crew "Priya Nair" "I’ll drive, room for three" --ei ago 49
+    note steps 1 "4,812 steps" "Goal 8,000 · 60% there" --ez ongoing true --ei progress 60
+    note calendar 1 "Standup moved to 10:30" "Today · Room 2"
+    sleep 60
+    note parcel 1 "Order confirmed" "Trail runners, size 42 · arriving Thursday"
+    sleep 150
+    note parcel 2 "Packed and on its way" "Tracking number PX-2048-1187"
+    sleep 150
+    note parcel 3 "Out for delivery" "Arriving today between 2 and 4 PM"
+    sleep 120
+    note bank 1 "You paid Corner Café" "€4.20 · Main account"
+    sleep 20
+    open_panel; sleep 3; adb shell input keyevent KEYCODE_BACK
+    echo "Earlier is set and checked."
+    ;;
+  player)
+    adb shell am start-foreground-service -n app.chronotif.demo.music/app.chronotif.demo.Player \
+      --es title "$(q "Slow Light")" --es artist "$(q "The Quiet Hours")" --ei at 48 >/dev/null
+    ;;
+  lock)
+    adb shell input keyevent KEYCODE_SLEEP; sleep 2
+    msg maya "Maya Chen" "Found a table by the window"
+    sleep 1
+    msg maya "Maya Chen" "Ordered you a flat white"
+    sleep 1
+    msg maya "Maya Chen" "Look at this view" --es photo lake
+    note calendar 2 "Design review in 15 min" "11:00 · Room 4" --es channel reminders
+    sleep 1
+    adb shell input keyevent KEYCODE_WAKEUP
+    ;;
+  arrive)
+    msg crew "Sam Ortiz" "Forecast says clear skies, we’re on" --es photo morning
+    ;;
+  panel) open_panel ;;
+  restore)
+    adb shell am broadcast -n $DEBUG/app.chronotif.DemoModeReceiver --ez on false | tail -1
+    adb shell am stopservice -n app.chronotif.demo.music/app.chronotif.demo.Player >/dev/null || true
+    for a in chat parcel calendar bank music steps; do post $a --es do reset; done
+    adb shell cmd notification allow_listener app.chronotif/app.chronotif.ListenerService
+    adb shell svc power stayon false
+    ;;
+  *) sed -n '2,15p' "$0"; exit 1 ;;
+esac
