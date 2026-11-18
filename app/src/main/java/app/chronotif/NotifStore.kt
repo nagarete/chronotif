@@ -28,12 +28,16 @@ class Entry(
     val isSummary get() = n.flags and Notification.FLAG_GROUP_SUMMARY != 0
     /** Includes the system's auto-grouping, so its empty summaries can be hidden too. */
     val groupId: String? get() = if (sbn.isGroup) sbn.groupKey else null
+    /** The app's channel; a conversation's own channel counts as the channel it was split from. */
+    val channelId: String get() = ranking.channel?.let { it.parentChannelId ?: it.id } ?: n.channelId ?: ""
+    /** Unknown for a conversation's channel, whose name is the conversation's. */
+    val channelName: String? get() = ranking.channel?.takeIf { it.parentChannelId == null }?.name?.toString()
 }
 
 /**
  * In-memory mirror of the active notifications, fed by [ListenerService].
  * Everything runs on the main thread (listener callbacks are delivered there).
- * Nothing here is persisted.
+ * Nothing here is persisted, apart from the apps and channels [Exclusions] has seen.
  */
 object NotifStore {
     private val entries = LinkedHashMap<String, Entry>()
@@ -55,8 +59,11 @@ object NotifStore {
         if (hidden.getOrPut(key) { HashSet() }.add(messageId)) changed()
     }
 
-    /** What the UI shows: group summaries with children, suspended apps and DND-hidden ones drop out. */
-    fun visible(): List<Entry> {
+    /**
+     * What the UI shows: group summaries with children, suspended apps, DND-hidden and Excluded ones
+     * drop out. [includeExcluded] is only for safety checks, such as not covering an excluded alarm.
+     */
+    fun visible(includeExcluded: Boolean = false): List<Entry> {
         val groupsWithChildren = HashSet<String>()
         for (e in entries.values) if (!e.isSummary) e.groupId?.let(groupsWithChildren::add)
         return entries.values.filter { e ->
@@ -64,7 +71,8 @@ object NotifStore {
                 !e.ranking.isSuspended &&
                 e.ranking.suppressedVisualEffects and
                 android.app.NotificationManager.Policy.SUPPRESSED_EFFECT_NOTIFICATION_LIST == 0 &&
-                !(e.isSummary && e.groupId in groupsWithChildren)
+                !(e.isSummary && e.groupId in groupsWithChildren) &&
+                (includeExcluded || !Exclusions.isExcluded(e))
         }
     }
 
@@ -141,11 +149,14 @@ object NotifStore {
             conversation = !live && Content.isConversation(n),
             message = Content.incomingMessage(n))
         entries.remove(sbn.key)
-        entries[sbn.key] = Entry(sbn, rankingOf(sbn.key, map), alertTime)
+        entries[sbn.key] = Entry(sbn, rankingOf(sbn.key, map), alertTime).also(Exclusions::note)
     }
 
     private fun rerank(map: RankingMap) {
-        for (e in entries.values) e.ranking = rankingOf(e.key, map)
+        for (e in entries.values) {
+            e.ranking = rankingOf(e.key, map)
+            Exclusions.note(e)
+        }
     }
 
     private fun rankingOf(key: String, map: RankingMap) = Ranking().also { map.getRanking(key, it) }

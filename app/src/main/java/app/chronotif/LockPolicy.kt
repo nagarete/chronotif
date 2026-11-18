@@ -64,7 +64,8 @@ object LockPolicy {
             mode == AudioManager.MODE_IN_COMMUNICATION
         ) return true
         val now = System.currentTimeMillis()
-        return NotifStore.visible().any {
+        // An Excluded app's alarm or call still rings on screen; Chronotif mustn't cover it.
+        return NotifStore.visible(includeExcluded = true).any {
             it.n.fullScreenIntent != null && now - it.sbn.postTime < 60_000 &&
                 (it.n.category == Notification.CATEGORY_CALL || it.n.category == Notification.CATEGORY_ALARM)
         }

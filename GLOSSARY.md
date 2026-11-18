@@ -51,6 +51,10 @@ _Avoid_: Now playing card
 Notifications for work that continues in the background (always-running services, connected devices, step counters, downloads, navigation, timers). They sit collapsed below Earlier and never count as New. Ongoing calls are not Running; they stay at the top with Media players.
 _Avoid_: Ongoing, Background
 
+**Excluded**:
+An app, or one of its channels, that Chronotif leaves out entirely: never shown, never New, never waking the lock-screen view. Android's own notifications are unaffected.
+_Avoid_: Hidden (a swiped message; redacted content), Muted, Blocked (Android's setting), Off
+
 **Status-bar swipe**:
 Opening the panel by swiping down on, or tapping, the notification side of the status bar, in place of the system shade.
 _Avoid_: Top swipe, top-edge gesture

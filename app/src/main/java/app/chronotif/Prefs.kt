@@ -6,7 +6,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import app.chronotif.core.Attention
 
-/** The only persisted state: the last-check watermark and a handful of settings. */
+/** The last-check watermark and a handful of settings. Excluded apps live in [Exclusions]. */
 object Prefs {
     const val LOCK_OFF = 0
     const val LOCK_WHEN_NEW = 1
