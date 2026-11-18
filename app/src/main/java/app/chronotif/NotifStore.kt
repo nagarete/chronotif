@@ -61,6 +61,7 @@ object NotifStore {
         for (e in entries.values) if (!e.isSummary) e.groupId?.let(groupsWithChildren::add)
         return entries.values.filter { e ->
             e.pkg != BuildConfig.APPLICATION_ID &&
+                !DemoMode.hides(e.pkg) &&
                 !e.ranking.isSuspended &&
                 e.ranking.suppressedVisualEffects and
                 android.app.NotificationManager.Policy.SUPPRESSED_EFFECT_NOTIFICATION_LIST == 0 &&
@@ -133,7 +134,14 @@ object NotifStore {
         }
     }
 
+    /** Demo mode: forgets everything it hides, so nothing can draw a real notification. */
+    fun dropDemoHidden() {
+        entries.values.removeAll { DemoMode.hides(it.pkg) }
+        changed()
+    }
+
     private fun put(sbn: StatusBarNotification, map: RankingMap) {
+        if (DemoMode.hides(sbn.packageName)) return
         val n = sbn.notification
         val live = Content.kind(sbn) != Kind.NOTIFICATION
         val quiet = n.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0 || live

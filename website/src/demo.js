@@ -24,7 +24,7 @@ function initialState() {
     now: 600,
     lastCheck: 560,
     arrivals: 0,
-    media: [{ id: "pod", app: "podcasts", title: "Slow Mornings · Episode 42", body: "Playing" }],
+    media: [{ id: "pod", app: "podcasts", title: "Slow Mornings", body: "Episode 42", elapsed: "18:04", total: "41:30" }],
     running: 2,
     items: [
       { id: "maya", app: "messages", title: "Maya", body: "Running ten minutes late, save me a seat?", alert: 598 },
@@ -85,20 +85,34 @@ function card(state, item, extra = "") {
     </div>`;
 }
 
+// Drawn like the app's Media player: artwork badged with the app, title and artist,
+// previous / pause / next, and a seek bar with elapsed and total time.
+const ICON = {
+  prev: "M6 5h2v14H6zM20 5v14L9 12z",
+  pause: "M7 5h4v14H7zM13 5h4v14h-4z",
+  next: "M16 5h2v14h-2zM4 5l11 7-11 7z",
+};
+const svg = (d) => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${d}"/></svg>`;
+
+function player(o) {
+  const app = APPS[o.app];
+  const [e, t] = [o.elapsed, o.total].map((x) => x.split(":").reduce((m, s) => m * 60 + Number(s), 0));
+  return `<div role="listitem" class="d-card d-player" style="view-transition-name: card-${o.id}">
+    <div class="d-player__top">
+      <span class="d-art" aria-hidden="true"><span class="d-art__badge" style="background:${app.color}">${app.glyph}</span></span>
+      <div><div class="d-title">${esc(o.title)}</div><div class="d-body">${esc(o.body)}</div></div>
+    </div>
+    <div class="d-player__controls" aria-hidden="true">${svg(ICON.prev)}<span class="d-player__play">${svg(ICON.pause)}</span>${svg(ICON.next)}</div>
+    <div class="d-seek" aria-hidden="true"><span>${o.elapsed}</span><div class="d-progress"><i style="width:${((e / t) * 100).toFixed(1)}%"></i></div><span>${o.total}</span></div>
+  </div>`;
+}
+
 function render(state, list, fresh = new Set()) {
   const { fresh: newItems, earlier } = sections(state);
   let html = "";
 
   html += `<div class="d-list" role="list">`;
-  html += state.media
-    .map((o) => {
-      const app = APPS[o.app];
-      return `<div role="listitem" class="d-card d-card--ongoing" style="view-transition-name: card-${o.id}">
-        <span class="d-icon" style="background:${app.color}" aria-hidden="true">${app.glyph}</span>
-        <div><div class="d-title">${esc(o.title)}</div><div class="d-progress" aria-hidden="true"><i></i></div></div>
-      </div>`;
-    })
-    .join("");
+  html += state.media.map((o) => player(o)).join("");
   html += `</div>`;
 
   html += `<p class="d-head"><span>New<b>${newItems.length}</b></span></p>`;

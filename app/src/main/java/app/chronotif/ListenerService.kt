@@ -66,6 +66,16 @@ class ListenerService : NotificationListenerService() {
         refreshHandle()
     }
 
+    /** Reloads every active notification, e.g. after demo mode stops dropping them. */
+    fun resync() {
+        val active = try {
+            activeNotifications
+        } catch (_: SecurityException) {
+            null
+        }
+        NotifStore.connect(active, currentRanking)
+    }
+
     override fun onListenerDisconnected() {
         teardown()
         NotifStore.disconnect()

@@ -1,0 +1,18 @@
+{
+  "title":    { "kind": "title", "big": "Chronotif", "small": "Every feature, in about a minute." },
+  "new":      { "kicker": "New and Earlier", "text": "Everything since you last looked is <b>New</b>. The rest steps back to <b>Earlier</b>." },
+  "check":    { "kicker": "What counts as a check", "text": "Open the panel and close it. What it showed moves to <b>Earlier</b>." },
+  "arrive":   { "kicker": "Newest first", "text": "A new message lands on top and brings its chat back to <b>New</b>." },
+  "chat":     { "kicker": "Conversation stacks", "text": "A chat stacks up. Tap it to read every message." },
+  "preview":  { "kicker": "Preview", "text": "Press and hold any card for a Preview, without opening the app." },
+  "viewer":   { "kicker": "Photos", "text": "Tap the photo to see it full screen. Zoom, save or share." },
+  "swipe":    { "kicker": "Swipe away", "text": "Swipe one message out of a chat. Only that message goes." },
+  "burst":    { "kicker": "App stacks", "text": "A burst from one app folds into a stack, still in time order." },
+  "media":    { "kicker": "Media", "text": "Music stays on top, with play, pause and a seek bar." },
+  "running":  { "kicker": "Running", "text": "Always-running services fold into one pill." },
+  "clear":    { "kicker": "Clear", "text": "Clear sweeps <b>Earlier</b> away. Music and Running stay." },
+  "lock":     { "kicker": "Lock screen", "text": "When the screen turns on, what’s new is up front. No unlocking." },
+  "privacy":  { "kind": "card", "big": "Private", "small": "Your notifications never leave your phone. No accounts, no analytics, no backend." },
+  "open":     { "kind": "card", "big": "Open source", "small": "Free, GPL-3.0. Read every line, change it, build it yourself.", "url2": "github.com/nagarete/chronotif" },
+  "feedback": { "kind": "end", "big": "Help shape it", "small": "Ideas or bugs? Tell us. Chronotif gets better from what you report.", "url": "github.com/nagarete/chronotif/issues", "url2": "chronotif.com" }
+}
