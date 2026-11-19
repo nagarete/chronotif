@@ -376,14 +376,17 @@ class SearchOverlay private constructor(
         addView(LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             addView(Ui.text(context, 16f, pal.text, lines = 1).apply { text = c.name })
-            if (c.callNumber != null) addView(Ui.text(context, 13f, pal.textSecondary, lines = 1).apply { text = c.callNumber })
+            val detail = listOfNotNull(c.callNumber, if (c.whatsapp != null) context.getString(R.string.search_whatsapp) else null)
+            if (detail.isNotEmpty()) addView(Ui.text(context, 13f, pal.textSecondary, lines = 1).apply { text = detail.joinToString(" · ") })
         }, LinearLayout.LayoutParams(0, -2, 1f))
-        c.callNumber?.let { number ->
+        if (c.callNumber != null || c.whatsapp?.chat != null) {
             addView(actionButton(R.drawable.ic_message, context.getString(R.string.search_message, c.name)) {
-                PersonalData.message(host.context, number)
+                PersonalData.message(host.context, c)
             })
+        }
+        if (c.callNumber != null || c.whatsapp?.call != null) {
             addView(actionButton(R.drawable.ic_call, context.getString(R.string.search_call, c.name)) {
-                PersonalData.call(host.context, number)
+                PersonalData.call(host.context, c)
             })
         }
         setOnClickListener { launch { PersonalData.openContact(host.context, c) } }

@@ -118,6 +118,7 @@
     <string name="search_contacts">Contacts</string>
     <string name="search_calendar">Calendar</string>
     <string name="search_show_more">Show more (%1$d)</string>
+    <string name="search_whatsapp" translatable="false">WhatsApp</string>
     <string name="search_unlock_for_more">Unlock to see all results</string>
     <string name="search_call">Call %1$s</string>
     <string name="search_message">Message %1$s</string>

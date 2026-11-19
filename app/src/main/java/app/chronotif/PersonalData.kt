@@ -29,7 +29,11 @@ class Contact(
     val numbers: List<String>,
     /** What the call and message buttons use; null when the contact has no number. */
     val callNumber: String?,
+    /** The contact's WhatsApp chat and voice-call entries, when WhatsApp has added them to Contacts. */
+    val whatsapp: WhatsApp? = null,
 )
+
+class WhatsApp(val chat: Long?, val call: Long?)
 
 class CalendarEvent(val id: Long, val title: String, val begin: Long, val end: Long, val allDay: Boolean)
 
@@ -73,6 +77,7 @@ object PersonalData {
                     PersonalMatch.Number(number, isDefault = c.getInt(3) != 0, isMobile = c.getInt(2) == Phone.TYPE_MOBILE)
             }
         }
+        val whatsapp = readWhatsApp(context)
         val out = ArrayList<Contact>()
         cr.query(
             ContactsContract.Contacts.CONTENT_URI,
@@ -95,11 +100,36 @@ object PersonalData {
                     photo = c.getString(3)?.let(Uri::parse),
                     numbers = own.map { it.number }.distinct(),
                     callNumber = PersonalMatch.callNumber(own),
+                    whatsapp = whatsapp[id],
                 )
             }
         }
         return out
     }
+
+    /**
+     * WhatsApp adds a chat and a voice-call entry to each contact who uses it. Opening one of those
+     * entries is how the Contacts app starts a WhatsApp chat or call, and Search does the same.
+     */
+    private fun readWhatsApp(context: Context): Map<Long, WhatsApp> {
+        val chats = HashMap<Long, Long>()
+        val calls = HashMap<Long, Long>()
+        context.contentResolver.query(
+            ContactsContract.Data.CONTENT_URI,
+            arrayOf(ContactsContract.Data._ID, ContactsContract.Data.CONTACT_ID, ContactsContract.Data.MIMETYPE),
+            "${ContactsContract.Data.MIMETYPE} IN (?, ?)",
+            arrayOf(WHATSAPP_CHAT, WHATSAPP_CALL), null,
+        )?.use { c ->
+            while (c.moveToNext()) {
+                val target = if (c.getString(2) == WHATSAPP_CHAT) chats else calls
+                target.putIfAbsent(c.getLong(1), c.getLong(0))
+            }
+        }
+        return (chats.keys + calls.keys).associateWith { WhatsApp(chats[it], calls[it]) }
+    }
+
+    private const val WHATSAPP_CHAT = "vnd.android.cursor.item/vnd.com.whatsapp.profile"
+    private const val WHATSAPP_CALL = "vnd.android.cursor.item/vnd.com.whatsapp.voip.call"
 
     /** The contact's photo, delivered on the main thread; nothing when it has none. */
     fun photo(context: Context, contact: Contact, done: (Drawable) -> Unit) {
@@ -157,17 +187,36 @@ object PersonalData {
     fun openContact(context: Context, contact: Contact) = start(context,
         Intent(Intent.ACTION_VIEW, ContactsContract.Contacts.getLookupUri(contact.id, contact.lookupKey)))
 
-    /** Opens the dialer with the number ready, so Chronotif needs no permission to place calls. */
-    fun call(context: Context, number: String) = start(context, Intent(Intent.ACTION_DIAL, Uri.fromParts("tel", number, null)))
+    /**
+     * A WhatsApp voice call when the contact is on WhatsApp. Otherwise the dialer opens with the
+     * number ready, so Chronotif needs no permission to place calls.
+     */
+    fun call(context: Context, contact: Contact) {
+        if (openWhatsApp(context, contact.whatsapp?.call, WHATSAPP_CALL)) return
+        val number = contact.callNumber ?: return
+        start(context, Intent(Intent.ACTION_DIAL, Uri.fromParts("tel", number, null)))
+    }
 
-    fun message(context: Context, number: String) = start(context, Intent(Intent.ACTION_SENDTO, Uri.fromParts("smsto", number, null)))
+    /** A WhatsApp chat when the contact is on WhatsApp, otherwise the SMS app. */
+    fun message(context: Context, contact: Contact) {
+        if (openWhatsApp(context, contact.whatsapp?.chat, WHATSAPP_CHAT)) return
+        val number = contact.callNumber ?: return
+        start(context, Intent(Intent.ACTION_SENDTO, Uri.fromParts("smsto", number, null)))
+    }
+
+    private fun openWhatsApp(context: Context, dataId: Long?, type: String): Boolean {
+        if (dataId == null) return false
+        val intent = Intent(Intent.ACTION_VIEW)
+            .setDataAndType(ContentUris.withAppendedId(ContactsContract.Data.CONTENT_URI, dataId), type)
+            .setPackage("com.whatsapp")
+        return start(context, intent)
+    }
 
     fun openEvent(context: Context, event: CalendarEvent) = start(context,
         Intent(Intent.ACTION_VIEW, ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, event.id))
             .putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, event.begin)
             .putExtra(CalendarContract.EXTRA_EVENT_END_TIME, event.end))
 
-    private fun start(context: Context, intent: Intent) {
-        runCatching { context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
-    }
+    private fun start(context: Context, intent: Intent): Boolean =
+        runCatching { context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }.isSuccess
 }
