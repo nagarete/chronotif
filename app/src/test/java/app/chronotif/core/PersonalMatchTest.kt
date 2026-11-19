@@ -63,6 +63,11 @@ class PersonalMatchTest {
         assertEquals(listOf("Gym@1500"), events("gym", weekly))
     }
 
+    @Test fun theSameEventInTwoCalendarsShowsOnce() {
+        val holidays = listOf(E(1, "International Labor Day", 5000), E(2, "International Labor Day", 5000))
+        assertEquals(listOf("International Labor Day@5000"), events("lab", holidays))
+    }
+
     @Test fun eventsMatchWordStarts() {
         assertEquals(listOf("Lunch with Budi@2000"), events("bud", listOf(E(1, "Lunch with Budi", 2000), E(2, "Ibu", 2000))))
     }

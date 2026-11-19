@@ -45,14 +45,18 @@ object PersonalMatch {
 
     /**
      * Events whose title matches, soonest first: those not over yet by start time, then past ones,
-     * the most recent first. A repeating event shows once, at its next (or last) time.
+     * the most recent first. A repeating event shows once, at its next (or last) time, and the
+     * same event in two calendars (a holiday in two holiday calendars) shows once.
      */
     fun <T> events(all: List<T>, query: String, now: Long, id: (T) -> Long, title: (T) -> String, begin: (T) -> Long, end: (T) -> Long): List<T> {
         val matching = all.filter { wordStart(title(it), query) != null }
         val (upcoming, past) = matching.partition { end(it) > now }
         val chosen = LinkedHashMap<Long, T>()
-        upcoming.sortedBy(begin).forEach { chosen.putIfAbsent(id(it), it) }
-        past.sortedByDescending(begin).forEach { chosen.putIfAbsent(id(it), it) }
+        val seen = HashSet<Pair<String, Long>>()
+        for (e in upcoming.sortedBy(begin) + past.sortedByDescending(begin)) {
+            if (id(e) in chosen || !seen.add(AppMatch.fold(title(e)) to begin(e))) continue
+            chosen[id(e)] = e
+        }
         return chosen.values.take(EVENTS_SHOWN)
     }
 }
