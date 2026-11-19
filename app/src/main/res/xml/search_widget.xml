@@ -1,14 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 2x1 by default; stretch it from 2 to 5 cells wide. -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     tools:ignore="UnusedAttribute"
     android:description="@string/search_widget_desc"
     android:initialLayout="@layout/search_widget"
-    android:minWidth="180dp"
+    android:previewLayout="@layout/search_widget"
+    android:minWidth="110dp"
     android:minHeight="40dp"
     android:minResizeWidth="110dp"
+    android:maxResizeWidth="400dp"
     android:resizeMode="horizontal"
-    android:targetCellWidth="4"
+    android:targetCellWidth="2"
     android:targetCellHeight="1"
     android:updatePeriodMillis="0"
     android:widgetCategory="home_screen" />

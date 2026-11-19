@@ -205,7 +205,7 @@ To open Chronotif in fullscreen, use the Quick Settings tile, or turn off the ed
   *Settings → Lock screen* chooses Off / *When something is new* (default) /
   *Whenever there are notifications*.
 - **Search**: find and open apps from anywhere, without the accessibility service. Pull down at
-  the top of the panel or the lock-screen view, hold the edge handle, tap the *Search* Quick
+  the top of the panel or the lock-screen view, hold the edge handle, tap the *Chronotif Search* Quick
   Settings tile or home-screen widget, or long-press Chronotif's icon and pick *Search*. Before
   you type, it suggests the four apps that notified most recently. On the lock screen, opening an
   app asks you to unlock first. *Settings → Panel → Pull down for Search* turns the pull-down off.

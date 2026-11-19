@@ -97,6 +97,8 @@
     <string name="search_pull_down">Pull down for Search</string>
     <string name="search_pull_down_desc">Pull down at the top of the panel or lock-screen view to open Search. It also opens from a long press on the edge handle, the Search tile, the Search widget and the app icon\'s shortcut.</string>
     <string name="search_label">Search</string>
+    <string name="search_tile_label">Chronotif Search</string>
+    <string name="search_icon_widget_desc">A round button that opens Chronotif\'s Search</string>
     <string name="search_widget_desc">A search bar that opens Chronotif\'s Search</string>
     <string name="search_suggestions">Suggestions</string>
     <string name="search_hint">Search apps</string>

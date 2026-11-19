@@ -65,7 +65,7 @@ A Media player is drawn from the app's media session, like the system shade's pl
 
 ## Search
 
-Search opens without the accessibility service, so it works alongside banking apps that refuse to run with one (ADR 0008). It opens from five places: a pull-down in the Panel or lock-screen view, a long press on the edge handle, the Search Quick Settings tile, the Search home-screen widget, and the Search shortcut on a long press of the app icon. Launchers that bind gestures, such as Nova, can bind theirs to the shortcut. Opened anywhere but the pull-down, Search has its own window over whatever is on screen, the lock screen included. It never takes the digital-assistant slot, so Gemini keeps the power button.
+Search opens without the accessibility service, so it works alongside banking apps that refuse to run with one (ADR 0008). It opens from five places: a pull-down in the Panel or lock-screen view, a long press on the edge handle, the Chronotif Search Quick Settings tile, a Search home-screen widget (a bar 2 to 5 cells wide, or a round 1x1 button), and the Search shortcut on a long press of the app icon. Launchers that bind gestures, such as Nova, can bind theirs to the shortcut. Opened anywhere but the pull-down, Search has its own window over whatever is on screen, the lock screen included. It never takes the digital-assistant slot, so Gemini keeps the power button.
 
 Pulling down with the list at its top, on the Panel or the lock-screen view, opens Search. On the Panel the pull has to start after the Panel has finished opening, so the status-bar swipe that opened it can't run on into search. A pull shorter than about 80dp springs back. The field gets focus and the keyboard comes up.
 
