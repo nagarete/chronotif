@@ -34,7 +34,8 @@ only made-up notifications posted by the demo apps in `poster/`.
 in seconds, so `trailer/render.mjs` steps through it frame by frame into `out/chronotif-trailer.mp4`.
 `node trailer/render.mjs out/x.mp4 --stills 2,8.5` writes stills next to the output to check a
 change. `trailer/vs.html` is a second trailer (`--page vs.html`) that sets the stock Android shade
-beside Chronotif; see `trailer-vs.md`. It shows the same made-up apps and people as the phone takes, and must follow the same
+beside Chronotif; see `trailer-vs.md`. `trailer/search.html` is the Search video (`--page search.html`,
+see `search.md`). They show the same made-up apps and people as the phone takes, and must follow the same
 ordering rules as the app (`docs/notification-behavior.md`): newest first, Conversation stacks,
 and App stacks only in Earlier.
 
@@ -63,17 +64,20 @@ the window in front, or a missed step captures the home screen.
 
 ## Music
 
-Both tracks are by HoliznaCC0, from the album "Public Domain Lofi" on the Free Music Archive, released
-under CC0 1.0 (public domain; no credit needed, use anywhere). The licence was checked on each track's
-own page on 2026-11-18. The files are kept in `raw/music/`, not in git.
+All tracks come from the Free Music Archive. The licence was checked on each track's own page
+(HoliznaCC0 on 2026-11-18, Alex Morgan on 2026-11-19). The files are kept in `raw/music/`, not in git.
+CC BY tracks must be credited: the videos that use them say so on the end card (the `credit` field
+in a cut's captions). Alex Morgan's track pages say they're AI-generated.
 
-| Video | Track | Source |
-|---|---|---|
-| Trailer | Tranquil Mindscape | freemusicarchive.org/music/holiznacc0/public-domain-lofi/tranquil-mindscape-lofi-happy-reflection/ |
-| Features | Bubbles | freemusicarchive.org/music/holiznacc0/public-domain-lofi/bubbles-lofi-bright-relaxed/ |
+| Video | Track | Licence | Source |
+|---|---|---|---|
+| Trailer | Tranquil Mindscape, HoliznaCC0 | CC0 1.0 | freemusicarchive.org/music/holiznacc0/public-domain-lofi/tranquil-mindscape-lofi-happy-reflection/ |
+| Features | Brazilian Phonk With Heavy Bass Drop, Alex Morgan | CC BY 4.0 | freemusicarchive.org/music/alex-morgan/phonk-drift/brazilian-phonk-with-heavy-bass-drop/ |
+| Search | Brazilian Phonk Bounce for Dance Reels, Alex Morgan | CC BY 4.0 | freemusicarchive.org/music/alex-morgan/phonk-drift/brazilian-phonk-bounce-for-dance-reels/ |
 
 Trailer: `node trailer/render.mjs raw/trailer-silent.mp4 && ./mux.sh raw/trailer-silent.mp4 raw/music/tranquil.mp3 out/chronotif-trailer.mp4`.
-Features: `MUSIC=raw/music/bubbles.mp3 ./edit.sh features`.
+Features: `MUSIC=raw/music/am-heavy-bass.mp3 MUSIC_START=1.25 ./edit.sh features`.
+Search: see `search.md`.
 
 ## On the website
 

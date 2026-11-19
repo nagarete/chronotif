@@ -8,9 +8,11 @@ The chapters are filmed on a real phone (a Xiaomi 17T Pro) running the debug bui
 plus one clip of the website's interactive demo. Every notification comes from the made-up demo
 apps in `poster/`. None of the phone's real notifications or home screen appear.
 
-Music: "Bubbles" by HoliznaCC0, from the album
-[Public Domain Lofi](https://freemusicarchive.org/music/holiznacc0/public-domain-lofi)
-(CC0 1.0, no credit required).
+Music: "Brazilian Phonk With Heavy Bass Drop" by Alex Morgan, from the album
+[Phonk & Drift](https://freemusicarchive.org/music/alex-morgan/phonk-drift) (CC BY 4.0). The end card
+credits it, as the licence requires. It replaced "Bubbles" by HoliznaCC0 (CC0) on 20 Nov 2026.
+Built with `MUSIC=raw/music/am-heavy-bass.mp3 MUSIC_START=1.25 ./edit.sh features`, so the first drop
+lands as the title card gives way.
 
 ## Chapters
 
@@ -33,7 +35,7 @@ Each chapter has a small label above its caption.
 | 0:46 | Lock screen | When the screen turns on, what's new is up front. No unlocking. | Phone: the lock-screen view, then Maya's stack opened |
 | 0:53 | Private | Your notifications never leave your phone. No accounts, no analytics, no backend. | Card |
 | 0:56 | Open source | Free, GPL-3.0. Read every line, change it, build it yourself. `github.com/nagarete/chronotif` | Card |
-| 1:00 | Help shape it | Ideas or bugs? Tell us. Chronotif gets better from what you report. `github.com/nagarete/chronotif/issues`, `chronotif.com` | End card |
+| 1:00 | Help shape it | Ideas or bugs? Tell us. Chronotif gets better from what you report. `github.com/nagarete/chronotif/issues`, `chronotif.com`, music credit | End card |
 
 ## Why it ends on feedback
 
@@ -47,5 +49,7 @@ templates.
   card away. Android 16 keeps the automatic group summary after its last child is removed. This
   is a known bug, and the swipe chapter stops before it shows.
 - Calls. Chronotif shows ongoing and incoming calls first, but no take recorded one.
+
+Search and the settings gear came later and have their own video (`search.md`).
 
 When a feature is added or changed, add or update its chapter here and in `cuts/features.*`.

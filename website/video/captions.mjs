@@ -27,6 +27,7 @@ const css = `
   .big { font: 600 150px/1 Newsreader, serif; letter-spacing: -0.03em; }
   .small { font: 400 52px/1.3 Newsreader, serif; color: #c9c6bf; max-width: 820px; margin: 0 auto; text-wrap: balance; }
   .url2 { font: 500 36px/1.3 "Noto Sans Mono", monospace; color: #c9c6bf; }
+  .credit { position: absolute; left: 0; right: 0; bottom: 70px; text-align: center; font: 400 26px/1.4 "Noto Sans", sans-serif; color: #8d8a84; }
   .url { margin-top: 30px; font: 600 46px/1 "Noto Sans", sans-serif; color: #9db8ff; letter-spacing: 0.02em; }
 `;
 
@@ -35,7 +36,7 @@ const browser = await chromium.launch({ executablePath: process.env.CHROMIUM ?? 
 const page = await browser.newPage({ viewport: { width: 1080, height: 1920 } });
 for (const [name, c] of Object.entries(captions)) {
   const body = c.kind
-    ? `<div class="card"><div class="big">${c.big}</div><div class="small">${c.small}</div>${c.url ? `<div class="url">${c.url}</div>` : ""}${c.url2 ? `<div class="url2">${c.url2}</div>` : ""}</div>`
+    ? `<div class="card"><div class="big">${c.big}</div><div class="small">${c.small}</div>${c.url ? `<div class="url">${c.url}</div>` : ""}${c.url2 ? `<div class="url2">${c.url2}</div>` : ""}${c.credit ? `<div class="credit">${c.credit}</div>` : ""}</div>`
     : c.kicker
       ? `<div class="cap kick"><div><div class="kicker">${c.kicker}</div>${c.text}</div></div>`
       : `<div class="cap"><div>${c.text}</div></div>`;

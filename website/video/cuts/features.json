@@ -14,5 +14,6 @@
   "lock":     { "kicker": "Lock screen", "text": "When the screen turns on, what’s new is up front. No unlocking." },
   "privacy":  { "kind": "card", "big": "Private", "small": "Your notifications never leave your phone. No accounts, no analytics, no backend." },
   "open":     { "kind": "card", "big": "Open source", "small": "Free, GPL-3.0. Read every line, change it, build it yourself.", "url2": "github.com/nagarete/chronotif" },
-  "feedback": { "kind": "end", "big": "Help shape it", "small": "Ideas or bugs? Tell us. Chronotif gets better from what you report.", "url": "github.com/nagarete/chronotif/issues", "url2": "chronotif.com" }
+  "feedback": { "kind": "end", "big": "Help shape it", "small": "Ideas or bugs? Tell us. Chronotif gets better from what you report.", "url": "github.com/nagarete/chronotif/issues", "url2": "chronotif.com",
+                "credit": "Music: “Brazilian Phonk With Heavy Bass Drop” by Alex Morgan, CC BY 4.0" }
 }

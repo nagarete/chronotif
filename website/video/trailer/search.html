@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Chronotif Search</title>
+<!-- The Search video, drawn frame by frame like trailer.html: render(t) sets everything from the
+     time t in seconds. The phone screen is laid out in dp, matching SearchOverlay.kt, and scaled
+     to the same 672x1440 screen the features video uses. Every app, person and event is made up. -->
+<style>
+  :root {
+    --card: rgba(44,44,46,.92); --text: #fff; --text-2: rgba(235,235,245,.6); --chip: rgba(255,255,255,.12);
+    --accent: #a8c7fa; --serif: "Newsreader", Georgia, serif; --sans: "Noto Sans", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; width: 1080px; height: 1920px; overflow: hidden; background: #0b0c10; }
+  body { font-family: var(--sans); color: #f4f1ea; }
+  #bg { position: absolute; inset: 0; background: radial-gradient(1080px 1920px at 50% 0%, #1b2236 0%, #0b0c10 100%); }
+  #bezel { position: absolute; left: 192px; top: 428px; width: 696px; height: 1464px; border-radius: 60px; background: #2a2d36; }
+  #bezel::after { content: ""; position: absolute; inset: 4px; border-radius: 57px; background: #08090c; }
+  #screen { position: absolute; left: 204px; top: 440px; width: 672px; height: 1440px; border-radius: 48px; overflow: hidden; background: #000; }
+  #ui { position: absolute; left: 0; top: 0; width: 412px; height: 883px; transform: scale(1.6311); transform-origin: 0 0; }
+  .lay { position: absolute; inset: 0; overflow: hidden; }
+  .abs { position: absolute; }
+
+  /* captions, as captions.mjs draws them */
+  .cap { position: absolute; left: 90px; right: 90px; top: 100px; height: 340px; display: grid; place-items: center;
+         text-align: center; font: 500 56px/1.22 var(--serif); letter-spacing: -0.01em; text-wrap: balance; }
+  .cap b { font-weight: 700; color: #9db8ff; }
+  .kicker { font: 600 30px/1 var(--sans); letter-spacing: .16em; text-transform: uppercase; color: #9db8ff; margin-bottom: 26px; }
+  .full { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; gap: 28px;
+          background: radial-gradient(120% 70% at 50% 35%, #1b2236 0%, #0b0c10 60%); }
+  .big { font: 600 150px/1 var(--serif); letter-spacing: -0.03em; }
+  .small { font: 400 52px/1.3 var(--serif); color: #c9c6bf; max-width: 820px; margin: 0 auto; text-wrap: balance; }
+  .url { margin-top: 30px; font: 600 46px/1 var(--sans); color: #9db8ff; letter-spacing: 0.02em; }
+  .url2 { font: 500 36px/1.3 "Noto Sans Mono", monospace; color: #c9c6bf; }
+  .credit { position: absolute; left: 0; right: 0; bottom: 70px; text-align: center; font: 400 26px/1.4 var(--sans); color: #8d8a84; }
+
+  /* --- inside the phone, in dp --- */
+  .wall { position: absolute; inset: 0; background: linear-gradient(160deg, #3a4a78 0%, #1d2440 45%, #121522 100%); }
+  .scrim { position: absolute; inset: 0; background: rgba(0,0,0,.45); }
+  .status { position: absolute; left: 0; right: 0; top: 0; height: 32px; padding: 8px 22px 0; display: flex; justify-content: space-between;
+            font: 500 13px var(--sans); color: #fff; }
+  .batt { width: 22px; height: 11px; border: 1.5px solid #fff; border-radius: 3px; position: relative; margin-top: 3px; }
+  .batt::after { content: ""; position: absolute; left: 1.5px; top: 1.5px; bottom: 1.5px; width: 13px; background: #fff; border-radius: 1px; }
+  .sec { position: absolute; left: 26px; font: 700 13px var(--sans); color: rgba(255,255,255,.75); text-shadow: 0 1px 3px rgba(0,0,0,.5); }
+  .ncard { position: absolute; left: 12px; width: 388px; padding: 12px 14px; border-radius: 22px; background: var(--card);
+           display: grid; grid-template-columns: 40px 1fr; column-gap: 12px; align-items: center; }
+  .ncard.dim { background: rgba(44,44,46,.78); }
+  .ncard .t { display: flex; justify-content: space-between; font: 600 15px/1.3 var(--sans); color: #fff; }
+  .ncard .t span:last-child { font: 400 13px var(--sans); color: var(--text-2); }
+  .ncard .b { font: 400 14px/1.35 var(--sans); color: rgba(235,235,245,.78); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ic { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; position: relative; flex: none; }
+  .ic svg { width: 22px; height: 22px; fill: #fff; }
+  .ic.round { border-radius: 50%; font: 600 15px var(--sans); color: #fff; }
+  .ic .badge { position: absolute; right: -4px; bottom: -4px; width: 18px; height: 18px; border-radius: 6px; display: grid; place-items: center; border: 2px solid #2c2c2e; }
+  .ic .badge svg { width: 10px; height: 10px; }
+
+  .search { position: absolute; inset: 0; background: rgba(0,0,0,.5); }
+  .sugl { position: absolute; left: 20px; font: 700 13px var(--sans); color: rgba(255,255,255,.75); text-shadow: 0 1px 3px rgba(0,0,0,.6); }
+  .sugrow { position: absolute; left: 12px; width: 388px; height: 98px; padding: 12px 6px 10px; border-radius: 22px; background: var(--card); display: flex; }
+  .cell { flex: 1; display: flex; flex-direction: column; align-items: center; }
+  .cell .ic { width: 52px; height: 52px; border-radius: 15px; }
+  .cell .ic svg { width: 28px; height: 28px; }
+  .cell span { margin-top: 6px; font: 400 12px var(--sans); color: #fff; }
+  .field { position: absolute; left: 12px; width: 388px; height: 44px; border-radius: 14px; background: var(--card);
+           display: flex; align-items: center; padding: 0 12px; font: 400 17px var(--sans); color: #fff; white-space: pre; }
+  .field svg { width: 18px; height: 18px; fill: var(--text-2); margin-right: 8px; flex: none; }
+  .field .hint { color: var(--text-2); }
+  .caret { display: inline-block; width: 2px; height: 20px; background: var(--accent); vertical-align: -4px; margin-left: 1px; }
+  .results { position: absolute; left: 12px; width: 388px; top: 48px; overflow: hidden; }
+  .scard { border-radius: 22px; background: var(--card); margin-bottom: 10px; overflow: hidden; position: relative; }
+  .stitle { padding: 12px 16px 2px; font: 700 13px var(--sans); color: var(--text-2); }
+  .srow { display: flex; align-items: center; padding: 8px 14px; min-height: 56px; position: relative; }
+  .srow .lead { width: 40px; height: 40px; margin-right: 14px; display: grid; place-items: center; flex: none; }
+  .srow .lead > svg { width: 24px; height: 24px; fill: var(--text-2); }
+  .srow .tx { flex: 1; min-width: 0; font: 400 16px/1.3 var(--sans); color: #fff; }
+  .srow .tx small { display: block; font: 400 13px/1.35 var(--sans); color: var(--text-2); }
+  .act { width: 44px; height: 44px; display: grid; place-items: center; }
+  .act svg { width: 22px; height: 22px; fill: var(--accent); }
+  .avatar { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font: 700 17px var(--sans); color: #fff; }
+  .answer { padding: 14px 18px; }
+  .answer .s { font: 400 13px var(--sans); color: var(--text-2); }
+  .answer .v { margin-top: 4px; font: 700 30px/1.2 var(--sans); color: #fff; }
+  .answer .v.mid { font-size: 22px; }
+  .answer .n { margin-top: 6px; font: 400 12px/1.4 var(--sans); color: var(--text-2); }
+  .ripple { position: absolute; inset: 0; background: rgba(255,255,255,.2); }
+
+  .kb { position: absolute; left: 0; right: 0; bottom: 0; height: 270px; background: #1c1d21; padding: 10px 4px 26px; }
+  .kr { display: flex; justify-content: center; gap: 6px; margin-bottom: 11px; }
+  .key { width: 34px; height: 44px; border-radius: 7px; background: #3a3b40; display: grid; place-items: center; font: 400 19px var(--sans); color: #fff; }
+  .key.w { width: 52px; background: #2c2d31; font-size: 14px; }
+  .key.sp { width: 180px; }
+  .key.on { background: #6b6d75; }
+
+  .finger { position: absolute; width: 44px; height: 44px; margin: -22px 0 0 -22px; border-radius: 50%;
+            background: rgba(255,255,255,.35); border: 2px solid rgba(255,255,255,.8); box-shadow: 0 2px 10px rgba(0,0,0,.4); }
+
+  .set { position: absolute; inset: 0; background: #111214; }
+  .set h1 { position: absolute; left: 20px; top: 52px; margin: 0; font: 400 30px var(--sans); color: #fff; }
+  .set .sh { position: absolute; left: 20px; font: 700 13px var(--sans); letter-spacing: .06em; color: var(--accent); }
+  .tog { position: absolute; left: 20px; right: 20px; }
+  .tog .row { display: flex; align-items: center; justify-content: space-between; font: 400 16px var(--sans); color: #fff; min-height: 40px; }
+  .tog p { margin: 0; font: 400 13px/1.4 var(--sans); color: var(--text-2); }
+  .sw { width: 52px; height: 32px; border-radius: 16px; border: 2px solid #8e9099; position: relative; flex: none; margin-left: 12px; }
+  .sw::after { content: ""; position: absolute; left: 6px; top: 6px; width: 16px; height: 16px; border-radius: 50%; background: #8e9099; }
+  .sw.on { background: var(--accent); border-color: var(--accent); }
+  .sw.on::after { left: 22px; top: 2px; width: 24px; height: 24px; background: #0b305f; }
+  .dlg-back { position: absolute; inset: 0; background: rgba(0,0,0,.55); }
+  .dlg { position: absolute; left: 32px; right: 32px; top: 300px; border-radius: 28px; background: #2b2d33; padding: 24px; text-align: center; }
+  .dlg svg { width: 26px; height: 26px; fill: var(--accent); }
+  .dlg h2 { margin: 14px 0 22px; font: 400 21px/1.35 var(--sans); color: #fff; }
+  .dlg .btn { height: 44px; border-radius: 22px; display: grid; place-items: center; font: 500 15px var(--sans); color: #0b305f; background: var(--accent); margin-top: 8px; position: relative; overflow: hidden; }
+  .dlg .btn.alt { background: transparent; color: var(--accent); }
+
+  .lockclock { position: absolute; left: 0; right: 0; text-align: center; font: 300 80px/1 var(--sans); color: #fff; }
+  .lockdate { position: absolute; left: 0; right: 0; text-align: center; font: 400 16px var(--sans); color: rgba(255,255,255,.85); }
+  .hclock { position: absolute; left: 22px; font: 300 46px/1 var(--sans); color: #fff; }
+  .hdate { position: absolute; left: 24px; font: 400 15px var(--sans); color: rgba(255,255,255,.8); }
+  .gear { position: absolute; width: 26px; height: 26px; fill: #fff; }
+  .widget { position: absolute; left: 20px; right: 20px; height: 52px; border-radius: 26px; background: rgba(44,44,46,.85);
+            display: flex; align-items: center; padding: 0 18px; font: 400 16px var(--sans); color: var(--text-2); }
+  .widget svg { width: 22px; height: 22px; fill: var(--text-2); margin-right: 12px; }
+  .grid { position: absolute; left: 20px; right: 20px; display: grid; grid-template-columns: repeat(4, 1fr); row-gap: 22px; }
+  .grid .cell .ic { width: 56px; height: 56px; border-radius: 16px; }
+  .handle { position: absolute; right: 3px; width: 4px; height: 90px; border-radius: 2px; background: rgba(255,255,255,.4); }
+</style>
+<body>
+<div id="bg"></div>
+<div id="bezel"></div>
+<div id="screen"><div id="ui"><div class="lay" id="layA"></div><div class="lay" id="layB"></div></div></div>
+<div id="capA"></div><div id="capB"></div>
+<div id="full"></div>
+
+<script>
+// --- glyphs (24x24) and the made-up apps ---
+const P = {
+  chat: "M4,3h16a2,2 0,0 1,2 2v10a2,2 0,0 1,-2 2H9l-5,4v-4a2,2 0,0 1,-2 -2V5a2,2 0,0 1,2 -2z",
+  parcel: "M12,2l9,4.5v11L12,22l-9,-4.5v-11L12,2zM12,4.2L6.2,7.1 12,10l5.8,-2.9L12,4.2zM5,8.7v7.6l6,3v-7.6l-6,-3zM19,8.7l-6,3v7.6l6,-3V8.7z",
+  calendar: "M7,2h2v2h6V2h2v2h2a2,2 0,0 1,2 2v14a2,2 0,0 1,-2 2H5a2,2 0,0 1,-2 -2V6a2,2 0,0 1,2 -2h2V2zM5,9v11h14V9H5zM7,11h4v4H7v-4z",
+  bank: "M12,2L21,7v2H3V7l9,-5zM5,10h2v7H5v-7zM9,10h2v7H9v-7zM13,10h2v7h-2v-7zM17,10h2v7h-2v-7zM3,18h18v3H3v-3z",
+  photo: "M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z",
+  music: "M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z",
+  clock: "M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z",
+  camera: "M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4zM9 2 7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9z",
+  search: "M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z",
+  gear: "M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z",
+  lock: "M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z",
+  call: "M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z",
+  message: "M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z",
+  event: "M17 12h-5v5h5v-5zM16 1v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2h-1V1h-2zm3 18H5V8h14v11z",
+  person: "M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z",
+  calc: "M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM13 7h4v1.5h-4V7zM7 7.75h1.5V6h1v1.75H11v1H9.5V10.5h-1V8.75H7v-1zM11 16H7v-1.5h4V16zm6 1.5h-4V16h4v1.5zm0-3h-4V13h4v1.5z",
+  folder: "M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z",
+};
+const svg = (g) => `<svg viewBox="0 0 24 24"><path d="${P[g]}"/></svg>`;
+const APPS = [
+  ["Murmur", "chat", "#2EAD6B"], ["Daybook", "calendar", "#4C6FE0"], ["Fernbank", "bank", "#14806F"], ["Parcelly", "parcel", "#E8813A"],
+  ["Glimmer", "photo", "#C2477A"], ["Hum Music", "music", "#7E57C2"], ["Calculator", "calc", "#5F6368"], ["Camera", "camera", "#3C4043"],
+  ["Clock", "clock", "#1A73E8"], ["Contacts", "person", "#1E88E5"], ["Phone", "call", "#34A853"], ["Messages", "message", "#4285F4"],
+  ["Files", "folder", "#F9AB00"], ["Settings", "gear", "#5F6368"],
+].map(([name, g, c]) => ({ name, g, c }));
+const app = (n) => APPS.find((a) => a.name === n);
+const icon = (a, cls = "") => `<div class="ic ${cls}" style="background:${a.c}">${svg(a.g)}</div>`;
+const SUGGESTED = ["Murmur", "Daybook", "Fernbank", "Parcelly"];   // the panel's apps, newest first
+
+const CONTACTS = [
+  { name: "Emma Wilson", num: "+44 7700 900123", wa: true, c: "#8E6CEF" },
+  { name: "Emeka Obi", num: "+44 7700 900456", c: "#E07A5F" },
+  { name: "Leo Park", num: "+44 7700 900789", c: "#3D9970" },
+  { name: "Maya Chen", num: "+44 7700 900321", wa: true, c: "#F06292" },
+];
+const EVENTS = [
+  { title: "Design review", when: "Thu, 26 Nov, 11:00 – 12:00" },       // weekly: shows once, at its next time
+  { title: "Design sprint demo", when: "Tue, 1 Dec, 15:00 – 16:00" },
+];
+const PAGES = [
+  { label: "Wi-Fi", keys: ["wifi", "wireless", "internet"] }, { label: "Bluetooth", keys: [] },
+  { label: "Display and brightness", keys: ["brightness", "screen"] }, { label: "Do not disturb", keys: ["dnd", "quiet"] },
+  { label: "Battery", keys: [] }, { label: "Hotspot and connections", keys: ["hotspot", "tethering"] },
+];
+
+// --- matching, the way core/AppMatch.kt and PersonalMatch.kt do it ---
+const fold = (s) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
+const words = (s) => fold(s).split(/[^a-z0-9]+/).filter(Boolean);
+function matchApps(q) {
+  const f = fold(q); if (!f) return [];
+  const by = (a, b) => a.name.localeCompare(b.name);
+  const pre = APPS.filter((a) => fold(a.name).startsWith(f)).sort(by);
+  const word = APPS.filter((a) => !pre.includes(a) && words(a.name).slice(1).some((w) => w.startsWith(f))).sort(by);
+  const any = APPS.filter((a) => !pre.includes(a) && !word.includes(a) && fold(a.name).includes(f)).sort(by);
+  return [...pre, ...word, ...any];
+}
+const wordStart = (s, q) => { const f = fold(q); return f && words(s).some((w) => w.startsWith(f)); };
+const matchPages = (q) => fold(q).length < 2 ? [] : PAGES.filter((p) => [...words(p.label), ...p.keys].some((w) => w.startsWith(fold(q).replace(/[^a-z0-9]/g, "")))).slice(0, 4);
+
+function answer(q, s) {
+  const t = q.trim();
+  if (/^[\d\s.+\-*\/()]+$/.test(t) && /[+\-*\/]/.test(t) && !/[+\-*\/.(]$/.test(t)) {
+    try { const v = Function(`"use strict";return (${t})`)(); if (Number.isFinite(v)) return { s: t, v: "= " + +v.toFixed(10), n: "Tap to copy" }; } catch {}
+  }
+  if (/^5 km/.test(t)) return { s: "5 km =", v: "3.10686 mi", n: "Tap to copy" };
+  if (t === "time in tokyo") return { s: "Tokyo · Friday · 8 h ahead", v: "17:41", n: "Tap to copy" };
+  if (t === "100 usd") {
+    if (s.rates === "off") return { s: "100.00 USD =", v: "Convert currencies", mid: true,
+      n: "Tap to turn on. Chronotif downloads the European Central Bank’s daily rates when you type a currency and newer ones are out. Nothing you type is sent." };
+    if (s.rates === "loading") return { s: "100.00 USD =", v: "… EUR", n: "Getting the European Central Bank’s rates…" };
+    return { s: "100.00 USD =", v: "86.12 EUR", n: "European Central Bank rate, 20 Nov 2026 · Tap to copy" };
+  }
+  return null;
+}
+
+// --- screen pieces ---
+const status = () => `<div class="status"><span>9:41</span><span style="display:flex;gap:6px">▂▄▆ <span class="batt"></span></span></div>`;
+const NCARDS = [
+  { a: "Murmur", person: ["MC", "#F06292"], title: "Maya Chen", body: "Look at this view", time: "now" },
+  { a: "Daybook", title: "Design review in 15 min", body: "11:00 · Room 4", time: "now" },
+  { a: "Fernbank", title: "You paid Corner Café", body: "€4.20 · Main account", time: "4m", dim: 1 },
+  { a: "Parcelly", title: "Out for delivery", body: "Arriving today, 2–4 PM", time: "31m", dim: 1 },
+  { a: "Murmur", person: ["H", "#64B5F6"], title: "Hiking crew", body: "Emma Wilson: I’ll drive, room for three", time: "1h", dim: 1 },
+];
+function ncard(c, y) {
+  const a = app(c.a);
+  const ic = c.person
+    ? `<div class="ic round" style="background:${c.person[1]}">${c.person[0]}<span class="badge" style="background:${a.c}">${svg(a.g)}</span></div>`
+    : icon(a);
+  return `<div class="ncard ${c.dim ? "dim" : ""}" style="top:${y}px">${ic}<div style="min-width:0"><div class="t"><span>${c.title}</span><span>${c.time}</span></div><div class="b">${c.body}</div></div></div>`;
+}
+function cardList(top) {
+  let y = top, h = `<div class="sec" style="top:${y}px">New</div>`; y += 24;
+  NCARDS.forEach((c, i) => {
+    if (i === 2) { y += 14; h += `<div class="sec" style="top:${y}px">Earlier</div>`; y += 24; }
+    h += ncard(c, y); y += 74;
+  });
+  return h;
+}
+// The panel: clock, date and the gear on the scrim, then New and Earlier. dy = pull-down offset.
+const panel = (dy = 0) => `<div class="wall"></div><div class="scrim"></div>${status()}
+  <div style="position:absolute;inset:0;transform:translateY(${dy}px)">
+    <div class="hclock" style="top:46px">9:41</div><div class="hdate" style="top:98px">Friday, 20 November</div>
+    <svg class="gear" style="left:364px;top:56px" viewBox="0 0 24 24"><path d="${P.gear}"/></svg>
+    ${cardList(140)}</div>`;
+const lockView = (dy = 0) => `<div class="wall"></div><div class="scrim" style="background:rgba(0,0,0,.3)"></div>${status()}
+  <div style="position:absolute;inset:0;transform:translateY(${dy}px)">
+    <div class="lockclock" style="top:78px">9:41</div><div class="lockdate" style="top:172px">Friday, 20 November</div>
+    ${cardList(222)}</div>`;
+
+const KEYS = ["qwertyuiop", "asdfghjkl", "zxcvbnm"];
+function keyboard(pressed) {
+  const k = (c) => `<div class="key ${pressed === c ? "on" : ""}">${c}</div>`;
+  return `<div class="kb"><div class="kr">${[...KEYS[0]].map(k).join("")}</div><div class="kr">${[...KEYS[1]].map(k).join("")}</div>
+    <div class="kr"><div class="key w">⇧</div>${[...KEYS[2]].map(k).join("")}<div class="key w">⌫</div></div>
+    <div class="kr"><div class="key w">?123</div><div class="key">,</div><div class="key sp ${pressed === " " ? "on" : ""}"></div><div class="key">.</div><div class="key w">→</div></div></div>`;
+}
+const ripple = (on) => (on > 0 ? `<div class="ripple" style="opacity:${on}"></div>` : "");
+
+// Search over whatever is behind it. s: { q, t, kb (0..1), rates, locked, people, tap: {what, o} }
+function search(s) {
+  const kbH = 270 * s.kb, fieldTop = 883 - Math.max(24, kbH) - 10 - 44;
+  const caret = Math.floor(s.t * 2.2) % 2 === 0 ? `<span class="caret"></span>` : `<span class="caret" style="opacity:0"></span>`;
+  let h = `<div class="search">`;
+  const q = s.q;
+  if (!fold(q)) {
+    const rowTop = fieldTop - 12 - 98;
+    h += `<div class="sugl" style="top:${rowTop - 26}px">Suggestions</div><div class="sugrow" style="top:${rowTop}px">` +
+      SUGGESTED.map((n) => `<div class="cell">${icon(app(n))}<span>${n}</span></div>`).join("") + `</div>`;
+  } else {
+    let r = "";
+    const a = answer(q, s);
+    if (a) r += `<div class="scard answer">${ripple(s.tap?.what === "answer" ? s.tap.o : 0)}<div class="s">${a.s}</div><div class="v ${a.mid ? "mid" : ""}">${a.v}</div><div class="n">${a.n}</div></div>`;
+    const apps = matchApps(q);
+    if (apps.length) r += `<div class="scard"><div class="stitle">Apps</div>${apps.map((x) => `<div class="srow"><div class="lead">${icon(x)}</div><div class="tx">${x.name}</div></div>`).join("")}</div>`;
+    const hide = s.locked && s.people;
+    const people = !hide && s.people ? CONTACTS.filter((c) => wordStart(c.name, q)).slice(0, 3) : [];
+    if (people.length) r += `<div class="scard"><div class="stitle">Contacts</div>${people.map((c) =>
+      `<div class="srow" style="padding-right:6px"><div class="lead"><div class="avatar" style="background:${c.c}">${c.name[0]}</div></div>
+        <div class="tx">${c.name}<small>${c.num}${c.wa ? " · WhatsApp" : ""}</small></div>
+        <div class="act">${svg("message")}</div><div class="act">${svg("call")}</div></div>`).join("")}</div>`;
+    const pages = matchPages(q);
+    if (pages.length) r += `<div class="scard"><div class="stitle">Settings</div>${pages.map((p) => `<div class="srow"><div class="lead">${svg("gear")}</div><div class="tx">${p.label}</div></div>`).join("")}</div>`;
+    const evs = !hide && s.people ? EVENTS.filter((e) => wordStart(e.title, q)).slice(0, 3) : [];
+    if (evs.length) r += `<div class="scard"><div class="stitle">Calendar</div>${evs.map((e) => `<div class="srow"><div class="lead">${svg("event")}</div><div class="tx">${e.title}<small>${e.when}</small></div></div>`).join("")}</div>`;
+    if (hide) r += `<div class="scard"><div class="srow"><div class="lead">${svg("lock")}</div><div class="tx">Unlock to see all results</div></div></div>`;
+    const addr = /^[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/i.test(q.trim());
+    r += `<div class="scard"><div class="srow"><div class="lead">${svg("search")}</div><div class="tx">${addr ? `Open ${q.trim()}` : `Search the web for “${q.trim()}”`}</div></div></div>`;
+    h += `<div class="results" style="height:${fieldTop - 12 - 48}px">${r}</div>`;
+  }
+  h += `<div class="field" style="top:${fieldTop}px">${svg("search")}${q ? q : ""}${caret}${q ? "" : `<span class="hint">Search</span>`}</div>`;
+  if (s.kb > 0) h += `<div style="position:absolute;left:0;right:0;bottom:0;height:270px;transform:translateY(${(1 - s.kb) * 270}px)">${keyboard(s.pressed)}</div>`;
+  return h + `</div>`;
+}
+const finger = (x, y, o, press = 0) => (o > 0 ? `<div class="finger" style="left:${x}px;top:${y}px;opacity:${o};transform:scale(${1 - press * 0.15})"></div>` : "");
+const blurred = (inner, b) => `<div style="position:absolute;inset:0;filter:${b > 0 ? `blur(${b * 12}px)` : "none"}">${inner}</div>`;
+
+function settings(t, contactsOn, calendarOn, dialog) {
+  const tog = (y, title, desc, on) => `<div class="tog" style="top:${y}px"><div class="row"><span>${title}</span><span class="sw ${on ? "on" : ""}"></span></div><p>${desc}</p></div>`;
+  let h = `<div class="set">${status()}<h1>Chronotif</h1><div class="sh" style="top:116px">SEARCH</div>` +
+    tog(140, "Pull down for Search", "Pull down at the top of the panel or lock-screen view to open Search.", true) +
+    `<div class="tog" style="top:222px"><div class="row"><span>Web search engine</span></div><p style="color:var(--accent)">● Google &nbsp;&nbsp;<span style="color:var(--text-2)">○ DuckDuckGo &nbsp;○ Bing &nbsp;○ Brave</span></p></div>` +
+    tog(300, "Find contacts", "Search lists matching contacts, with buttons to call or message them. Contacts are read only on this phone, and hidden while it’s locked.", contactsOn) +
+    tog(420, "Call from Search", "A contact’s call button places the call. Off, it opens the dialer with the number ready.", false) +
+    tog(520, "Currency rates", "Search converts currencies with the European Central Bank’s daily rates. Nothing you type is sent.", true) +
+    tog(620, "Find calendar events", "Search lists matching events from the past month to a year ahead. Events are read only on this phone, and hidden while it’s locked.", calendarOn) +
+    `</div>`;
+  if (dialog) h += `<div class="dlg-back" style="opacity:${dialog.o}"></div><div class="dlg" style="opacity:${dialog.o};transform:scale(${0.94 + 0.06 * dialog.o})">${svg(dialog.icon)}
+    <h2>Allow <b>Chronotif</b> to access your ${dialog.what}?</h2><div class="btn">${ripple(dialog.tap)}Allow</div><div class="btn alt">Don’t allow</div></div>`;
+  return h;
+}
+function home() {
+  const grid = ["Murmur", "Daybook", "Glimmer", "Hum Music", "Fernbank", "Parcelly", "Camera", "Clock"].map((n) =>
+    `<div class="cell">${icon(app(n))}<span>${n}</span></div>`).join("");
+  return `<div class="wall"></div>${status()}<div class="lockclock" style="top:70px;font-size:64px">9:41</div>
+    <div class="widget" style="top:190px">${svg("search")}Search</div><div class="handle" style="top:330px"></div>
+    <div class="grid" style="top:560px">${grid}</div>`;
+}
+
+// --- timing ---
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const ease = (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+const k = (t, t0, t1) => ease(clamp((t - t0) / (t1 - t0)));
+const typed = (t, t0, str, cps = 8) => str.slice(0, clamp(Math.floor((t - t0) * cps) + 1, 0, str.length) * (t >= t0 ? 1 : 0));
+// The key under the finger for 0.12 s after each keystroke.
+function pressedKey(t, t0, str, cps = 8) {
+  if (t < t0) return null;
+  const i = Math.floor((t - t0) * cps);
+  if (i >= str.length || (t - t0) * cps - i > 0.12 * cps) return null;
+  return str[i].toLowerCase();
+}
+// A tap: finger shows 0.35 s before, presses at t0, lifts 0.25 s after.
+const tapAt = (t, t0) => ({ o: k(t, t0 - 0.35, t0 - 0.15) * (1 - k(t, t0 + 0.25, t0 + 0.45)), press: k(t, t0 - 0.05, t0) * (1 - k(t, t0 + 0.12, t0 + 0.2)), rip: clamp(1 - Math.abs(t - t0 - 0.08) / 0.2) });
+// One typing run inside a scene: [[start, text, cps]...]; the last one that has started is in the field.
+function run(t, steps) {
+  let q = "", pressed = null;
+  for (const [t0, str, cps = 8] of steps) if (t >= t0) { q = typed(t, t0, str, cps); pressed = pressedKey(t, t0, str, cps); }
+  return { q, pressed };
+}
+const openSearch = (behind, t, s, b = 1) => blurred(behind, b) + search({ t, kb: 1, rates: "on", people: true, ...s });
+
+// --- scenes: [start, end, kicker, caption, draw(t)] ---
+const SCENES = [
+  [2.25, 7.6, "Pull down for Search", "Pull down on the panel. The apps that just notified are right there.", (t) => {
+    const drag = k(t, 3.0, 3.7), back = k(t, 3.75, 3.97), dy = 160 * drag * 0.5 * (1 - back);
+    const open = k(t, 3.78, 3.93), kb = k(t, 3.85, 4.15);
+    const f = { o: k(t, 2.75, 2.95) * (1 - k(t, 3.72, 3.85)) };
+    let h = blurred(panel(dy), open) + finger(206, 250 + 160 * drag, f.o);
+    if (open > 0) h += `<div style="position:absolute;inset:0;opacity:${open}">${search({ t, q: "", kb, rates: "off" })}</div>`;
+    return h;
+  }],
+  [7.6, 11.4, "Apps", "Type a few letters to open any app.", (t) => {
+    const { q, pressed } = run(t, [[7.9, "mu", 5], [9.5, "mur", 8]]);
+    return openSearch(panel(), t, { q: t < 9.5 ? q : "mur", pressed, rates: "off" });
+  }],
+  [11.4, 19.4, "Answers", "Quick math, units and the time anywhere. <b>Tap to copy.</b>", (t) => {
+    const { q, pressed } = run(t, [[11.7, "12*7.5+3", 8], [14.1, "5 km in mi", 9], [16.4, "time in tokyo", 10]]);
+    const tp = tapAt(t, 18.4);
+    return openSearch(panel(), t, { q, pressed, rates: "off", tap: { what: "answer", o: tp.rip } }) + finger(200, 95, tp.o, tp.press);
+  }],
+  [19.4, 25.4, "Currencies", "The European Central Bank’s daily rates. <b>Off</b> until you tap to turn them on.", (t) => {
+    const { q, pressed } = run(t, [[19.7, "100 usd", 8]]);
+    const tp = tapAt(t, 22.0);
+    const rates = t < 22.1 ? "off" : t < 22.8 ? "loading" : "on";
+    return openSearch(panel(), t, { q, pressed, rates, tap: { what: "answer", o: tp.rip } }) + finger(200, 110, tp.o, tp.press);
+  }],
+  [25.4, 32.0, "Off until you say so", "Contacts and calendar wait behind the <b>new gear</b> in the panel.", (t) => {
+    const g = tapAt(t, 26.0), c = tapAt(t, 27.0), ca = tapAt(t, 27.9), e = tapAt(t, 28.9), ea = tapAt(t, 29.8);
+    const set = k(t, 26.2, 26.45);
+    let h = panel() + finger(377, 69, g.o, g.press);
+    if (set > 0) {
+      const dlg1 = t > 27.1 && t < 28.2 ? { o: k(t, 27.1, 27.3) * (1 - k(t, 28.0, 28.2)), icon: "person", what: "contacts", tap: ca.rip } : null;
+      const dlg2 = t > 29.0 && t < 30.1 ? { o: k(t, 29.0, 29.2) * (1 - k(t, 29.9, 30.1)), icon: "event", what: "calendar", tap: ea.rip } : null;
+      h += `<div style="position:absolute;inset:0;opacity:${set}">${settings(t, t > 28.0, t > 29.9, dlg1 || dlg2)}</div>`;
+      h += finger(372, 316, c.o, c.press) + finger(206, 472, ca.o, ca.press) + finger(372, 636, e.o, e.press) + finger(206, 472, ea.o, ea.press);
+    }
+    return h;
+  }],
+  [32.0, 36.4, "Contacts", "Find someone, then message or call them in one tap.", (t) => {
+    const { q, pressed } = run(t, [[32.5, "em", 5]]);
+    return openSearch(panel(), t, { q, pressed });
+  }],
+  [36.4, 40.6, "Calendar", "Your events too. A weekly one shows once, at its next date.", (t) => {
+    const { q, pressed } = run(t, [[36.7, "design", 8]]);
+    return openSearch(panel(), t, { q, pressed });
+  }],
+  [40.6, 46.0, "Lock screen", "Pull down on the lock screen too. Contacts and events stay hidden until you unlock.", (t) => {
+    const drag = k(t, 41.2, 41.9), back = k(t, 41.95, 42.17), dy = 160 * drag * 0.5 * (1 - back);
+    const open = k(t, 41.98, 42.13), kb = k(t, 42.05, 42.35);
+    const { q, pressed } = run(t, [[42.8, "emma", 7]]);
+    let h = blurred(lockView(dy), open) + finger(206, 330 + 160 * drag, k(t, 40.95, 41.15) * (1 - k(t, 41.92, 42.05)));
+    if (open > 0) h += `<div style="position:absolute;inset:0;opacity:${open}">${search({ t, q, pressed, kb, rates: "on", people: true, locked: true })}</div>`;
+    return h;
+  }],
+  [46.0, 51.0, "Settings and the web", "Jump to a Settings page, or hand the rest to your browser.", (t) => {
+    const { q, pressed } = run(t, [[46.3, "wifi", 6], [48.5, "chronotif.com", 12]]);
+    return openSearch(panel(), t, { q, pressed });
+  }],
+  [51.0, 55.6, "More ways in", "A home-screen widget, a Quick Settings tile, the app icon, or a long press on the edge handle.", (t) => {
+    const tp = tapAt(t, 52.3), open = k(t, 52.45, 52.6), kb = k(t, 52.5, 52.8);
+    let h = blurred(home(), open) + finger(206, 216, tp.o, tp.press);
+    if (open > 0) h += `<div style="position:absolute;inset:0;opacity:${open}">${search({ t, q: "", kb, rates: "on" })}</div>`;
+    return h;
+  }],
+];
+const FULL = [
+  [0, 2.6, `<div class="big">Search</div><div class="small">New in Chronotif: apps, answers, people and plans, from the panel.</div>`],
+  [55.6, 59.0, `<div class="big">Private</div><div class="small">Nothing you type is sent. Contacts and events are read on your phone and never stored.</div>`],
+  [58.65, 64.0, `<div class="big">Help shape it</div><div class="small">Ideas or bugs? Tell us. Chronotif gets better from what you report.</div>
+    <div class="url">github.com/nagarete/chronotif/issues</div><div class="url2">chronotif.com</div>
+    <div class="credit">Music: “Brazilian Phonk Bounce for Dance Reels” by Alex Morgan, CC BY 4.0</div>`],
+];
+const XF = 0.35;
+const $ = (id) => document.getElementById(id);
+const capHTML = (kick, text) => `<div class="cap"><div><div class="kicker">${kick}</div>${text}</div></div>`;
+
+function render(t) {
+  // Phone: the current scene, and the one before it fading out during the crossfade.
+  let i = SCENES.findIndex(([t0, t1]) => t >= t0 && t < t1);
+  if (i < 0) i = t < SCENES[0][0] ? 0 : SCENES.length - 1;
+  const [t0, , kick, text, draw] = SCENES[i];
+  const prev = SCENES[i - 1];
+  const fade = prev ? k(t, t0, t0 + XF) : 1;
+  $("layA").innerHTML = prev && fade < 1 ? prev[4](prev[1]) : "";
+  $("layB").innerHTML = draw(t);
+  $("layB").style.opacity = fade;
+  // Captions fade in like edit.sh's (after 0.15 s, over 0.3 s), and out with the crossfade.
+  $("capA").innerHTML = prev && fade < 1 ? capHTML(prev[2], prev[3]) : "";
+  $("capA").style.opacity = 1 - fade;
+  $("capB").innerHTML = capHTML(kick, text);
+  $("capB").style.opacity = clamp((t - t0 - 0.15) / 0.3);
+  // Full-frame cards over everything.
+  $("full").innerHTML = FULL.filter(([f0, f1]) => t >= f0 && t < f1).map(([f0, f1, html]) =>
+    `<div class="full" style="opacity:${f0 === 0 ? 1 - k(t, f1 - XF, f1) : k(t, f0, f0 + XF)}">${html}</div>`).join("");
+}
+window.render = render;
+window.DURATION = 64.0;
+render(Number(new URLSearchParams(location.search).get("t") ?? 0));
+</script>
