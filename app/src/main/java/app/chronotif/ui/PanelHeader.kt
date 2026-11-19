@@ -6,15 +6,19 @@ import android.annotation.SuppressLint
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import android.content.res.ColorStateList
 import android.graphics.Typeface
 import android.provider.AlarmClock
 import android.provider.CalendarContract
+import android.provider.Settings
 import android.text.format.DateFormat
 import android.util.TypedValue
+import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.Button
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextClock
 import android.widget.TextView
@@ -28,8 +32,8 @@ import kotlin.math.min
 /**
  * The panel header: a clock and the date, set up by the header settings. Android decides what
  * they say (12/24h, the locale's date order); the settings decide what shows, where and how big
- * (ADR 0005). Tapping the clock opens the alarms and tapping the date opens the calendar, as in
- * the stock shade. The rest of the header isn't a tap target, so a tap there still closes the panel.
+ * (ADR 0005). Tapping the clock opens the alarms, the date opens the calendar and the gear opens
+ * Android's Settings, as in the stock shade. The rest of the header isn't a tap target, so a tap there still closes the panel.
  */
 internal object PanelHeader {
 
@@ -37,18 +41,33 @@ internal object PanelHeader {
     fun fill(header: LinearLayout, host: NotifList.Host) {
         val ctx = header.context
         header.removeAllViews()
+        // The clock and date sit at the start and the gear at the end. Space between them isn't
+        // a tap target, so a tap there still closes the panel.
+        val start = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL }
+        val row = LinearLayout(ctx).apply {
+            orientation = LinearLayout.HORIZONTAL
+            addView(start, LinearLayout.LayoutParams(0, -2, 1f))
+        }
+        header.addView(row, Ui.lp())
+        if (Prefs.headerSettings) {
+            row.addView(settings(ctx).apply {
+                tapTarget(host, R.string.header_open_settings) { listOf(settingsIntent()) }
+            }, LinearLayout.LayoutParams(ctx.dp(48), ctx.dp(48)).apply { gravity = Gravity.TOP })
+        }
         val date = date(ctx).apply {
             tapTarget(host, R.string.header_open_calendar) { listOf(calendarIntent(System.currentTimeMillis())) }
         }
         if (!Prefs.headerClock) {
-            header.addView(date, Ui.lp(-2))
+            start.addView(date, Ui.lp(-2))
             return
         }
         val clock = clock(ctx, Prefs.headerClockSize.toFloat()).apply {
             tapTarget(host, R.string.header_open_alarms) { alarmsIntents(ctx) }
         }
-        header.addView(ClockDateRow(ctx, clock, date, Prefs.headerDateBeside, Prefs.headerDateAlign))
+        start.addView(ClockDateRow(ctx, clock, date, Prefs.headerDateBeside, Prefs.headerDateAlign))
     }
+
+    fun settingsIntent() = Intent(Settings.ACTION_SETTINGS)
 
     fun alarmsIntent() = Intent(AlarmClock.ACTION_SHOW_ALARMS)
 
@@ -86,6 +105,14 @@ internal object PanelHeader {
         setShadowLayer(dp(8).toFloat(), 0f, 0f, 0x40000000)
     }
 
+    /** The gear, white on the scrim like the clock. */
+    private fun settings(ctx: Context) = ImageView(ctx).apply {
+        setImageResource(R.drawable.ic_settings)
+        imageTintList = ColorStateList.valueOf(Palette(ctx).onScrim)
+        scaleType = ImageView.ScaleType.CENTER
+        contentDescription = ctx.getString(R.string.header_open_settings)
+    }
+
     /** A [TextClock] too, so the date turns over at midnight while the panel is open. */
     private fun date(ctx: Context) = TextClock(ctx).apply {
         val pattern = datePattern()
@@ -103,7 +130,7 @@ internal object PanelHeader {
      * A button for TalkBack ("Open alarms") that opens the first of [intents] Android lets it
      * start; does nothing when none can be opened.
      */
-    private fun TextView.tapTarget(host: NotifList.Host, label: Int, intents: () -> List<Intent>) {
+    private fun View.tapTarget(host: NotifList.Host, label: Int, intents: () -> List<Intent>) {
         background = Ui.pressable(0, dp(8).toFloat(), Palette(context).pill)
         setOnClickListener {
             val opened = intents().any { intent ->

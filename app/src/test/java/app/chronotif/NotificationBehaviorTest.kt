@@ -868,6 +868,7 @@ class NotificationBehaviorTest {
 
     // --- Panel header ---
 
+    /** Runs [block] with the header's clock-and-date block, the start of its row; the gear is at the end. */
     private fun <T> withPanelHeader(block: (app.chronotif.ui.PanelActivity, LinearLayout) -> T): T {
         val controller = Robolectric.buildActivity(app.chronotif.ui.PanelActivity::class.java).create()
         try {
@@ -875,7 +876,8 @@ class NotificationBehaviorTest {
             val scroll = (0 until root.childCount).map { root.getChildAt(it) }
                 .filterIsInstance<android.widget.ScrollView>().single()
             val header = (scroll.getChildAt(0) as ViewGroup).getChildAt(0) as LinearLayout
-            return block(controller.get(), header)
+            val row = header.getChildAt(0) as LinearLayout
+            return block(controller.get(), row.getChildAt(0) as LinearLayout)
         } finally {
             controller.destroy()
         }
@@ -928,7 +930,7 @@ class NotificationBehaviorTest {
             assertTrue("Beside the clock", date.left >= clock.right)
             assertEquals("Bottom lines up with the clock's baseline",
                 clock.top + clock.baseline, date.top + date.baseline)
-            measure(header, clock.measuredWidth + 40)
+            measure(header, clock.measuredWidth + 8)
             assertFalse(row.beside)
             assertTrue("Under the clock, not cut off", date.top >= clock.bottom)
         }
@@ -998,5 +1000,33 @@ class NotificationBehaviorTest {
             assertTrue(info.actionList.any { it.id == android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK &&
                 it.label == context.getString(label) })
         }
+    }
+
+    private fun gear(start: LinearLayout): View? = (start.parent as ViewGroup).let { row ->
+        (0 until row.childCount).map { row.getChildAt(it) }.filterIsInstance<android.widget.ImageView>().singleOrNull()
+    }
+
+    @Test
+    fun tappingTheGearOpensAndroidSettingsThenThePanelCloses() = withPanelHeader { activity, start ->
+        val gear = gear(start)!!
+        assertTrue(gear.performClick())
+        assertEquals(android.provider.Settings.ACTION_SETTINGS, shadowOf(activity).nextStartedActivity.action)
+        assertTrue(activity.isFinishing)
+        val info = android.view.accessibility.AccessibilityNodeInfo.obtain()
+        gear.onInitializeAccessibilityNodeInfo(info)
+        assertEquals(android.widget.Button::class.java.name, info.className)
+        assertEquals(context.getString(R.string.header_open_settings), gear.contentDescription)
+    }
+
+    @Test
+    fun theGearSitsAtTheHeadersEndAndCanBeTurnedOff() {
+        withPanelHeader { _, start ->
+            val row = start.parent as ViewGroup
+            measure(row, 1080)
+            assertEquals("At the end", 1080, gear(start)!!.right)
+            assertTrue("After the clock and date", gear(start)!!.left >= start.right)
+        }
+        Prefs.headerSettings = false
+        withPanelHeader { _, start -> assertNull(gear(start)) }
     }
 }

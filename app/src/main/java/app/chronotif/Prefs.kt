@@ -104,6 +104,11 @@ object Prefs {
         get() = sp.getBoolean("header_short_names", false)
         set(v) = sp.edit().putBoolean("header_short_names", v).apply()
 
+    /** A gear at the header's end that opens Android's Settings. */
+    var headerSettings: Boolean
+        get() = sp.getBoolean("header_settings", true)
+        set(v) = sp.edit().putBoolean("header_settings", v).apply()
+
     /** Opt-in: check GitHub Releases daily and install newer versions. */
     var autoUpdate: Boolean
         get() = sp.getBoolean("auto_update", false)
