@@ -204,11 +204,13 @@ To open Chronotif in fullscreen, use the Quick Settings tile, or turn off the ed
   display timeout, which can be longer than the stock lock-screen timeout.
   *Settings → Lock screen* chooses Off / *When something is new* (default) /
   *Whenever there are notifications*.
-- **Search**: find and open apps from anywhere, without the accessibility service. Pull down at
-  the top of the panel or the lock-screen view, hold the edge handle, tap the *Chronotif Search* Quick
-  Settings tile or home-screen widget, or long-press Chronotif's icon and pick *Search*. Before
-  you type, it suggests the four apps that notified most recently. On the lock screen, opening an
-  app asks you to unlock first. *Settings → Panel → Pull down for Search* turns the pull-down off.
+- **Search**: find and open apps, do quick math, convert units, check the time in another city,
+  jump to a Settings page, or hand anything else to your browser, all without the accessibility
+  service. Pull down at the top of the panel or the lock-screen view, hold the edge handle, tap the
+  *Search* Quick Settings tile or home-screen widget, or long-press Chronotif's icon and pick
+  *Search*. Before you type, it suggests the four apps that notified most recently. Tap an answer
+  to copy it. On the lock screen, opening anything asks you to unlock first.
+  *Settings → Search* turns the pull-down off and picks the web search engine.
 - **Header**: the clock and date at the top of the panel, with a settings gear at the end. Tap the
   clock to open your alarms, the date to open your calendar, or the gear to open Android's
   Settings; tapping elsewhere in the header closes the panel.

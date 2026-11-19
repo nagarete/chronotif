@@ -185,9 +185,6 @@ class SetupActivity : Activity() {
             Prefs.handleHideLandscape = it
             applyHandle()
         }
-        toggle(R.string.search_pull_down, R.string.search_pull_down_desc, { Prefs.pullDownSearch }) {
-            Prefs.pullDownSearch = it
-        }
         header()
         body.addView(text(getString(R.string.tile_hint), 13f, secondary = true), gap(12))
         val buttons = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
@@ -207,6 +204,18 @@ class SetupActivity : Activity() {
             }
         }, gap(0).apply { marginStart = dp(8) })
         body.addView(buttons, gap(8))
+
+        section(R.string.setup_search)
+        toggle(R.string.search_pull_down, R.string.search_pull_down_desc, { Prefs.pullDownSearch }) {
+            Prefs.pullDownSearch = it
+        }
+        body.addView(text(getString(R.string.search_engine), 15f), gap(12))
+        radios(
+            listOf(R.string.search_engine_google, R.string.search_engine_duckduckgo, R.string.search_engine_bing, R.string.search_engine_brave),
+            selected = Prefs.searchEngine,
+            vertical = true,
+        ) { Prefs.searchEngine = it }
+        body.addView(text(getString(R.string.search_engine_desc), 13f, secondary = true))
 
         section(R.string.setup_lock)
         body.addView(text(getString(R.string.lock_mode), 15f), gap(4))
