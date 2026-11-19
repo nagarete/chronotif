@@ -119,6 +119,16 @@ object Prefs {
         get() = sp.getInt("search_engine", 0)
         set(v) = sp.edit().putInt("search_engine", v).apply()
 
+    /** Search finds contacts. Off until turned on, which asks for the Contacts permission. */
+    var searchContacts: Boolean
+        get() = sp.getBoolean("search_contacts", false)
+        set(v) = sp.edit().putBoolean("search_contacts", v).apply()
+
+    /** Search finds calendar events. Off until turned on, which asks for the Calendar permission. */
+    var searchCalendar: Boolean
+        get() = sp.getBoolean("search_calendar", false)
+        set(v) = sp.edit().putBoolean("search_calendar", v).apply()
+
     /**
      * When each app last notified, for Search's suggestion row: app id (package|user) to
      * arrival time. Times only, never content, and only the most recent few apps are kept.

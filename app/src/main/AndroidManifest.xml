@@ -22,6 +22,11 @@
         android:name="android.permission.QUERY_ALL_PACKAGES"
         tools:ignore="QueryAllPackagesPermission" />
 
+    <!-- Search's contacts and calendar events (ADR 0008). Each is asked for only when its switch
+         in Settings → Search is turned on, and read only on the phone. -->
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
+
     <application
         android:name=".App"
         android:allowBackup="false"

@@ -123,7 +123,8 @@ Notifications stay in memory on your device. Chronotif saves your settings, the 
 of your last check, and when each of the last few apps notified (for Search's
 suggestions, never what they said), with backups disabled. The lock-screen view follows Android's
 notification privacy settings and requires unlocking before opening notifications,
-using actions, or replying.
+using actions, or replying. If you turn them on for Search, contacts and calendar events are read
+on the device when you search, never stored, and hidden while the phone is locked.
 
 The optional status-bar swipe uses an accessibility service to place a touch area over the left
 half of the status bar, and to close the system shade when you open Chronotif from its Quick

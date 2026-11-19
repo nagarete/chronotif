@@ -64,4 +64,42 @@ class SearchActivityTest {
         assertTrue("The web row is last: $shown", web > answer && web == shown.lastIndex)
         controller.destroy()
     }
+
+    private fun typeInto(search: SearchOverlay, text: String) {
+        generateSequence(listOf<android.view.View>(search)) { level ->
+            level.flatMap { v -> if (v is ViewGroup) (0 until v.childCount).map(v::getChildAt) else emptyList() }.ifEmpty { null }
+        }.flatten().filterIsInstance<android.widget.EditText>().single().setText(text)
+        shadowOf(Looper.getMainLooper()).idle()
+    }
+
+    private fun shownWith(locked: Boolean): List<String> {
+        Prefs.searchContacts = true
+        shadowOf(RuntimeEnvironment.getApplication()).grantPermissions(android.Manifest.permission.READ_CONTACTS)
+        shadowOf(context.getSystemService(android.app.KeyguardManager::class.java)).setKeyguardLocked(locked)
+        val controller = Robolectric.buildActivity(SearchActivity::class.java, SearchActivity.intent(context)).setup()
+        shadowOf(Looper.getMainLooper()).idle()
+        val search = overlays(controller.get().window.decorView as ViewGroup).single()
+        typeInto(search, "budi")
+        val shown = texts(search).filter { it.isNotBlank() }
+        controller.destroy()
+        return shown
+    }
+
+    @Test fun contactsAndEventsWaitForUnlock() {
+        val shown = shownWith(locked = true)
+        assertTrue("Locked: asks to unlock, before the web row: $shown",
+            shown.indexOf("Unlock to see all results") == shown.lastIndex - 1)
+    }
+
+    @Test fun nothingIsHiddenOnceUnlocked() {
+        assertTrue(shownWith(locked = false).none { it == "Unlock to see all results" })
+    }
+
+    @Test fun startsWithTheQueryCarriedOverFromTheLockScreen() {
+        val controller = Robolectric.buildActivity(SearchActivity::class.java, SearchActivity.intent(context, "12*2")).setup()
+        shadowOf(Looper.getMainLooper()).idle()
+        val shown = texts(overlays(controller.get().window.decorView as ViewGroup).single())
+        assertTrue("$shown", "= 24" in shown)
+        controller.destroy()
+    }
 }

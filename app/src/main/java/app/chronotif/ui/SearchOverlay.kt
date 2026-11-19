@@ -25,35 +25,41 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.window.OnBackInvokedCallback
 import android.window.OnBackInvokedDispatcher
+import app.chronotif.CalendarEvent
+import app.chronotif.Contact
 import app.chronotif.Launchables
 import app.chronotif.Launchable
+import app.chronotif.PersonalData
 import app.chronotif.R
 import app.chronotif.Prefs
 import app.chronotif.SettingsPages
 import app.chronotif.core.Answer
 import app.chronotif.core.AppMatch
 import app.chronotif.core.Numbers
+import app.chronotif.core.PersonalMatch
 import app.chronotif.core.WebQuery
 
 /**
  * Search (ADR 0008), laid over the panel, the lock-screen view or its own window. Before typing:
  * the apps that notified most recently. Typing: an answer (math, units, time in a place), apps,
- * Settings pages and, last, the web. It never searches notifications. Opening anything goes
- * through [NotifList.Host.guarded], so on the lock screen it unlocks first; copying an answer doesn't.
+ * contacts, Settings pages, calendar events and, last, the web. It never searches notifications.
+ * Opening anything goes through [NotifList.Host.guarded], so on the lock screen it unlocks first;
+ * copying an answer doesn't. Contacts and events stay hidden while the phone is locked.
  */
 @SuppressLint("ViewConstructor")
 class SearchOverlay private constructor(
     context: Context,
     private val host: NotifList.Host,
+    initialQuery: String,
     private val onClosed: () -> Unit,
 ) : FrameLayout(context), Overlay {
 
     companion object {
         /** Lays Search over [anchor]'s window. Nothing happens if something already covers it. */
-        fun show(anchor: View, host: NotifList.Host, onClosed: () -> Unit = {}): SearchOverlay? {
+        fun show(anchor: View, host: NotifList.Host, query: String = "", onClosed: () -> Unit = {}): SearchOverlay? {
             val root = anchor.rootView as? ViewGroup ?: return null
             if ((0 until root.childCount).any { root.getChildAt(it) is Overlay }) return null
-            val v = SearchOverlay(anchor.context, host, onClosed)
+            val v = SearchOverlay(anchor.context, host, query, onClosed)
             root.addView(v, ViewGroup.LayoutParams(-1, -1))
             return v
         }
@@ -64,13 +70,18 @@ class SearchOverlay private constructor(
     private val suggestionsBlock = LinearLayout(context)
     private val suggestionsRow = LinearLayout(context)
     private val resultsScroll = ScrollView(context)
-    /** Answer, apps, Settings pages and the web row, each its own card, in that order. */
+    /** Answer, apps, contacts, Settings pages, events and the web row, each its own card, in that order. */
     private val results = LinearLayout(context)
     private val numbers = Numbers(context.resources.configuration.locales[0])
     private val spacer = View(context)
     private val field = EditText(context)
     private val fieldBox = LinearLayout(context)
     private var apps: List<Launchable> = emptyList()
+    private var contacts: List<Contact> = emptyList()
+    private var events: List<CalendarEvent> = emptyList()
+    /** "Show more" was tapped for this query's contacts. */
+    private var allContacts = false
+    private var shownQuery = ""
     private var closing = false
 
     private val back = if (Build.VERSION.SDK_INT >= 33) OnBackInvokedCallback { close() } else null
@@ -167,11 +178,25 @@ class SearchOverlay private constructor(
             insets
         }
 
+        if (initialQuery.isNotEmpty()) {
+            field.setText(initialQuery)
+            field.setSelection(initialQuery.length)
+        }
         Launchables.load(context) { list ->
             apps = list
             refresh()
         }
+        PersonalData.contacts(context) { list ->
+            contacts = list
+            if (list.isNotEmpty()) refresh()
+        }
+        PersonalData.events(context) { list ->
+            events = list
+            if (list.isNotEmpty()) refresh()
+        }
     }
+
+    private fun locked() = context.getSystemService(android.app.KeyguardManager::class.java).isKeyguardLocked
 
     private fun refresh() {
         if (closing) return
@@ -192,12 +217,27 @@ class SearchOverlay private constructor(
         suggestionsBlock.visibility = GONE
         resultsScroll.visibility = VISIBLE
         spacer.visibility = GONE
+        if (query != shownQuery) allContacts = false
+        shownQuery = query
         results.removeAllViews()
         Answer.of(query, numbers)?.let { results.addView(answerCard(it), cardLp()) }
         val found = AppMatch.search(apps, query) { it.label }
         if (found.isNotEmpty()) results.addView(card(R.string.search_apps, found.map(::row)), cardLp())
+        // Who you know and where you'll be stay private until the phone is unlocked.
+        val hidePersonal = locked() && (PersonalData.contactsOn(context) || PersonalData.calendarOn(context))
+        val people = if (hidePersonal) emptyList() else PersonalMatch.contacts(contacts, query, { it.name }, { it.numbers })
+        if (people.isNotEmpty()) {
+            val shown = if (allContacts) people.take(PersonalMatch.CONTACTS_MAX) else people.take(PersonalMatch.CONTACTS_SHOWN)
+            val rows = shown.map(::contactRow) +
+                listOfNotNull(if (shown.size < people.size && !allContacts) showMoreRow(people.size - shown.size) else null)
+            results.addView(card(R.string.search_contacts, rows), cardLp())
+        }
         val pages = SettingsPages.search(context, query)
         if (pages.isNotEmpty()) results.addView(card(R.string.search_settings, pages.map(::settingsRow)), cardLp())
+        val upcoming = if (hidePersonal) emptyList()
+        else PersonalMatch.events(events, query, System.currentTimeMillis(), { it.id }, { it.title }, { it.begin }, { it.end })
+        if (upcoming.isNotEmpty()) results.addView(card(R.string.search_calendar, upcoming.map(::eventRow)), cardLp())
+        if (hidePersonal) results.addView(card(null, listOf(unlockRow())), cardLp())
         results.addView(card(null, listOf(webRow(query))), cardLp())
         resultsScroll.scrollTo(0, 0)
     }
@@ -293,6 +333,122 @@ class SearchOverlay private constructor(
                 SettingsPages.open(host.context, p)
                 host.launched()
             }
+        }
+    }
+
+    /** A row with [icon] in the leading 40dp slot, the way every result row lines up, and an optional second line. */
+    private fun iconRow(icon: Int, title: CharSequence, detail: String? = null, onClick: () -> Unit): View = LinearLayout(context).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        background = Ui.pressable(0, 0f, pal.ripple)
+        setPadding(dp(14), dp(8), dp(14), dp(8))
+        addView(ImageView(context).apply {
+            setImageResource(icon)
+            imageTintList = ColorStateList.valueOf(pal.textSecondary)
+            scaleType = ImageView.ScaleType.CENTER
+        }, LinearLayout.LayoutParams(dp(40), dp(40)).apply { marginEnd = dp(14) })
+        addView(LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(Ui.text(context, 16f, pal.text, lines = 2).apply { text = title })
+            if (detail != null) addView(Ui.text(context, 13f, pal.textSecondary, lines = 1).apply { text = detail })
+        }, LinearLayout.LayoutParams(0, -2, 1f))
+        setOnClickListener { onClick() }
+    }
+
+    /** Photo (or initial), name and the number the buttons use; tapping opens the contact. */
+    private fun contactRow(c: Contact): View = LinearLayout(context).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        background = Ui.pressable(0, 0f, pal.ripple)
+        setPadding(dp(14), dp(8), dp(6), dp(8))
+        val avatar = FrameLayout(context).apply {
+            background = Ui.rounded(pal.chip, dp(20).toFloat())
+            addView(Ui.text(context, 17f, pal.textSecondary, bold = true, lines = 1).apply {
+                text = c.name.trim().firstOrNull { it.isLetterOrDigit() }?.uppercase() ?: "#"
+                gravity = Gravity.CENTER
+            }, LayoutParams(-1, -1))
+            val photo = ImageView(context).apply { scaleType = ImageView.ScaleType.CENTER_CROP }
+            addView(photo, LayoutParams(-1, -1))
+            PersonalData.photo(context, c) { photo.setImageDrawable(it) }
+            Ui.clipOval(this)
+        }
+        addView(avatar, LinearLayout.LayoutParams(dp(40), dp(40)).apply { marginEnd = dp(14) })
+        addView(LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(Ui.text(context, 16f, pal.text, lines = 1).apply { text = c.name })
+            if (c.callNumber != null) addView(Ui.text(context, 13f, pal.textSecondary, lines = 1).apply { text = c.callNumber })
+        }, LinearLayout.LayoutParams(0, -2, 1f))
+        c.callNumber?.let { number ->
+            addView(actionButton(R.drawable.ic_message, context.getString(R.string.search_message, c.name)) {
+                PersonalData.message(host.context, number)
+            })
+            addView(actionButton(R.drawable.ic_call, context.getString(R.string.search_call, c.name)) {
+                PersonalData.call(host.context, number)
+            })
+        }
+        setOnClickListener { launch { PersonalData.openContact(host.context, c) } }
+    }
+
+    private fun actionButton(icon: Int, label: String, action: () -> Unit): View = ImageView(context).apply {
+        setImageResource(icon)
+        imageTintList = ColorStateList.valueOf(pal.accent)
+        scaleType = ImageView.ScaleType.CENTER
+        background = Ui.pressable(0, dp(22).toFloat(), pal.ripple)
+        contentDescription = label
+        layoutParams = LinearLayout.LayoutParams(dp(44), dp(44))
+        setOnClickListener { launch(action) }
+    }
+
+    private fun showMoreRow(more: Int): View = Ui.text(context, 15f, pal.accent, lines = 1).apply {
+        text = context.getString(R.string.search_show_more, more)
+        background = Ui.pressable(0, 0f, pal.ripple)
+        setPadding(dp(68), dp(12), dp(14), dp(14))
+        setOnClickListener {
+            allContacts = true
+            refresh()
+        }
+    }
+
+    private fun eventRow(e: CalendarEvent): View {
+        val flags = android.text.format.DateUtils.FORMAT_SHOW_DATE or android.text.format.DateUtils.FORMAT_SHOW_WEEKDAY or
+            android.text.format.DateUtils.FORMAT_ABBREV_ALL or
+            (if (e.allDay) 0 else android.text.format.DateUtils.FORMAT_SHOW_TIME) or
+            (if (sameYear(e.begin)) 0 else android.text.format.DateUtils.FORMAT_SHOW_YEAR)
+        // All-day events are stored at midnight UTC.
+        val time = android.text.format.DateUtils.formatDateRange(
+            context, java.util.Formatter(StringBuilder(), numbers.locale), e.begin, e.end, flags,
+            if (e.allDay) "UTC" else null,
+        ).toString()
+        return iconRow(R.drawable.ic_event, e.title, time) { launch { PersonalData.openEvent(host.context, e) } }
+    }
+
+    private fun sameYear(t: Long): Boolean {
+        val zone = java.time.ZoneId.systemDefault()
+        return java.time.Instant.ofEpochMilli(t).atZone(zone).year == java.time.LocalDate.now(zone).year
+    }
+
+    /**
+     * Shown instead of contacts and events while locked. After unlocking, Search shows everything:
+     * in its own window right away, or reopened when the lock-screen view closes on unlock.
+     */
+    private fun unlockRow(): View = iconRow(R.drawable.ic_lock, context.getString(R.string.search_unlock_for_more)) {
+        val query = field.text.toString()
+        hideKeyboard()
+        host.guarded {
+            if (host.keepsSearchAfterUnlock) {
+                refresh()
+                focusField()
+            } else {
+                SearchActivity.open(host.context, query)
+            }
+        }
+    }
+
+    private fun launch(action: () -> Unit) {
+        hideKeyboard()
+        host.guarded {
+            action()
+            host.launched()
         }
     }
 
