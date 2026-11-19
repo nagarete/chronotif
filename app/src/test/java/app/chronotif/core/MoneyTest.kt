@@ -3,8 +3,11 @@
 package app.chronotif.core
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Assert.assertNull
 import org.junit.Test
+import java.time.Instant
 import java.time.LocalDate
 import java.util.Locale
 
@@ -84,5 +87,24 @@ class MoneyTest {
         assertEquals("16,500", en.money(16500.4, 0))
         assertEquals("12.50", en.money(12.5, 2))
         assertEquals("12,50", id.money(12.5, 2))
+    }
+
+    @Test fun newerRatesAreDueAfterTheEcbPublishesOnWorkingDays() {
+        fun at(utc: String) = Money.latestPublished(Instant.parse(utc))
+        val thu = LocalDate.of(2026, 11, 19)
+        // Thursday 16:00 UTC is 17:00 in Frankfurt: Thursday's are out.
+        assertEquals(thu, at("2026-11-19T16:00:00Z"))
+        // Friday morning in Jakarta is still before 16:15 in Frankfurt.
+        assertEquals(thu, at("2026-11-20T03:00:00Z"))
+        assertEquals(thu.plusDays(1), at("2026-11-20T15:20:00Z"))
+        // None on the weekend, and Monday's aren't out until the afternoon.
+        assertEquals(thu.plusDays(1), at("2026-11-22T20:00:00Z"))
+        assertEquals(thu.plusDays(1), at("2026-11-23T08:00:00Z"))
+        // Summer time: 16:15 in Frankfurt is 14:15 UTC.
+        assertEquals(LocalDate.of(2026, 7, 1), at("2026-07-01T14:30:00Z"))
+
+        val rates = Money.Rates(thu, mapOf("USD" to 1.05))
+        assertFalse(Money.isStale(rates, Instant.parse("2026-11-20T03:00:00Z")))
+        assertTrue(Money.isStale(rates, Instant.parse("2026-11-20T15:20:00Z")))
     }
 }

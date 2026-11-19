@@ -10,6 +10,7 @@ import android.telephony.TelephonyManager
 import app.chronotif.core.Money
 import java.net.HttpURLConnection
 import java.net.URL
+import java.time.Instant
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
@@ -17,13 +18,14 @@ import kotlin.concurrent.thread
 /**
  * Search's exchange rates (ADR 0008): the European Central Bank's public daily reference rates.
  * Nothing is downloaded until *Currency rates* is turned on, and then only when a currency
- * question meets rates more than a day old. The request carries nothing typed; it's the same
+ * question meets saved rates older than the ECB's latest. The request carries nothing typed; it's the same
  * file for everyone.
  */
 object ExchangeRates {
     private const val TAG = "ExchangeRates"
     private const val SOURCE = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml"
-    private val MAX_AGE_MS = TimeUnit.DAYS.toMillis(1)
+    /** How often to look again when the ECB should have newer rates but sent the same (a holiday). */
+    private val RECHECK_MS = TimeUnit.HOURS.toMillis(1)
     /** After a failed download, wait this long before trying again, so typing doesn't retry per key. */
     private val RETRY_MS = TimeUnit.MINUTES.toMillis(1)
 
@@ -37,13 +39,15 @@ object ExchangeRates {
     val failed: Boolean get() = failedAt != 0L && rates == null
 
     /**
-     * Downloads fresh rates if they're on, over a day old, and not already coming. [done] runs on
+     * Downloads fresh rates if they're on, the ECB should have newer ones, and they're not already
+     * coming. [done] runs on
      * the main thread when a download ends, whether it worked or not.
      */
     fun refreshIfStale(done: () -> Unit) {
         if (!Prefs.currencyRates || fetching) return
         val now = System.currentTimeMillis()
-        if (rates != null && now - Prefs.exchangeRatesFetchedAt < MAX_AGE_MS) return
+        val saved = rates
+        if (saved != null && (!Money.isStale(saved, Instant.ofEpochMilli(now)) || now - Prefs.exchangeRatesFetchedAt < RECHECK_MS)) return
         if (now - failedAt < RETRY_MS) return
         fetching = true
         thread(name = "exchange-rates") {

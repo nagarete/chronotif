@@ -2,7 +2,11 @@
 
 package app.chronotif.core
 
+import java.time.DayOfWeek
+import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalTime
+import java.time.ZoneId
 
 /**
  * Currency for Search (ADR 0008): "100 usd", "$100", "€20", "rp 50.000", "100 usd to sgd". Rates
@@ -114,6 +118,26 @@ object Money {
         local != "USD" -> "USD"
         else -> "EUR"
     }
+
+    private val ECB_ZONE: ZoneId = ZoneId.of("Europe/Berlin")
+    /** The ECB publishes "around 16:00 CET" on working days; a little later to be sure it's out. */
+    private val PUBLISHED_AT: LocalTime = LocalTime.of(16, 15)
+
+    /**
+     * The date of the newest rates the ECB should have published by [now]: today's after 16:15 in
+     * Frankfurt, else the working day before. Weekends have none. Holidays aren't known, so on one
+     * this names a day with no rates, and the download just brings the same ones back.
+     */
+    fun latestPublished(now: Instant): LocalDate {
+        val t = now.atZone(ECB_ZONE)
+        var d = t.toLocalDate()
+        if (t.toLocalTime() < PUBLISHED_AT) d = d.minusDays(1)
+        while (d.dayOfWeek == DayOfWeek.SATURDAY || d.dayOfWeek == DayOfWeek.SUNDAY) d = d.minusDays(1)
+        return d
+    }
+
+    /** Newer rates than [r] should be out. */
+    fun isStale(r: Rates, now: Instant): Boolean = r.date < latestPublished(now)
 
     /** Parses the ECB's daily reference-rate XML (eurofxref-daily.xml). */
     fun parseEcb(xml: String): Rates? {

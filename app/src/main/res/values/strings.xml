@@ -131,12 +131,12 @@
     <string name="search_find_calendar_desc">Search lists matching events from the past month to a year ahead. Events are read only on this phone, and hidden while it\'s locked.</string>
     <string name="search_permission_denied">Allow the permission in Chronotif\'s app info to turn this on.</string>
     <string name="search_currency_off_title">Convert currencies</string>
-    <string name="search_currency_off_desc">Tap to turn on. Chronotif downloads the European Central Bank\'s daily rates, at most once a day. Nothing you type is sent.</string>
+    <string name="search_currency_off_desc">Tap to turn on. Chronotif downloads the European Central Bank\'s daily rates when you type a currency and newer ones are out. Nothing you type is sent.</string>
     <string name="search_currency_loading">Getting the European Central Bank\'s rates…</string>
     <string name="search_currency_failed">Couldn\'t get exchange rates. Check your connection and type again.</string>
     <string name="search_currency_note">European Central Bank rate, %1$s · Tap to copy</string>
     <string name="search_currency_rates">Currency rates</string>
-    <string name="search_currency_rates_desc">Search converts currencies (100 usd, $20, rp 50.000 to sgd) with the European Central Bank\'s daily reference rates. They\'re downloaded only when you type a currency and the saved ones are over a day old. Nothing you type is sent.</string>
+    <string name="search_currency_rates_desc">Search converts currencies (100 usd, $20, rp 50.000 to sgd) with the European Central Bank\'s daily reference rates. They\'re downloaded only when you type a currency and the bank has published newer ones than you have, which it does on working days around 16:00 in Frankfurt. Nothing you type is sent.</string>
     <string name="search_engine">Web search engine</string>
     <string name="search_engine_google">Google</string>
     <string name="search_engine_duckduckgo">DuckDuckGo</string>

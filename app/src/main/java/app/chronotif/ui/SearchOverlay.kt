@@ -307,7 +307,7 @@ class SearchOverlay private constructor(
 
     /**
      * Currency (ADR 0008). Off, the card offers to turn on the daily rates; on, it converts with
-     * the saved rates and fetches newer ones in the background when they're over a day old.
+     * the saved rates and fetches newer ones in the background once the ECB should have published them.
      */
     private fun currencyCard(q: Money.Query): View? {
         val to = Money.target(q, ExchangeRates.localCurrency(context))
