@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Chronotif vs stock Android</title>
+<!-- A second motion-graphics trailer: what goes wrong in the stock Android shade, then the same
+     notifications side by side with Chronotif. render(t) sets every element from the time t in
+     seconds, so render.mjs can step through it exactly. Everything shown is made up. -->
+<style>
+  :root {
+    --bg: #0b0c0e; --text: #f4f4f6; --text-2: rgba(235,235,245,.66); --text-3: rgba(235,235,245,.46);
+    --accent: #0a84ff; --accent-soft: #8fbcff; --warn: #ffb35c; --bad: #ff7a7a;
+    --serif: "Newsreader", Georgia, serif; --sans: "Noto Sans", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; width: 1080px; height: 1920px; overflow: hidden; background: var(--bg); }
+  body { font-family: var(--sans); color: var(--text); }
+  #glow { position: absolute; inset: 0; background: radial-gradient(90% 55% at 50% 45%, #1b2236 0%, #0b0c10 70%); }
+  .abs { position: absolute; left: 0; top: 0; will-change: transform, opacity; }
+
+  /* A phone screen, drawn at 1080x1920 and scaled into place. */
+  .screen { width: 1080px; height: 1920px; transform-origin: 0 0; overflow: hidden; border-radius: 90px;
+            border: 6px solid #2a2d36; box-shadow: 0 40px 120px rgba(0,0,0,.6); }
+  #stock { background: linear-gradient(180deg, #17181c, #111215); }
+  #chrono { background: linear-gradient(170deg, #1d2438, #0f1218 60%); }
+  .sclock { left: 70px; top: 60px; font: 400 64px var(--sans); }
+  .sdate { left: 70px; top: 140px; font: 400 34px var(--sans); color: var(--text-2); }
+
+  /* Stock shade: Material-style cards, app name and time above the title. */
+  .qs { left: 40px; top: 210px; width: 1000px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+  .qs i { height: 100px; border-radius: 50px; background: #2b2d33; }
+  .qs i:nth-child(1), .qs i:nth-child(3) { background: #3b4a6b; }
+  .sc { left: 40px; width: 1000px; min-height: 166px; padding: 26px 34px; border-radius: 34px; background: #24262b;
+        display: grid; grid-template-columns: 72px 1fr auto; column-gap: 26px; align-items: start; }
+  .sic { width: 72px; height: 72px; border-radius: 50%; display: grid; place-items: center; }
+  .sic svg { width: 40px; height: 40px; fill: #fff; }
+  .sapp { font: 400 30px var(--sans); color: var(--text-3); white-space: nowrap; }
+  .st { display: inline-block; padding: 0 8px; border-radius: 10px; }
+  .stitle { font: 600 38px/1.25 var(--sans); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sbody { font: 400 34px/1.3 var(--sans); color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .scount { align-self: center; min-width: 64px; height: 56px; padding: 0 18px; border-radius: 28px; background: #3a3d45;
+            font: 600 30px/56px var(--sans); text-align: center; color: var(--text-2); }
+  .bar { height: 12px; border-radius: 6px; background: #3a3d45; margin-top: 16px; overflow: hidden; }
+  .bar b { display: block; height: 100%; width: 62%; background: #8fbcff; }
+  .shead { left: 74px; font: 500 32px var(--sans); color: var(--text-2); }
+  #sClear { left: 760px; top: 1810px; padding: 18px 40px; border-radius: 40px; background: #2b2d33; font: 500 32px var(--sans); }
+  .q { position: absolute; right: 26px; top: 50%; margin-top: -40px; width: 80px; height: 80px; border-radius: 50%;
+       background: var(--warn); color: #1b1408; font: 700 52px/80px var(--sans); text-align: center; }
+
+  /* Chronotif panel: the app's own card look. */
+  .card { left: 40px; width: 1000px; min-height: 166px; padding: 26px 30px; border-radius: 40px;
+          display: grid; grid-template-columns: 92px 1fr auto; column-gap: 26px; align-items: center;
+          transform-origin: 50% 0; box-shadow: 0 18px 50px rgba(0,0,0,.35);
+          background: color-mix(in srgb, #2c2c2e calc(100% - var(--dim, 0) * 100%), #1e1e21); }
+  .card > * { opacity: calc(1 - var(--dim, 0) * 0.42); }
+  .card.stack::before, .card.stack::after { content: ""; position: absolute; left: 4%; right: 4%; bottom: -20px; height: 40px;
+          border-radius: 0 0 36px 36px; background: #3a3a3f; z-index: -1; opacity: calc(1 - var(--dim, 0) * 0.5); }
+  .card.stack::after { left: 8%; right: 8%; bottom: -38px; background: #2f2f33; z-index: -2; }
+  .icon { width: 92px; height: 92px; border-radius: 26px; display: grid; place-items: center; position: relative; }
+  .icon svg { width: 52px; height: 52px; fill: #fff; }
+  .avatar { border-radius: 50%; font: 600 36px var(--sans); color: #fff; }
+  .badge-app { position: absolute; right: -6px; bottom: -6px; width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; border: 4px solid #2c2c2e; }
+  .badge-app svg { width: 20px; height: 20px; }
+  .count { position: absolute; right: -10px; top: -10px; min-width: 42px; height: 42px; border-radius: 21px; background: #6c8fe0;
+           font: 600 26px/42px var(--sans); text-align: center; color: #fff; border: 4px solid #2c2c2e; }
+  .row { display: flex; justify-content: space-between; gap: 20px; }
+  .title { font: 600 38px/1.2 var(--sans); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .time { font: 400 32px/1.2 var(--sans); color: var(--text-3); white-space: nowrap; padding: 0 8px; border-radius: 10px; }
+  .body { font: 400 34px/1.3 var(--sans); color: var(--text-2); margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .thumb { width: 92px; height: 92px; border-radius: 20px; background:
+           radial-gradient(circle at 70% 32%, #fff4cc 0 10%, transparent 11%),
+           linear-gradient(transparent 55%, #3e5470 56%), linear-gradient(#4e8fd1, #bfe0f5); }
+  .head { left: 80px; font: 600 32px var(--sans); letter-spacing: .12em; color: var(--text-2); }
+  .head b { color: var(--text); margin-left: 14px; }
+  #cLine { left: 60px; width: 960px; height: 4px; background: linear-gradient(90deg, transparent, var(--accent-soft), transparent); }
+  #cLineLabel { left: 60px; width: 960px; text-align: center; font: 500 28px var(--sans); letter-spacing: .16em; color: var(--accent-soft); }
+  #cPill { left: 390px; top: 1780px; width: 300px; padding: 18px 0; border-radius: 40px; background: #2c2c2e; text-align: center;
+           font: 500 32px var(--sans); color: var(--text-2); }
+
+  .hot { background: var(--warn); color: #1b1408 !important; font-weight: 700; }
+  .good { background: var(--accent-soft); color: #0b1426 !important; font-weight: 700; }
+
+  .label { width: 508px; text-align: center; font: 600 40px var(--sans); letter-spacing: .02em; }
+  #lStock { color: var(--text-2); }
+  .chip { width: 508px; text-align: center; font: 500 40px/1.25 var(--serif); text-wrap: balance; padding: 0 20px; }
+  .chip.l { color: var(--bad); }
+  .chip.r { color: var(--accent-soft); }
+
+  .cap { left: 70px; width: 940px; text-align: center; }
+  .capt { font: 500 76px/1.15 var(--serif); letter-spacing: -.015em; text-wrap: balance; }
+  .cap em { font-style: normal; color: var(--warn); }
+  .cap em.g { color: var(--accent-soft); }
+  .sub { margin-top: 26px; font: 400 44px/1.3 var(--serif); color: var(--text-2); text-wrap: balance; }
+
+  #table { left: 60px; width: 960px; }
+  #table .th { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; font: 600 36px var(--sans); margin-bottom: 26px; }
+  #table .th span:first-child { color: var(--text-2); }
+  #table .th span:last-child { color: var(--accent-soft); }
+  #table .tr { margin-bottom: 40px; }
+  #table .k { font: 600 28px var(--sans); letter-spacing: .14em; color: var(--text-3); text-transform: uppercase; margin-bottom: 12px; }
+  #table .v { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; font: 400 42px/1.25 var(--serif); }
+  #table .v span { padding: 22px 26px; border-radius: 26px; }
+  #table .v span:first-child { background: rgba(255,122,122,.08); color: var(--text-2); text-decoration: line-through; text-decoration-color: rgba(255,122,122,.55); }
+  #table .v span:last-child { background: rgba(143,188,255,.14); color: var(--text); }
+
+  #logo { left: 390px; width: 300px; height: 300px; }
+  #word { width: 1080px; text-align: center; font: 600 170px/1 var(--serif); letter-spacing: -.03em; }
+  #tag { width: 1080px; text-align: center; font: 400 50px var(--serif); color: var(--text-2); }
+  #url { width: 1080px; text-align: center; font: 600 46px var(--sans); color: var(--accent-soft); letter-spacing: .03em; }
+  #gh2 { width: 1080px; text-align: center; font: 500 34px "Noto Sans Mono", ui-monospace, monospace; color: var(--text-2); }
+</style>
+<body>
+<div id="glow"></div>
+
+<div id="stock" class="abs screen">
+  <div class="abs sclock">9:41</div>
+  <div class="abs sdate">Wed, 18 November</div>
+  <div class="abs qs"><i></i><i></i><i></i><i></i></div>
+  <div id="sHConv" class="abs shead">Conversations</div>
+  <div id="sHSilent" class="abs shead">Silent</div>
+  <div id="sCards"></div>
+  <div id="sClear" class="abs">Clear all</div>
+</div>
+
+<div id="chrono" class="abs screen">
+  <div class="abs sclock">9:41</div>
+  <div id="cHNew" class="abs head">NEW<b id="cNewCount">3</b></div>
+  <div id="cLine" class="abs"></div>
+  <div id="cLineLabel" class="abs">LAST CHECK</div>
+  <div id="cHEarlier" class="abs head">EARLIER</div>
+  <div id="cCards"></div>
+  <div id="cPill" class="abs">1 running</div>
+</div>
+
+<div id="lStock" class="abs label">Stock Android</div>
+<div id="lChrono" class="abs label">Chronotif</div>
+<div id="chips"></div>
+<div id="caps"></div>
+
+<div id="table" class="abs">
+  <div class="th"><span>Stock Android</span><span>Chronotif</span></div>
+  <div class="tr"><div class="k">Order</div><div class="v"><span>By app and importance</span><span>Newest first</span></div></div>
+  <div class="tr"><div class="k">What’s new</div><div class="v"><span>You read it all again</span><span>New, since your last check</span></div></div>
+  <div class="tr"><div class="k">What you’ve seen</div><div class="v"><span>Clear it or scroll past it</span><span>Steps back into Earlier</span></div></div>
+  <div class="tr"><div class="k">Always-running</div><div class="v"><span>Pinned to the top</span><span>Behind a “running” pill</span></div></div>
+</div>
+
+<svg id="logo" class="abs" viewBox="18 18 72 72">
+  <rect x="18" y="18" width="72" height="72" rx="16" fill="#1C1C1E"/>
+  <path id="lgCard" fill="#FFF" d="M36,34h36a6,6 0,0 1,6 6v14a6,6 0,0 1,-6 6H36a6,6 0,0 1,-6 -6V40a6,6 0,0 1,6 -6z"/>
+  <path id="lgDot" fill="#0A84FF" d="M41,40.5a4.5,4.5 0,1 1,0 9a4.5,4.5 0,1 1,0 -9z"/>
+  <path id="lgBar1" fill="#FFF" fill-opacity=".6" d="M38,64h32a3,3 0,0 1,0 6H38a3,3 0,0 1,0 -6z"/>
+  <path id="lgBar2" fill="#FFF" fill-opacity=".3" d="M43,73h22a2,2 0,0 1,0 4H43a2,2 0,0 1,0 -4z"/>
+</svg>
+<div id="word" class="abs">Chronotif</div>
+<div id="tag" class="abs">Free and open source, for Android</div>
+<div id="url" class="abs">chronotif.com</div>
+<div id="gh2" class="abs">github.com/nagarete/chronotif</div>
+
+<script>
+// --- made-up apps, the same ones the other videos use, plus Glimmer (a photo app) ---
+const GLYPH = {
+  chat: "M4,3h16a2,2 0,0 1,2 2v10a2,2 0,0 1,-2 2H9l-5,4v-4a2,2 0,0 1,-2 -2V5a2,2 0,0 1,2 -2z",
+  parcel: "M12,2l9,4.5v11L12,22l-9,-4.5v-11L12,2zM12,4.2L6.2,7.1 12,10l5.8,-2.9L12,4.2zM5,8.7v7.6l6,3v-7.6l-6,-3zM19,8.7l-6,3v7.6l6,-3V8.7z",
+  calendar: "M7,2h2v2h6V2h2v2h2a2,2 0,0 1,2 2v14a2,2 0,0 1,-2 2H5a2,2 0,0 1,-2 -2V6a2,2 0,0 1,2 -2h2V2zM5,9v11h14V9H5zM7,11h4v4H7v-4z",
+  bank: "M12,2L21,7v2H3V7l9,-5zM5,10h2v7H5v-7zM9,10h2v7H9v-7zM13,10h2v7h-2v-7zM17,10h2v7h-2v-7zM3,18h18v3H3v-3z",
+  heart: "M12,21l-1.4,-1.3C5.4,15 2,11.9 2,8.1 2,5 4.4,2.6 7.5,2.6c1.7,0 3.4,.8 4.5,2.1 1.1,-1.3 2.8,-2.1 4.5,-2.1C19.6,2.6 22,5 22,8.1c0,3.8 -3.4,6.9 -8.6,11.6L12,21z",
+  cloud: "M19,18H6a4,4 0,0 1,-.6 -8A6,6 0,0 1,17 8a5,5 0,0 1,2 10z",
+};
+const COLOR = { chat: "#2EAD6B", parcel: "#E8813A", calendar: "#4C6FE0", bank: "#14806F", heart: "#C2449F", cloud: "#2EAD6B" };
+const NAME = { chat: "Murmur", parcel: "Parcelly", calendar: "Daybook", bank: "Fernbank", heart: "Glimmer", cloud: "Murmur" };
+const svg = (app) => `<svg viewBox="0 0 24 24"><path d="${GLYPH[app]}"/></svg>`;
+const $ = (id) => document.getElementById(id);
+
+// The same notifications on both screens. Last check: ten minutes ago.
+const N = {
+  maya:   { app: "chat", person: ["MC", "#F06292"], title: "Maya Chen", body: "Look at this view", time: "now", thumb: true,
+            stockBody: "Ordered you a flat white · Look at this view" },
+  day:    { app: "calendar", title: "Design review in 15 min", body: "11:00 · Room 4", time: "now" },
+  fern:   { app: "bank", title: "You paid Corner Café", body: "€4.20 · Main account", time: "4m" },
+  parcel: { app: "parcel", title: "Out for delivery", body: "Arriving today, 2–4 PM", time: "31m" },
+  hike:   { app: "chat", person: ["H", "#64B5F6"], title: "Hiking crew", body: "Emma Wilson: I’ll drive, room for three", time: "1h" },
+  glim:   { app: "heart", title: "Leo Park liked your photo", body: "and 11 others", time: "2h" },
+  pNew:   { app: "parcel", title: "Delivered", body: "Left at your front door", time: "now" },
+};
+
+// Stock shade cards.
+const stockCard = (id, n, extra = "") => `<div class="abs sc" id="s_${id}">
+  <div class="sic" style="background:${n.person ? n.person[1] : COLOR[n.app]}">${n.person ? `<span style="font:600 30px var(--sans)">${n.person[0]}</span>` : svg(n.app)}</div>
+  <div style="min-width:0"><div class="sapp">${NAME[n.app]} · <span class="st" id="st_${id}">${n.time}</span></div>
+  <div class="stitle" id="stt_${id}">${n.title}</div><div class="sbody" id="sb_${id}">${n.stockBody ?? n.body}</div>${extra}</div>
+  <span class="scount" id="sn_${id}" style="${id === "parcel" ? "" : "display:none"}">3</span>
+  <div class="q" id="q_${id}">?</div></div>`;
+$("sCards").innerHTML =
+  `<div class="abs sc" id="s_run"><div class="sic" style="background:${COLOR.cloud}">${svg("cloud")}</div>
+   <div><div class="sapp">Murmur · <span class="st">now</span></div><div class="stitle">Backing up chats</div><div class="bar"><b></b></div></div><span></span></div>` +
+  ["maya", "hike", "glim", "day", "parcel", "fern"].map((id) => stockCard(id, N[id])).join("");
+
+// Chronotif cards.
+const chronoCard = (id, n) => {
+  const icon = n.person
+    ? `<div class="icon avatar" style="background:${n.person[1]}">${n.person[0]}<span class="badge-app" style="background:${COLOR[n.app]}">${svg(n.app)}</span><span class="count" id="cn_${id}">3</span></div>`
+    : `<div class="icon" style="background:${COLOR[n.app]}">${svg(n.app)}</div>`;
+  return `<div class="abs card" id="c_${id}">${icon}
+    <div style="min-width:0"><div class="row"><span class="title">${n.title}</span><span class="time" id="ct_${id}">${n.time}</span></div><div class="body" id="cb_${id}">${n.body}</div></div>
+    ${n.thumb ? '<div class="thumb"></div>' : "<span></span>"}</div>`;
+};
+$("cCards").innerHTML = ["pNew", "maya", "day", "fern", "parcel", "hike", "glim"].map((id) => chronoCard(id, N[id])).join("");
+$("c_maya").classList.add("stack");
+$("c_parcel").classList.add("stack");
+["pNew", "maya", "day", "fern", "parcel", "hike", "glim"].forEach((id, i) => ($("c_" + id).style.zIndex = 50 - i));
+
+const CAPS = [
+  [0.3, 3.0, "You pick up your phone.", "And try to work out what happened."],
+  [3.3, 7.1, "Old things sit <em>on top.</em>", "A like from 2 hours ago, above a reminder from just now."],
+  [7.4, 10.7, "What’s <em>new</em> since you last looked?", "Nothing tells you. So you read it all again."],
+  [11.0, 14.6, "So you clear all…", "…and lose what you still needed."],
+  [15.2, 18.9, "Same notifications.", "Side by side."],
+  [19.2, 23.2, "Something new arrives."],
+  [23.5, 26.3, "You look, then put the phone down."],
+  [26.6, 30.0, "Next time, <em class=\"g\">what’s new</em> is obvious."],
+  [30.4, 35.2, "Stock Android vs <em class=\"g\">Chronotif</em>"],
+];
+for (const [i, [, , text, sub]] of CAPS.entries()) {
+  $("caps").insertAdjacentHTML("beforeend", `<div class="abs cap" id="cap${i}"><div class="capt">${text}</div>` + (sub ? `<div class="sub" id="sub${i}">${sub}</div>` : "") + "</div>");
+}
+// What each side does, under the phones: [start, end, stock, Chronotif].
+const CHIPS = [
+  [16.0, 18.9, "Sorted by app and importance", "Newest first"],
+  [20.5, 23.2, "Folded into the middle", "On top, under New"],
+  [24.9, 26.3, "Nothing changes", "What you saw steps back"],
+  [27.6, 30.0, "Looks like everything else", "Right in front"],
+];
+for (const [i, [, , l, r]] of CHIPS.entries()) {
+  $("chips").insertAdjacentHTML("beforeend", `<div class="abs chip l" id="chipL${i}">✕ ${l}</div><div class="abs chip r" id="chipR${i}">✓ ${r}</div>`);
+}
+
+// --- timing helpers ---
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const inOut = (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+const out = (x) => 1 - Math.pow(1 - x, 3);
+const back = (x) => 1 + 2.2 * Math.pow(x - 1, 3) + 1.2 * Math.pow(x - 1, 2);
+const k = (t, t0, t1, e = inOut) => e(clamp((t - t0) / (t1 - t0)));
+const mix = (a, b, p) => a + (b - a) * p;
+const set = (node, { x = 0, y = 0, s = 1, o = 1 }) => {
+  node.style.transform = `translate(${x}px, ${y}px) scale(${s})`;
+  node.style.opacity = o;
+};
+const pulse = (t, t0, t1) => k(t, t0, t0 + 0.3) * (1 - k(t, t1 - 0.3, t1));
+
+// Keyframed layouts: each state takes over from the one before over 0.8 s.
+function track(t, keys) {
+  let i = 0;
+  while (i + 1 < keys.length && t >= keys[i + 1][0]) i++;
+  const [t0, cur] = keys[i];
+  if (i === 0) return { ...cur };
+  const prev = keys[i - 1][1], p = k(t, t0, t0 + 0.8), r = {};
+  for (const key of new Set([...Object.keys(prev), ...Object.keys(cur)])) {
+    const a = prev[key] ?? cur[key], b = cur[key] ?? prev[key];
+    r[key] = typeof a === "number" ? mix(a, b, p) : p < 0.5 ? a : b;
+  }
+  return r;
+}
+
+// Stock shade: where Android puts things. Ongoing on top, Conversations, ranked alerts, Silent.
+const STOCK_BASE = { run: 330, hConv: 540, maya: 590, hike: 800, glim: 1010, day: 1190, parcel: 1370, hSilent: 1580, fern: 1630 };
+const STOCK = [[0, STOCK_BASE], [26.8, { ...STOCK_BASE, hike: 590, maya: 780 }]];
+
+// Chronotif: newest first, New above the last check, Earlier dimmed. E = in Earlier.
+const E = (y) => ({ y, s: 0.9, dim: 1 });
+const F = (y) => ({ y, s: 1, dim: 0 });
+const CHRONO = [
+  [0, { hNew: 200, line: 860, hEarlier: 910, newO: 1, lineO: 1, pNew: { ...F(200), o: 0 },
+        maya: F(250), day: F(470), fern: F(650), parcel: E(970), hike: E(1170), glim: E(1330) }],
+  [19.6, { hNew: 200, line: 1040, hEarlier: 1090, newO: 1, lineO: 1, pNew: F(250),
+           maya: F(430), day: F(650), fern: F(830), parcel: E(1150), hike: E(1350), glim: E(1510) }],
+  [24.2, { hNew: 200, line: 120, hEarlier: 200, newO: 0, lineO: 0, pNew: E(250),
+           maya: E(410), day: E(610), fern: E(770), parcel: E(930), hike: E(1130), glim: E(1290) }],
+  [26.8, { hNew: 200, line: 470, hEarlier: 520, newO: 1, lineO: 1, pNew: E(580),
+           maya: E(740), day: E(940), fern: E(1100), parcel: E(1260), hike: F(250), glim: E(1460) }],
+];
+function chronoAt(t) {
+  let i = 0;
+  while (i + 1 < CHRONO.length && t >= CHRONO[i + 1][0]) i++;
+  const [t0, cur] = CHRONO[i], prev = (CHRONO[i - 1] ?? CHRONO[0])[1], p = i ? k(t, t0, t0 + 0.8) : 1;
+  const m = (a, b) => typeof a === "number" ? mix(a, b, p)
+    : Object.fromEntries(Object.keys(b).map((key) => [key, mix(a[key] ?? 1, b[key], p)]));
+  return Object.fromEntries(Object.keys(cur).map((key) => [key, m(prev[key], cur[key])]));
+}
+
+function render(t) {
+  // --- where the two screens sit: stock alone, then side by side, then gone for the table ---
+  const split = k(t, 14.6, 15.6);
+  const away = k(t, 30.0, 30.6);
+  const SOLO = 0.765, HALF = 0.47;
+  const sS = mix(SOLO, HALF, split);
+  set($("stock"), { x: mix((1080 - 1080 * SOLO) / 2, 24, split), y: mix(400, 580, split), s: sS, o: k(t, 0, 0.5) * (1 - away) });
+  set($("chrono"), { x: mix(1100, 548, split), y: 580, s: HALF, o: split * (1 - away) });
+  $("stock").style.filter = $("chrono").style.filter = away > 0 ? `blur(${away * 12}px)` : "none";
+  set($("lStock"), { x: 24, y: 510, o: k(t, 15.2, 15.6) * (1 - away) });
+  set($("lChrono"), { x: 548, y: 510, o: k(t, 15.4, 15.8) * (1 - away) });
+
+  // --- stock shade ---
+  const S = track(t, STOCK);
+  // Clear all: the cards sweep away, then come back.
+  const press = pulse(t, 11.2, 11.7);
+  set($("sClear"), { s: 1 - press * 0.08, o: 1 });
+  $("sClear").style.background = press > 0.5 ? "#3b4a6b" : "#2b2d33";
+  const swept = ["maya", "hike", "glim", "day", "parcel", "fern"];
+  const sweep = (i) => k(t, 11.6 + i * 0.07, 12.2 + i * 0.07) * (1 - k(t, 13.6 + i * 0.05, 14.2 + i * 0.05));
+  set($("s_run"), { y: S.run });
+  swept.forEach((id, i) => set($("s_" + id), { x: sweep(i) * 1150, y: S[id], o: 1 - sweep(i) * 0.6 }));
+  set($("sHConv"), { x: sweep(0) * 1150, y: S.hConv });
+  set($("sHSilent"), { x: sweep(5) * 1150, y: S.hSilent });
+
+  // Old on top: rings around the like and the reminder under it, then every time lights up.
+  const ring = (id, a, color) => ($("s_" + id).style.boxShadow = a > 0 ? `0 0 0 ${a * 8}px ${color}` : "none");
+  ring("glim", pulse(t, 3.7, 7.0), "var(--warn)");
+  ring("day", pulse(t, 4.4, 7.0), "var(--accent-soft)");
+  ring("fern", 0, "");
+  ring("parcel", pulse(t, 20.2, 23.0), "var(--warn)");
+  ring("hike", pulse(t, 27.1, 29.8), "rgba(235,235,245,.4)");
+  const timesHot = (t > 5.4 && t < 7.1) || (t > 16.4 && t < 18.8);
+  for (const id of ["glim", "day", "maya", "hike", "parcel", "fern"]) $("st_" + id).classList.toggle("hot", timesHot || (id === "glim" && t > 3.9 && t < 7.1));
+  // Which ones are new? A question mark on every card, one by one.
+  swept.forEach((id, i) => set($("q_" + id), { s: k(t, 7.8 + i * 0.32, 8.2 + i * 0.32, back), o: k(t, 7.8 + i * 0.32, 8.0 + i * 0.32) * (1 - k(t, 10.4, 10.8)) }));
+  // Something new: a parcel update folds into the Parcelly group in the middle.
+  const arrived = t >= 19.6;
+  $("sn_parcel").textContent = arrived ? "4" : "3";
+  $("st_parcel").textContent = arrived ? "now" : "31m";
+  $("stt_parcel").textContent = arrived ? "Delivered" : N.parcel.title;
+  $("sb_parcel").textContent = arrived ? "Left at your front door" : N.parcel.body;
+  const hikeNew = t >= 26.8;
+  $("st_hike").textContent = hikeNew ? "now" : "1h";
+  $("sb_hike").textContent = hikeNew ? "Emma Wilson: Leaving at 7, bring snacks" : N.hike.body;
+
+  // --- Chronotif panel ---
+  const C = chronoAt(t);
+  set($("cHNew"), { y: C.hNew - 60, o: C.newO });
+  $("cNewCount").textContent = t >= 26.8 ? 1 : t >= 19.6 ? 4 : 3;
+  set($("cLine"), { y: C.line - 70, o: C.lineO });
+  set($("cLineLabel"), { y: C.line - 120, o: C.lineO });
+  set($("cHEarlier"), { y: C.hEarlier - 60 });
+  for (const id of ["pNew", "maya", "day", "fern", "parcel", "hike", "glim"]) {
+    const c = C[id];
+    set($("c_" + id), { y: c.y, s: c.s, o: c.o ?? 1 });
+    $("c_" + id).style.setProperty("--dim", c.dim * 1.25);
+  }
+  $("c_pNew").style.opacity = k(t, 19.6, 20.0);
+  $("c_hike").classList.toggle("stack", hikeNew);
+  $("cn_hike").style.display = hikeNew ? "" : "none";
+  $("cn_hike").textContent = "2";
+  $("ct_hike").textContent = hikeNew ? "now" : "1h";
+  $("cb_hike").textContent = hikeNew ? "Emma Wilson: Leaving at 7, bring snacks" : N.hike.body;
+  for (const id of ["maya", "day", "fern", "parcel", "hike", "glim"]) $("ct_" + id).classList.toggle("good", t > 16.4 && t < 18.8);
+  const cring = (id, a) => ($("c_" + id).style.outline = a > 0 ? `${a * 8}px solid var(--accent-soft)` : "none");
+  cring("pNew", pulse(t, 20.2, 23.0));
+  cring("hike", pulse(t, 27.6, 29.8));
+
+  // --- words ---
+  CAPS.forEach(([t0, t1, , sub], i) => {
+    const o = k(t, t0, t0 + 0.4, out) * (1 - k(t, t1 - 0.35, t1));
+    const y = i === 8 ? 180 : i < 4 ? 120 : 150;
+    set($("cap" + i), { y: y + (1 - k(t, t0, t0 + 0.5, out)) * 30, o });
+    // The clear-all aftermath lands a beat later.
+    const s0 = i === 3 ? t0 + 1.6 : t0 + 0.3;
+    if (sub) set($("sub" + i), { y: (1 - k(t, s0, s0 + 0.5, out)) * 30, o: k(t, s0, s0 + 0.4) });
+  });
+  CHIPS.forEach(([t0, t1], i) => {
+    const o = (d) => k(t, t0 + d, t0 + d + 0.4) * (1 - k(t, t1 - 0.35, t1));
+    set($("chipL" + i), { x: 24, y: 1540 + (1 - k(t, t0, t0 + 0.5, out)) * 20, o: o(0) });
+    set($("chipR" + i), { x: 548, y: 1540 + (1 - k(t, t0 + 0.25, t0 + 0.75, out)) * 20, o: o(0.25) });
+  });
+
+  // --- the recap table ---
+  const tOut = k(t, 34.9, 35.3);
+  set($("table"), { y: 420, o: k(t, 30.6, 31.0) * (1 - tOut) });
+  [...$("table").querySelectorAll(".tr")].forEach((row, i) => {
+    const p = k(t, 31.0 + i * 0.7, 31.5 + i * 0.7, out);
+    row.style.opacity = p; row.style.transform = `translateY(${(1 - p) * 24}px)`;
+  });
+
+  // --- end card: the logo builds itself ---
+  const e0 = 35.3;
+  set($("logo"), { y: 520, s: mix(0.6, 1, k(t, e0, e0 + 0.7, back)), o: k(t, e0, e0 + 0.3) });
+  set($("lgCard"), { y: (1 - k(t, e0 + 0.3, e0 + 0.8, back)) * -14, o: k(t, e0 + 0.3, e0 + 0.6) });
+  $("lgCard").style.transformOrigin = "54px 47px";
+  set($("lgDot"), { s: k(t, e0 + 0.7, e0 + 1.1, back), o: k(t, e0 + 0.7, e0 + 0.9) });
+  $("lgDot").style.transformBox = "fill-box"; $("lgDot").style.transformOrigin = "center";
+  set($("lgBar1"), { y: (1 - k(t, e0 + 0.9, e0 + 1.4, out)) * 8, o: k(t, e0 + 0.9, e0 + 1.3) });
+  set($("lgBar2"), { y: (1 - k(t, e0 + 1.1, e0 + 1.6, out)) * 8, o: k(t, e0 + 1.1, e0 + 1.5) });
+  set($("word"), { y: 900 + (1 - k(t, e0 + 1.0, e0 + 1.6, out)) * 30, o: k(t, e0 + 1.0, e0 + 1.5) });
+  set($("tag"), { y: 1110 + (1 - k(t, e0 + 1.4, e0 + 2.0, out)) * 24, o: k(t, e0 + 1.4, e0 + 1.9) });
+  set($("url"), { y: 1250 + (1 - k(t, e0 + 1.8, e0 + 2.3, out)) * 24, o: k(t, e0 + 1.8, e0 + 2.2) });
+  set($("gh2"), { y: 1330 + (1 - k(t, e0 + 2.1, e0 + 2.6, out)) * 24, o: k(t, e0 + 2.1, e0 + 2.5) });
+}
+window.render = render;
+window.DURATION = 40;
+render(Number(new URLSearchParams(location.search).get("t") ?? 0));
+</script>
