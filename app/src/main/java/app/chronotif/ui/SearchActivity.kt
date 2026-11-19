@@ -24,16 +24,20 @@ class SearchActivity : Activity(), NotifList.Host {
     companion object {
         /** Exported, so launchers such as Nova can bind it to their own gestures. */
         const val ACTION = "app.chronotif.action.SEARCH"
+        /** Text to start with: what was typed on the lock-screen view before unlocking. */
+        private const val EXTRA_QUERY = "query"
 
-        fun intent(context: Context): Intent =
+        fun intent(context: Context, query: String = ""): Intent =
             Intent(context, SearchActivity::class.java)
                 .setAction(ACTION)
+                .putExtra(EXTRA_QUERY, query)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION)
 
-        fun open(context: Context) = context.startActivity(intent(context))
+        fun open(context: Context, query: String = "") = context.startActivity(intent(context, query))
     }
 
     override val context: Context get() = this
+    override val keepsSearchAfterUnlock get() = true
 
     private var unlocking = false
 
@@ -52,7 +56,8 @@ class SearchActivity : Activity(), NotifList.Host {
         getSystemService(ShortcutManager::class.java)?.reportShortcutUsed("search")
         val root = FrameLayout(this)
         setContentView(root)
-        root.post { SearchOverlay.show(root, this) { finishQuietly() } }
+        val query = intent.getStringExtra(EXTRA_QUERY).orEmpty()
+        root.post { SearchOverlay.show(root, this, query) { finishQuietly() } }
         registerReceiver(screenOff, IntentFilter(Intent.ACTION_SCREEN_OFF),
             if (Build.VERSION.SDK_INT >= 33) RECEIVER_EXPORTED else 0)
     }

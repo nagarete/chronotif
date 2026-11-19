@@ -44,6 +44,8 @@ class NotifList(
         fun launched()
         /** Run [action] now, or after the user unlocks (lock screen). */
         fun guarded(action: () -> Unit)
+        /** Still showing once [guarded] has unlocked, so Search can stay open rather than reopen. */
+        val keepsSearchAfterUnlock: Boolean get() = false
         /** Lock screen only: replying needs the keyboard, so continue in the panel. */
         fun replyElsewhere(e: Entry, actionIndex: Int) {}
     }

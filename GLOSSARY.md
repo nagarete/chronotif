@@ -56,5 +56,5 @@ Opening the panel by swiping down on, or tapping, the notification side of the s
 _Avoid_: Top swipe, top-edge gesture
 
 **Search**:
-Opened by pulling down at the top of the Panel or the lock-screen view, or from Chronotif's handle, tile, widget or app shortcut. It finds and opens apps, answers quick math and currency, and hands anything else to the web. It never searches notifications.
+Opened by pulling down at the top of the Panel or the lock-screen view, or from Chronotif's handle, tile, widget or app shortcut. It finds and opens apps, contacts and calendar events, answers quick math and currency, and hands anything else to the web. It never searches notifications.
 _Avoid_: Spotlight, App search

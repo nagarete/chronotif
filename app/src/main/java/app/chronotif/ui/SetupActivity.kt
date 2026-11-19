@@ -46,6 +46,7 @@ class SetupActivity : Activity() {
     private companion object {
         /** A listener the system is still binding looks disconnected for a moment after launch. */
         const val SETTLE_MS = 2000L
+        const val REQUEST_SEARCH_PERMISSION = 10
     }
 
     private var settled = false
@@ -216,6 +217,12 @@ class SetupActivity : Activity() {
             vertical = true,
         ) { Prefs.searchEngine = it }
         body.addView(text(getString(R.string.search_engine_desc), 13f, secondary = true))
+        permissionToggle(R.string.search_find_contacts, R.string.search_find_contacts_desc,
+            android.Manifest.permission.READ_CONTACTS, { Prefs.searchContacts }) { Prefs.searchContacts = it }
+        permissionToggle(R.string.search_calls, R.string.search_calls_desc,
+            android.Manifest.permission.CALL_PHONE, { Prefs.searchCalls }) { Prefs.searchCalls = it }
+        permissionToggle(R.string.search_find_calendar, R.string.search_find_calendar_desc,
+            android.Manifest.permission.READ_CALENDAR, { Prefs.searchCalendar }) { Prefs.searchCalendar = it }
 
         section(R.string.setup_lock)
         body.addView(text(getString(R.string.lock_mode), 15f), gap(4))
@@ -424,7 +431,7 @@ class SetupActivity : Activity() {
         return row
     }
 
-    private fun toggle(title: Int, desc: Int?, value: () -> Boolean, onChange: (Boolean) -> Unit) {
+    private fun toggle(title: Int, desc: Int?, value: () -> Boolean, onChange: (Boolean) -> Unit): Switch {
         val s = Switch(this).apply {
             text = getString(title)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
@@ -434,6 +441,35 @@ class SetupActivity : Activity() {
         }
         body.addView(s, gap(12))
         if (desc != null) body.addView(text(getString(desc), 13f, secondary = true))
+        return s
+    }
+
+    /** Switches waiting on a permission answer, by request code. */
+    private val pendingPermission = HashMap<Int, Pair<Switch, (Boolean) -> Unit>>()
+
+    /**
+     * A switch that needs [permission] (ADR 0008): turning it on asks for it, and it stays on only
+     * if granted. Once Android stops asking, the switch points to the app's permission page.
+     */
+    private fun permissionToggle(title: Int, desc: Int, permission: String, value: () -> Boolean, set: (Boolean) -> Unit) {
+        val code = REQUEST_SEARCH_PERMISSION + pendingPermission.size
+        val s = toggle(title, desc, { value() && checkSelfPermission(permission) == android.content.pm.PackageManager.PERMISSION_GRANTED }) { on ->
+            if (!on || checkSelfPermission(permission) == android.content.pm.PackageManager.PERMISSION_GRANTED) return@toggle set(on)
+            requestPermissions(arrayOf(permission), code)
+        }
+        pendingPermission[code] = s to set
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        val (s, set) = pendingPermission[requestCode] ?: return
+        val granted = grantResults.firstOrNull() == android.content.pm.PackageManager.PERMISSION_GRANTED
+        set(granted)
+        s.isChecked = granted
+        if (!granted && permissions.firstOrNull()?.let(::shouldShowRequestPermissionRationale) == false) {
+            android.widget.Toast.makeText(this, R.string.search_permission_denied, android.widget.Toast.LENGTH_LONG).show()
+            open(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
+        }
     }
 
     private fun radios(
