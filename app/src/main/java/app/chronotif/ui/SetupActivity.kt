@@ -219,6 +219,8 @@ class SetupActivity : Activity() {
         body.addView(text(getString(R.string.search_engine_desc), 13f, secondary = true))
         permissionToggle(R.string.search_find_contacts, R.string.search_find_contacts_desc,
             android.Manifest.permission.READ_CONTACTS, { Prefs.searchContacts }) { Prefs.searchContacts = it }
+        permissionToggle(R.string.search_calls, R.string.search_calls_desc,
+            android.Manifest.permission.CALL_PHONE, { Prefs.searchCalls }) { Prefs.searchCalls = it }
         permissionToggle(R.string.search_find_calendar, R.string.search_find_calendar_desc,
             android.Manifest.permission.READ_CALENDAR, { Prefs.searchCalendar }) { Prefs.searchCalendar = it }
 

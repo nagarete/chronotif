@@ -55,6 +55,8 @@ object PersonalData {
 
     fun contactsOn(context: Context) = Prefs.searchContacts && granted(context, Manifest.permission.READ_CONTACTS)
     fun calendarOn(context: Context) = Prefs.searchCalendar && granted(context, Manifest.permission.READ_CALENDAR)
+    /** Call buttons place calls themselves; WhatsApp only starts a call for an app allowed to. */
+    fun callsOn(context: Context) = Prefs.searchCalls && granted(context, Manifest.permission.CALL_PHONE)
 
     private fun granted(context: Context, permission: String) =
         context.checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
@@ -210,16 +212,20 @@ object PersonalData {
         Intent(Intent.ACTION_VIEW, ContactsContract.Contacts.getLookupUri(contact.id, contact.lookupKey)))
 
     /**
-     * A WhatsApp voice call when the contact is on WhatsApp. Otherwise the dialer opens with the
-     * number ready, so Chronotif needs no permission to place calls.
+     * With *Call from Search* on: a WhatsApp voice call when the contact is on WhatsApp, otherwise
+     * a phone call. With it off, the dialer opens with the number ready.
      */
     fun call(context: Context, contact: Contact) {
-        if (openWhatsApp(context, contact.whatsapp?.call)) return
+        val calls = callsOn(context)
+        if (calls && openWhatsApp(context, contact.whatsapp?.call)) return
         val number = contact.callNumber ?: return
-        start(context, Intent(Intent.ACTION_DIAL, Uri.fromParts("tel", number, null)))
+        start(context, Intent(if (calls) Intent.ACTION_CALL else Intent.ACTION_DIAL, Uri.fromParts("tel", number, null)))
     }
 
-    /** A WhatsApp video call; only offered when WhatsApp added one to the contact. */
+    /** True when the video button shows: the contact is on WhatsApp and calls are allowed. */
+    fun canVideoCall(context: Context, contact: Contact) = contact.whatsapp?.video != null && callsOn(context)
+
+    /** A WhatsApp video call; only offered when [canVideoCall]. */
     fun videoCall(context: Context, contact: Contact) {
         openWhatsApp(context, contact.whatsapp?.video)
     }

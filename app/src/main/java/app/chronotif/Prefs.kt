@@ -124,6 +124,11 @@ object Prefs {
         get() = sp.getBoolean("search_contacts", false)
         set(v) = sp.edit().putBoolean("search_contacts", v).apply()
 
+    /** Search's call buttons place calls, WhatsApp ones included. Off until turned on, which asks for the Phone permission. */
+    var searchCalls: Boolean
+        get() = sp.getBoolean("search_calls", false)
+        set(v) = sp.edit().putBoolean("search_calls", v).apply()
+
     /** Search finds calendar events. Off until turned on, which asks for the Calendar permission. */
     var searchCalendar: Boolean
         get() = sp.getBoolean("search_calendar", false)
