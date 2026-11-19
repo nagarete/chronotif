@@ -102,4 +102,28 @@ class SearchActivityTest {
         assertTrue("$shown", "= 24" in shown)
         controller.destroy()
     }
+
+    private fun shownFor(text: String): List<String> {
+        val controller = Robolectric.buildActivity(SearchActivity::class.java, SearchActivity.intent(context)).setup()
+        shadowOf(Looper.getMainLooper()).idle()
+        val search = overlays(controller.get().window.decorView as ViewGroup).single()
+        typeInto(search, text)
+        val shown = texts(search).filter { it.isNotBlank() }
+        controller.destroy()
+        return shown
+    }
+
+    @Test fun currencyOffersToTurnOnRatesFirst() {
+        Prefs.currencyRates = false
+        assertTrue(shownFor("100 usd to idr").contains("Convert currencies"))
+    }
+
+    @Test fun currencyConvertsWithSavedRates() {
+        Prefs.currencyRates = true
+        Prefs.exchangeRates = "2026-11-18;USD=1.05,IDR=17325"
+        Prefs.exchangeRatesFetchedAt = System.currentTimeMillis()
+        val shown = shownFor("100 usd to idr")
+        assertTrue("$shown", "1,650,000 IDR" in shown)
+        assertTrue("$shown", "100.00 USD =" in shown)
+    }
 }

@@ -221,6 +221,9 @@ class SetupActivity : Activity() {
             android.Manifest.permission.READ_CONTACTS, { Prefs.searchContacts }) { Prefs.searchContacts = it }
         permissionToggle(R.string.search_calls, R.string.search_calls_desc,
             android.Manifest.permission.CALL_PHONE, { Prefs.searchCalls }) { Prefs.searchCalls = it }
+        toggle(R.string.search_currency_rates, R.string.search_currency_rates_desc, { Prefs.currencyRates }) {
+            Prefs.currencyRates = it
+        }
         permissionToggle(R.string.search_find_calendar, R.string.search_find_calendar_desc,
             android.Manifest.permission.READ_CALENDAR, { Prefs.searchCalendar }) { Prefs.searchCalendar = it }
 
