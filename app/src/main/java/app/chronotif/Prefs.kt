@@ -6,7 +6,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import app.chronotif.core.Attention
 
-/** The only persisted state: the last-check watermark and a handful of settings. */
+/** The only persisted state: the last-check watermark, when apps last notified, and a handful of settings. */
 object Prefs {
     const val LOCK_OFF = 0
     const val LOCK_WHEN_NEW = 1
@@ -108,6 +108,31 @@ object Prefs {
     var headerSettings: Boolean
         get() = sp.getBoolean("header_settings", true)
         set(v) = sp.edit().putBoolean("header_settings", v).apply()
+
+    /** App search: pulled down from the top of the panel or lock-screen view (ADR 0007). */
+    var appSearch: Boolean
+        get() = sp.getBoolean("app_search", true)
+        set(v) = sp.edit().putBoolean("app_search", v).apply()
+
+    /**
+     * When each app last notified, for App search's suggestion row: app id (package|user) to
+     * arrival time. Times only, never content, and only the most recent few apps are kept.
+     */
+    val lastNotified: Map<String, Long>
+        get() = sp.getString("last_notified", null).orEmpty().split(';').mapNotNull { pair ->
+            val i = pair.lastIndexOf('=')
+            if (i <= 0) null else pair.substring(i + 1).toLongOrNull()?.let { pair.substring(0, i) to it }
+        }.toMap()
+
+    fun notified(appId: String, at: Long) {
+        val all = lastNotified
+        if ((all[appId] ?: 0L) >= at) return
+        val kept = (all + (appId to at)).entries.sortedByDescending { it.value }.take(LAST_NOTIFIED_KEPT)
+        sp.edit().putString("last_notified", kept.joinToString(";") { "${it.key}=${it.value}" }).apply()
+    }
+
+    /** Enough to fill the row when some of them can't be launched (uninstalled, no launcher entry). */
+    private const val LAST_NOTIFIED_KEPT = 16
 
     /** Opt-in: check GitHub Releases daily and install newer versions. */
     var autoUpdate: Boolean

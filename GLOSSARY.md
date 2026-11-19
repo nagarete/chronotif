@@ -54,3 +54,7 @@ _Avoid_: Ongoing, Background
 **Status-bar swipe**:
 Opening the panel by swiping down on, or tapping, the notification side of the status bar, in place of the system shade.
 _Avoid_: Top swipe, top-edge gesture
+
+**App search**:
+Pulled down from the top of the Panel or the lock-screen view. It finds and opens apps by name, and suggests the apps that notified most recently. It never searches notifications.
+_Avoid_: Spotlight, search (unqualified)

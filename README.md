@@ -119,8 +119,9 @@ If your installed version has no channel setting, install a nightly APK once to 
 
 ## Privacy and battery use
 
-Notifications stay in memory on your device. Chronotif saves your settings and the time
-of your last check, with backups disabled. The lock-screen view follows Android's
+Notifications stay in memory on your device. Chronotif saves your settings, the time
+of your last check, and when each of the last few apps notified (for App search's
+suggestions, never what they said), with backups disabled. The lock-screen view follows Android's
 notification privacy settings and requires unlocking before opening notifications,
 using actions, or replying.
 

@@ -204,6 +204,9 @@ To open Chronotif in fullscreen, use the Quick Settings tile, or turn off the ed
   display timeout, which can be longer than the stock lock-screen timeout.
   *Settings → Lock screen* chooses Off / *When something is new* (default) /
   *Whenever there are notifications*.
+- **App search**: pull down at the top of the panel or the lock-screen view to find and open
+  apps. Before you type, it suggests the four apps that notified most recently. On the lock
+  screen, opening an app asks you to unlock first. *Settings → Panel → App search* turns it off.
 - **Header**: the clock and date at the top of the panel, with a settings gear at the end. Tap the
   clock to open your alarms, the date to open your calendar, or the gear to open Android's
   Settings; tapping elsewhere in the header closes the panel.

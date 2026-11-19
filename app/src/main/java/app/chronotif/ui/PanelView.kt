@@ -24,7 +24,8 @@ import kotlin.math.abs
 
 /**
  * The panel's content: scrim, header and notification list, with its close gestures (outside
- * tap, tap below the list, upward fling at the end of the list). Hosted by [Panel] as an overlay
+ * tap, tap below the list, upward fling at the end of the list) and the pull-down that opens App
+ * search. Hosted by [Panel] as an overlay
  * window, or by [PanelActivity] when overlays aren't allowed. Being on screen for a moment (or
  * interacting) counts as a meaningful check: on [dismissed], what was shown moves to EARLIER.
  */
@@ -39,6 +40,8 @@ class PanelView(
 
     companion object {
         private const val CHECK_DWELL_MS = 1500L
+        /** [animateIn]'s length: a pull only counts from a touch that starts after it. */
+        private const val OPEN_ANIMATION_MS = 260L
 
         /**
          * How dark the backdrop is. Over a blur it's a light tint, like the stock shade, so the
@@ -201,6 +204,15 @@ class PanelView(
     private var tracker: VelocityTracker? = null
     private var edgeSwipe = false
     private var swallowGesture = false
+    private var openedAt = 0L
+
+    /** Pulling down at the top of the list opens App search, once the panel has finished opening. */
+    private val pull = PullToSearch(
+        list = scroll,
+        atTop = { !scroll.canScrollVertically(-1) },
+        ready = { !closing && android.os.SystemClock.uptimeMillis() - openedAt >= OPEN_ANIMATION_MS },
+        open = { AppSearchView.show(this, host) },
+    )
 
     // --- Back swipe from a screen edge. Over the home screen, MIUI turns its Back gesture off
     // and the swipe reaches the panel window instead; elsewhere the system's gesture wins.
@@ -210,6 +222,7 @@ class PanelView(
         if (swallowGesture) {
             if (ev.actionMasked == MotionEvent.ACTION_DOWN) swallowGesture = false else return true
         }
+        if (pull.onTouch(ev) { cancelChildren(ev) }) return true
         when (ev.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 interacted = true
@@ -228,12 +241,7 @@ class PanelView(
                     val dy = abs(ev.rawY - downY)
                     if (dx > dp(56) && dx > dy * 2) {
                         edgeSwipe = false
-                        // Children stop tracking this gesture (e.g. a card swipe).
-                        MotionEvent.obtain(ev).also {
-                            it.action = MotionEvent.ACTION_CANCEL
-                            super.dispatchTouchEvent(it)
-                            it.recycle()
-                        }
+                        cancelChildren(ev)
                         swallowGesture = true
                         close()
                         return true
@@ -258,9 +266,19 @@ class PanelView(
         return super.dispatchTouchEvent(ev)
     }
 
+    /** Children stop tracking this gesture (e.g. a card swipe). */
+    private fun cancelChildren(ev: MotionEvent) {
+        MotionEvent.obtain(ev).also {
+            it.action = MotionEvent.ACTION_CANCEL
+            super.dispatchTouchEvent(it)
+            it.recycle()
+        }
+    }
+
     // --- Animation ---
 
     fun animateIn() {
+        openedAt = android.os.SystemClock.uptimeMillis()
         scrim.alpha = 0f
         scroll.alpha = 0f
         scroll.translationY = -dp(48).toFloat()

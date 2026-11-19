@@ -101,6 +101,22 @@ class NotificationBehaviorTest {
     }
 
     @Test
+    fun appSearchSuggestsAppsThatNotifiedButNotRunningWork() {
+        val chat = post(notification(listOf("hi" to 1000L)), time = 1000, id = 1, pkg = "example.chat")
+        val mail = post(notification(listOf("hello again" to 3000L)), time = 3000, id = 2, pkg = "example.mail")
+        val steps = Notification.Builder(context, "steps")
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle("1,204 steps")
+            .setOngoing(true)
+            .build()
+        val running = post(steps, time = 5000, id = 3, pkg = "example.steps")
+        assertEquals(Kind.RUNNING, running.kind)
+        val last = Prefs.lastNotified
+        assertEquals(setOf(chat.appId, mail.appId), last.keys)
+        assertTrue("The app that notified later is newer", last.getValue(mail.appId) > last.getValue(chat.appId))
+    }
+
+    @Test
     fun demoModeShowsOnlyTheMadeUpDemoAppsAndStaysOnAfterARestart() {
         val real = post(notification("real chat"), time = 1000, id = 1, pkg = "example.chat")
         post(notification("demo chat"), time = 2000, id = 2, pkg = DemoMode.PREFIX + "chat")
