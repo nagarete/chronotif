@@ -58,3 +58,15 @@ _Avoid_: Top swipe, top-edge gesture
 **Search**:
 Opened by pulling down at the top of the Panel or the lock-screen view, or from Chronotif's handle, tile, widget or app shortcut. It finds and opens apps, contacts and calendar events, answers quick math and currency, and hands anything else to the web. It never searches notifications.
 _Avoid_: Spotlight, App search
+
+**Stable**:
+A tested release of Chronotif, tagged `vX.Y.Z`, and the update channel that receives only those. The default channel.
+_Avoid_: Production, latest
+
+**Nightly**:
+A build of the next Stable while it is still being tested, and the update channel that receives those builds.
+_Avoid_: Beta, preview, dev build
+
+**Release notes**:
+The plain-language account of what a Stable changed for the people using it, plus one entry for the next Stable while it is in Nightly. Changes that don't reach the app, such as website or build work, are left out.
+_Avoid_: Changelog, What's Changed (GitHub's generated list of pull requests)

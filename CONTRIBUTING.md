@@ -42,7 +42,9 @@ Please make sure tests and lint pass before opening a PR (CI runs the same check
 4. Add or update unit tests when you change the attention model (`core/Attention.kt`).
 5. If the change affects behaviour you can see, say which device/Android version you tested on
    and include a screenshot or short recording.
-6. Open a pull request against `main` and fill in the template.
+6. If people using the app will notice the change, add a line for it to the `next` entry in
+   `website/src/releases.json`, in plain words.
+7. Open a pull request against `main` and fill in the template.
 
 ## Reporting bugs
 

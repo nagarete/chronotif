@@ -1,0 +1,117 @@
+{
+  "next": {
+    "version": "0.2.6",
+    "headline": "Search, from the panel or the lock screen.",
+    "notes": [
+      "Pull down in the panel or the lock-screen view to search. Before you type, it suggests the apps that notified most recently.",
+      "Search answers quick math, unit conversions and the time in other cities, opens Android's settings pages, and hands anything else to the web search engine you pick.",
+      "Turn on contacts and calendar events under Settings → Search to find people and plans too. While the phone is locked, they stay hidden until you unlock.",
+      "Convert currencies with the European Central Bank's daily rates. It's off until you turn it on, and the download carries nothing you type.",
+      "Open Search without accessibility: hold the edge handle, or use the Search tile, home-screen widget or app shortcut.",
+      "A gear in the panel header opens Android's Settings."
+    ],
+    "video": {
+      "src": "/video/release-0.2.6.mp4",
+      "poster": "/video/release-0.2.6-poster.webp",
+      "label": "Search in Chronotif 0.2.6",
+      "music": {
+        "title": "Brazilian Phonk Bounce for Dance Reels",
+        "artist": "Alex Morgan",
+        "album": "Phonk & Drift",
+        "url": "https://freemusicarchive.org/music/alex-morgan/phonk-drift",
+        "license": "CC BY 4.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by/4.0/"
+      }
+    }
+  },
+  "stable": [
+    {
+      "version": "0.2.5",
+      "date": "2026-11-18",
+      "headline": "Chats stack by message, and Earlier keeps its order.",
+      "notes": [
+        "A conversation shows one card per message, stacked newest on top, with the person's picture in place of the app icon.",
+        "Photos show as thumbnails. Press and hold a message to preview it, and open attachments full screen.",
+        "Earlier stays in the order things arrived. One app's cards that arrived close together fold into a stack.",
+        "The panel header shows the time and date. Tap the clock to open your clock app.",
+        "Paused media players can be swiped away when the app allows it. Contributed by lgg.",
+        "Update checks read GitHub's release pages, so they no longer hit a rate limit."
+      ],
+      "video": {
+        "src": "/video/release-0.2.5.mp4",
+        "poster": "/video/release-0.2.5-poster.webp",
+        "label": "What's in Chronotif 0.2.5",
+        "music": {
+          "title": "Brazilian Phonk With Heavy Bass Drop",
+          "artist": "Alex Morgan",
+          "album": "Phonk & Drift",
+          "url": "https://freemusicarchive.org/music/alex-morgan/phonk-drift",
+          "license": "CC BY 4.0",
+          "licenseUrl": "https://creativecommons.org/licenses/by/4.0/"
+        }
+      }
+    },
+    {
+      "version": "0.2.4",
+      "date": "2026-10-31",
+      "headline": "The panel opens over your apps.",
+      "notes": [
+        "The panel opens as an overlay, so the app underneath keeps running.",
+        "Swipe down on the left half of the status bar to open Chronotif. It's optional and uses an accessibility service.",
+        "Tap empty space to close the panel, if you turn it on. Contributed by lgg.",
+        "The lock-screen view no longer dims your wallpaper.",
+        "Setup warns when notification access is on but Chronotif has lost its connection."
+      ]
+    },
+    {
+      "version": "0.2.3",
+      "date": "2026-10-27",
+      "headline": "A media player, a Running group, and Stable or Nightly updates.",
+      "notes": [
+        "Music and video notifications show as a player with artwork, controls and a seek bar.",
+        "Always-running items, like step counters and downloads, fold into a Running group below the list.",
+        "Choose Stable or Nightly under Settings → Updates.",
+        "A switch turns Chronotif on and off.",
+        "A New chat card lists every message since your last check.",
+        "The lock-screen view sleeps after the lock screen's own short timeout.",
+        "Cards stay readable in dark mode when an app sets its own text colours."
+      ]
+    },
+    {
+      "version": "0.2.2",
+      "date": "2026-10-24",
+      "headline": "A quicker lock-screen view.",
+      "notes": [
+        "The lock-screen view steps aside after 10 seconds untouched, like the stock lock screen.",
+        "Tap outside a card to start unlocking.",
+        "The Quick Settings tile is now called Chronotif."
+      ]
+    },
+    {
+      "version": "0.2.1",
+      "date": "2026-10-23",
+      "headline": "A fix for Android 16.",
+      "notes": [
+        "Fixes a crash on start on Android 16 when automatic updates are on."
+      ]
+    },
+    {
+      "version": "0.2.0",
+      "date": "2026-10-22",
+      "headline": "Updates from GitHub.",
+      "notes": [
+        "Turn on automatic updates and Chronotif checks GitHub once a day, verifies the new APK against its checksum and installs it. Check for updates does the same on demand.",
+        "Signed with Chronotif's permanent key. Coming from 0.1.0, uninstall it once first."
+      ]
+    },
+    {
+      "version": "0.1.0",
+      "date": "2026-10-21",
+      "headline": "The first release.",
+      "notes": [
+        "A notification panel and a lock-screen view, newest first, split into New and Earlier at your last check.",
+        "Open the panel from the edge handle or the Quick Settings tile."
+      ]
+    }
+  ]
+}
