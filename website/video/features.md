@@ -8,9 +8,11 @@ The chapters are filmed on a real phone (a Xiaomi 17T Pro) running the debug bui
 plus one clip of the website's interactive demo. Every notification comes from the made-up demo
 apps in `poster/`. None of the phone's real notifications or home screen appear.
 
-Music: "Bubbles" by HoliznaCC0, from the album
-[Public Domain Lofi](https://freemusicarchive.org/music/holiznacc0/public-domain-lofi)
-(CC0 1.0, no credit required).
+Music: "Phonk Remix" by HoliznaCC0, from the album
+[PHONK - AURA FARMING](https://freemusicarchive.org/music/holiznacc0/phonk-aura-farming) (CC0 1.0, no
+credit required; tagged Instrumental). It replaced "Bubbles" (lofi, same artist) on 20 Nov 2026.
+Built with `MUSIC=raw/music/phonk-remix.mp3 MUSIC_START=28.75 ./edit.sh features`: from 31 s the track
+stays loud without a break, and that point lands as the title card gives way.
 
 ## Chapters
 
@@ -47,5 +49,7 @@ templates.
   card away. Android 16 keeps the automatic group summary after its last child is removed. This
   is a known bug, and the swipe chapter stops before it shows.
 - Calls. Chronotif shows ongoing and incoming calls first, but no take recorded one.
+
+Search and the settings gear came later and have their own video (`search.md`).
 
 When a feature is added or changed, add or update its chapter here and in `cuts/features.*`.
