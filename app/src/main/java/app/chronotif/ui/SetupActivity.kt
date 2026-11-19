@@ -185,8 +185,8 @@ class SetupActivity : Activity() {
             Prefs.handleHideLandscape = it
             applyHandle()
         }
-        toggle(R.string.app_search_enabled, R.string.app_search_enabled_desc, { Prefs.appSearch }) {
-            Prefs.appSearch = it
+        toggle(R.string.search_pull_down, R.string.search_pull_down_desc, { Prefs.pullDownSearch }) {
+            Prefs.pullDownSearch = it
         }
         header()
         body.addView(text(getString(R.string.tile_hint), 13f, secondary = true), gap(12))

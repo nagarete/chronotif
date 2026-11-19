@@ -10,7 +10,7 @@ import app.chronotif.Prefs
 import kotlin.math.abs
 
 /**
- * Pulling down with the list at its top opens App search (ADR 0007). Fed every touch from a
+ * Pulling down with the list at its top opens Search (ADR 0008). Fed every touch from a
  * window's dispatchTouchEvent; [list] follows the finger, damped, and springs back on release.
  * [ready] lets the panel ignore touches until it has finished opening.
  */
@@ -42,7 +42,7 @@ class PullToSearch(
                 downX = ev.rawX
                 downY = ev.rawY
                 pulling = false
-                armed = Prefs.appSearch && ready() && atTop()
+                armed = Prefs.pullDownSearch && ready() && atTop()
             }
             MotionEvent.ACTION_POINTER_DOWN -> if (!pulling) armed = false
             MotionEvent.ACTION_MOVE -> {

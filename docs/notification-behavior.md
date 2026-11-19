@@ -63,13 +63,15 @@ A media player stays a Media player while paused, even though apps drop the ongo
 
 A Media player is drawn from the app's media session, like the system shade's player: artwork, title and artist, previous / play-pause / next, and a seek bar you can drag with elapsed and total time. It has no output (cast) button, because Android offers apps no public way to open the output picker. Apps that share no session fall back to their notification actions. When several apps have players, all of them show, newest first. Paused or stopped Media players can be swiped left or right when the app allows it. A playing player cannot be swiped away. If Android keeps the notification after a swipe, the card returns. On the lock-screen view, players follow the same privacy rules as other cards: when content is hidden, only the app name and controls show.
 
-## App search
+## Search
 
-Pulling down with the list at its top, on the Panel or the lock-screen view, opens App search (ADR 0007). On the Panel the pull has to start after the Panel has finished opening, so the status-bar swipe that opened it can't run on into search. A pull shorter than about 80dp springs back. The field gets focus and the keyboard comes up.
+Search opens without the accessibility service, so it works alongside banking apps that refuse to run with one (ADR 0008). It opens from five places: a pull-down in the Panel or lock-screen view, a long press on the edge handle, the Search Quick Settings tile, the Search home-screen widget, and the Search shortcut on a long press of the app icon. Launchers that bind gestures, such as Nova, can bind theirs to the shortcut. Opened anywhere but the pull-down, Search has its own window over whatever is on screen, the lock screen included. It never takes the digital-assistant slot, so Gemini keeps the power button.
 
-App search finds apps, never notifications. Before you type, it shows a row of up to four apps, the ones that notified most recently, newest first, once each. That counts an app whose notification has since been dismissed. Calls, Media players, Running and Chronotif itself don't count. Typing hides the row and lists apps whose name starts with the query, then those where a later word starts with it ("music" finds YouTube Music), then those containing it anywhere ("tok" finds TikTok), alphabetical within each. Case and accents don't matter. A work-profile or dual copy of an app is its own entry, with the profile's badge.
+Pulling down with the list at its top, on the Panel or the lock-screen view, opens Search. On the Panel the pull has to start after the Panel has finished opening, so the status-bar swipe that opened it can't run on into search. A pull shorter than about 80dp springs back. The field gets focus and the keyboard comes up.
 
-Results show while locked. Tapping an app on the lock-screen view asks to unlock, then opens it; that unlock counts as a check like any other. Back, a tap on empty space, or a swipe up closes App search. On the lock-screen view, closing goes back to the notifications rather than unlocking. *Settings → Panel → App search* turns the pull-down off.
+Search finds apps, never notifications. Before you type, it shows a row of up to four apps, the ones that notified most recently, newest first, once each. That counts an app whose notification has since been dismissed. Calls, Media players, Running and Chronotif itself don't count. Typing hides the row and lists apps whose name starts with the query, then those where a later word starts with it ("music" finds YouTube Music), then those containing it anywhere ("tok" finds TikTok), alphabetical within each. Case and accents don't matter. A work-profile or dual copy of an app is its own entry, with the profile's badge.
+
+Results show while locked. Tapping an app on the lock screen asks to unlock, then opens it. Search shows no notifications, so opening it is never a check. Back, a tap on empty space, or a swipe up closes Search. On the lock-screen view, closing goes back to the notifications rather than unlocking. *Settings → Panel → Pull down for Search* turns the pull-down off; the other ways in stay.
 
 ## Verification cases
 
@@ -89,9 +91,12 @@ Results show while locked. Tapping an app on the lock-screen view asks to unlock
 - Pause music. Its player stays at the top and does not move to Earlier.
 - Play music in Spotify or YouTube Music. The player shows artwork, title, artist, transport controls and a seek bar that moves; dragging it seeks.
 - With "Hide sensitive content" on, the lock-screen view's player shows the app name and controls but not the track.
-- Get notifications from two apps, dismiss one, then pull down at the top of the panel. App search opens with the keyboard up, and its row shows both apps, the newer first. Type "tok": TikTok is listed. Tap it: TikTok opens and the panel closes.
+- Get notifications from two apps, dismiss one, then pull down at the top of the panel. Search opens with the keyboard up, and its row shows both apps, the newer first. Type "tok": TikTok is listed. Tap it: TikTok opens and the panel closes.
 - Pull down on the lock-screen view and tap a suggestion. The unlock prompt shows, then the app opens. Pull down again and press Back: the notifications are back, still locked.
-- Open the panel with the status-bar swipe and keep dragging down. App search doesn't open.
+- Open the panel with the status-bar swipe and keep dragging down. Search doesn't open.
+- With BCA open and the accessibility service off, hold the edge handle. Search opens over BCA; Back returns to it.
+- Add the Search tile and the Search widget. Each opens Search with the keyboard up, also from the lock screen, where tapping an app asks to unlock first.
+- Long-press Chronotif's icon and tap Search. Search opens.
 
 ## Automated verification
 

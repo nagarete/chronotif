@@ -109,13 +109,13 @@ object Prefs {
         get() = sp.getBoolean("header_settings", true)
         set(v) = sp.edit().putBoolean("header_settings", v).apply()
 
-    /** App search: pulled down from the top of the panel or lock-screen view (ADR 0007). */
-    var appSearch: Boolean
+    /** Search: pulled down from the top of the panel or lock-screen view (ADR 0008). */
+    var pullDownSearch: Boolean
         get() = sp.getBoolean("app_search", true)
         set(v) = sp.edit().putBoolean("app_search", v).apply()
 
     /**
-     * When each app last notified, for App search's suggestion row: app id (package|user) to
+     * When each app last notified, for Search's suggestion row: app id (package|user) to
      * arrival time. Times only, never content, and only the most recent few apps are kept.
      */
     val lastNotified: Map<String, Long>

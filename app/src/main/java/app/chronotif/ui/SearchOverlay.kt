@@ -25,28 +25,29 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.window.OnBackInvokedCallback
 import android.window.OnBackInvokedDispatcher
-import app.chronotif.AppSearch
+import app.chronotif.Launchables
 import app.chronotif.Launchable
 import app.chronotif.R
 import app.chronotif.core.AppMatch
 
 /**
- * App search (ADR 0007), laid over the panel or the lock-screen view: the apps that notified most
+ * Search (ADR 0008), laid over the panel, the lock-screen view or its own window: the apps that notified most
  * recently, and a field that finds apps by name. It never searches notifications. Opening an app
  * goes through [NotifList.Host.guarded], so on the lock screen it unlocks first.
  */
 @SuppressLint("ViewConstructor")
-class AppSearchView private constructor(
+class SearchOverlay private constructor(
     context: Context,
     private val host: NotifList.Host,
+    private val onClosed: () -> Unit,
 ) : FrameLayout(context), Overlay {
 
     companion object {
-        /** Lays App search over [anchor]'s window. Nothing happens if something already covers it. */
-        fun show(anchor: View, host: NotifList.Host): AppSearchView? {
+        /** Lays Search over [anchor]'s window. Nothing happens if something already covers it. */
+        fun show(anchor: View, host: NotifList.Host, onClosed: () -> Unit = {}): SearchOverlay? {
             val root = anchor.rootView as? ViewGroup ?: return null
             if ((0 until root.childCount).any { root.getChildAt(it) is Overlay }) return null
-            val v = AppSearchView(anchor.context, host)
+            val v = SearchOverlay(anchor.context, host, onClosed)
             root.addView(v, ViewGroup.LayoutParams(-1, -1))
             return v
         }
@@ -80,7 +81,7 @@ class AppSearchView private constructor(
 
         suggestionsBlock.orientation = LinearLayout.VERTICAL
         suggestionsBlock.addView(Ui.text(context, 13f, pal.onScrimSecondary, bold = true, lines = 1).apply {
-            setText(R.string.app_search_suggestions)
+            setText(R.string.search_suggestions)
             Ui.shadow(this)
             setPadding(dp(8), 0, dp(8), dp(8))
         })
@@ -101,7 +102,7 @@ class AppSearchView private constructor(
             isClickable = true
         }
         empty = Ui.text(context, 15f, pal.onScrimSecondary).apply {
-            setText(R.string.app_search_no_match)
+            setText(R.string.search_no_match)
             gravity = Gravity.CENTER_HORIZONTAL
             Ui.shadow(this)
             visibility = GONE
@@ -142,7 +143,7 @@ class AppSearchView private constructor(
             textSize = 17f
             setTextColor(pal.text)
             setHintTextColor(pal.textSecondary)
-            setHint(R.string.app_search_hint)
+            setHint(R.string.search_hint)
             isSingleLine = true
             imeOptions = EditorInfo.IME_ACTION_GO or EditorInfo.IME_FLAG_NO_EXTRACT_UI
             inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
@@ -168,7 +169,7 @@ class AppSearchView private constructor(
             insets
         }
 
-        AppSearch.load(context) { list ->
+        Launchables.load(context) { list ->
             apps = list
             refresh()
         }
@@ -180,7 +181,7 @@ class AppSearchView private constructor(
         if (AppMatch.fold(query).isEmpty()) {
             resultsScroll.visibility = GONE
             spacer.visibility = VISIBLE
-            val picks = AppSearch.suggestions(apps)
+            val picks = Launchables.suggestions(apps)
             suggestionsBlock.visibility = if (picks.isEmpty()) GONE else VISIBLE
             suggestionsRow.removeAllViews()
             for (a in picks) suggestionsRow.addView(cell(a), LinearLayout.LayoutParams(0, -2, 1f))
@@ -208,7 +209,7 @@ class AppSearchView private constructor(
         background = Ui.pressable(0, dp(14).toFloat(), pal.ripple)
         setPadding(dp(2), dp(4), dp(2), dp(4))
         val icon = ImageView(context)
-        AppSearch.icon(context, a) { icon.setImageDrawable(it) }
+        Launchables.icon(context, a) { icon.setImageDrawable(it) }
         addView(icon, LinearLayout.LayoutParams(dp(52), dp(52)))
         addView(Ui.text(context, 12f, pal.text, lines = 1).apply {
             text = a.label
@@ -224,7 +225,7 @@ class AppSearchView private constructor(
         background = Ui.pressable(0, 0f, pal.ripple)
         setPadding(dp(14), dp(8), dp(14), dp(8))
         val icon = ImageView(context)
-        AppSearch.icon(context, a) { icon.setImageDrawable(it) }
+        Launchables.icon(context, a) { icon.setImageDrawable(it) }
         addView(icon, LinearLayout.LayoutParams(dp(40), dp(40)).apply { marginEnd = dp(14) })
         addView(Ui.text(context, 16f, pal.text, lines = 1).apply { text = a.label }, LinearLayout.LayoutParams(0, -2, 1f))
         setOnClickListener { open(a) }
@@ -233,7 +234,7 @@ class AppSearchView private constructor(
     private fun open(a: Launchable) {
         hideKeyboard()
         host.guarded {
-            AppSearch.launch(host.context, a)
+            Launchables.launch(host.context, a)
             host.launched()
         }
     }
@@ -251,10 +252,13 @@ class AppSearchView private constructor(
         if (closing) return
         closing = true
         hideKeyboard()
-        animate().alpha(0f).setDuration(150).withEndAction { (parent as? ViewGroup)?.removeView(this) }.start()
+        animate().alpha(0f).setDuration(150).withEndAction {
+            (parent as? ViewGroup)?.removeView(this)
+            onClosed()
+        }.start()
     }
 
-    /** What sits behind in the same window, blurred while App search is up. */
+    /** What sits behind in the same window, blurred while Search is up. */
     private val blurred = ArrayList<View>()
 
     override fun onAttachedToWindow() {

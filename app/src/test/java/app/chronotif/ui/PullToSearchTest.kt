@@ -68,7 +68,7 @@ class PullToSearchTest {
         assertEquals("The panel's opening swipe doesn't run on into search", 0, drag(120f, ready = false).opened)
         assertEquals("Swiping up isn't a pull", 0, drag(-120f).opened)
         assertEquals("A sideways swipe (a card) isn't a pull", 0, drag(30f, dxDp = 120f).opened)
-        Prefs.appSearch = false
+        Prefs.pullDownSearch = false
         val off = drag(120f)
         assertEquals(0, off.opened)
         assertFalse(off.consumed)

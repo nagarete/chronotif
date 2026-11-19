@@ -23,10 +23,10 @@ class Launchable(val label: String, internal val info: LauncherActivityInfo) {
 }
 
 /**
- * App search's data (ADR 0007): the launchable apps, read through [LauncherApps] off the main
+ * Search's data (ADR 0008): the launchable apps, read through [LauncherApps] off the main
  * thread, their badged icons, and the suggestion row built from [Prefs.lastNotified].
  */
-object AppSearch {
+object Launchables {
     private val io = Executors.newSingleThreadExecutor()
     private val main = Handler(Looper.getMainLooper())
     private val icons = LruCache<String, Drawable>(64)

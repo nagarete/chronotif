@@ -13,6 +13,8 @@ import android.view.Display
 import android.view.Gravity
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
+import android.view.ViewConfiguration
+import app.chronotif.ui.SearchActivity
 import android.view.View
 import android.view.WindowManager
 import app.chronotif.ui.Panel
@@ -22,7 +24,7 @@ import kotlin.math.abs
 
 /**
  * A slim always-available handle on the screen edge. Tap it, or swipe down/inward on it, to
- * open the panel. It is tinted with the accent colour while anything is NEW, so the attention
+ * open the panel; hold it to open Search. It is tinted with the accent colour while anything is NEW, so the attention
  * model is visible at a glance. Idle cost is one tiny window with no timers.
  */
 class EdgeHandle(service: Context) {
@@ -121,20 +123,33 @@ class EdgeHandle(service: Context) {
                     downX = e.rawX
                     downY = e.rawY
                     fired = false
+                    postDelayed(longPress, ViewConfiguration.getLongPressTimeout().toLong())
                 }
                 MotionEvent.ACTION_MOVE -> if (!fired) {
                     val dx = e.rawX - downX
                     val inward = if (right) -dx else dx
                     if (e.rawY - downY > trigger || inward > trigger) open()
+                    else if (abs(dx) > trigger || abs(e.rawY - downY) > trigger) removeCallbacks(longPress)
                 }
-                MotionEvent.ACTION_UP -> if (!fired &&
-                    abs(e.rawX - downX) < trigger && abs(e.rawY - downY) < trigger
-                ) open()
+                MotionEvent.ACTION_UP -> {
+                    removeCallbacks(longPress)
+                    if (!fired && abs(e.rawX - downX) < trigger && abs(e.rawY - downY) < trigger) open()
+                }
+                MotionEvent.ACTION_CANCEL -> removeCallbacks(longPress)
             }
             return true
         }
 
+        /** Holding the handle opens Search instead of the panel (ADR 0008). */
+        private val longPress = Runnable {
+            if (fired) return@Runnable
+            fired = true
+            performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+            runCatching { SearchActivity.open(context) }
+        }
+
         private fun open() {
+            removeCallbacks(longPress)
             fired = true
             performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
             runCatching { Panel.open(context) }

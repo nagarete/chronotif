@@ -206,12 +206,12 @@ class PanelView(
     private var swallowGesture = false
     private var openedAt = 0L
 
-    /** Pulling down at the top of the list opens App search, once the panel has finished opening. */
+    /** Pulling down at the top of the list opens Search, once the panel has finished opening. */
     private val pull = PullToSearch(
         list = scroll,
         atTop = { !scroll.canScrollVertically(-1) },
         ready = { !closing && android.os.SystemClock.uptimeMillis() - openedAt >= OPEN_ANIMATION_MS },
-        open = { AppSearchView.show(this, host) },
+        open = { SearchOverlay.show(this, host) },
     )
 
     // --- Back swipe from a screen edge. Over the home screen, MIUI turns its Back gesture off
