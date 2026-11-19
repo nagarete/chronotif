@@ -16,7 +16,12 @@ const fallback = (nightly) => ({
 
 async function github(path) {
   const res = await fetch(`https://api.github.com/repos/${REPO}/releases${path}`, {
-    headers: { Accept: "application/vnd.github+json", "User-Agent": "chronotif-website-build" },
+    headers: {
+      Accept: "application/vnd.github+json",
+      "User-Agent": "chronotif-website-build",
+      // CI passes its token to avoid the shared unauthenticated rate limit.
+      ...(process.env.GITHUB_TOKEN && { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` }),
+    },
     signal: AbortSignal.timeout(10_000),
   });
   if (!res.ok) throw new Error(`GitHub API returned ${res.status}`);

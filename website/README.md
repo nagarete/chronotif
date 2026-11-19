@@ -57,7 +57,7 @@ headless Chromium (set `CHROME=/path/to/chrome` if `chromium` isn't on your `PAT
 
 ## Download links
 
-*Download stable* links to the APK from GitHub's latest stable release, currently v0.2.5.
+*Download stable* links to the APK from GitHub's latest stable release.
 *Download nightly* links to the newest `nightly-<version>-<build>` APK, ordered by version
 and build number. Both buttons appear at the top and bottom of the page. Nightly release
 notes explain the changes still being tested.
@@ -65,7 +65,8 @@ notes explain the changes still being tested.
 `vite.config.js` resolves the links at build time from GitHub's public API. The stable tag,
 file name and size come from that release. Visitors' browsers never call GitHub's API.
 
-- Rebuild and redeploy after publishing a release or changing the stable release.
+- CI redeploys the site after every published release (stable or nightly). See *Deployment*.
+  Redeploy by hand after changing which release is marked latest on GitHub.
 - If GitHub can't be reached, or with `CHRONOTIF_OFFLINE=1`, buttons link to the stable and
   nightly release pages. The build never guesses a download URL from an unpublished version.
 - The build log prints the stable and nightly download URLs it selected.
@@ -95,6 +96,13 @@ Any static host works. Configure it with:
 
 The existing Cloudflare Worker and custom domains are configured in `wrangler.jsonc`.
 With Cloudflare credentials available, `npm run deploy` builds and publishes the site.
+
+The `website` job in `.github/workflows/build.yml` runs `npm run deploy` from `main` after the
+build job publishes a release, so the download buttons follow GitHub. It needs two repository
+secrets and is skipped until both are set:
+
+- `CLOUDFLARE_API_TOKEN`: a token from the *Edit Cloudflare Workers* template.
+- `CLOUDFLARE_ACCOUNT_ID`: the account that owns the `chronotif-website` Worker.
 
 ## Keeping it accurate
 
