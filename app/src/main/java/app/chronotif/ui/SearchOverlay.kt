@@ -28,12 +28,18 @@ import android.window.OnBackInvokedDispatcher
 import app.chronotif.Launchables
 import app.chronotif.Launchable
 import app.chronotif.R
+import app.chronotif.Prefs
+import app.chronotif.SettingsPages
+import app.chronotif.core.Answer
 import app.chronotif.core.AppMatch
+import app.chronotif.core.Numbers
+import app.chronotif.core.WebQuery
 
 /**
- * Search (ADR 0008), laid over the panel, the lock-screen view or its own window: the apps that notified most
- * recently, and a field that finds apps by name. It never searches notifications. Opening an app
- * goes through [NotifList.Host.guarded], so on the lock screen it unlocks first.
+ * Search (ADR 0008), laid over the panel, the lock-screen view or its own window. Before typing:
+ * the apps that notified most recently. Typing: an answer (math, units, time in a place), apps,
+ * Settings pages and, last, the web. It never searches notifications. Opening anything goes
+ * through [NotifList.Host.guarded], so on the lock screen it unlocks first; copying an answer doesn't.
  */
 @SuppressLint("ViewConstructor")
 class SearchOverlay private constructor(
@@ -58,8 +64,9 @@ class SearchOverlay private constructor(
     private val suggestionsBlock = LinearLayout(context)
     private val suggestionsRow = LinearLayout(context)
     private val resultsScroll = ScrollView(context)
+    /** Answer, apps, Settings pages and the web row, each its own card, in that order. */
     private val results = LinearLayout(context)
-    private val empty: TextView
+    private val numbers = Numbers(context.resources.configuration.locales[0])
     private val spacer = View(context)
     private val field = EditText(context)
     private val fieldBox = LinearLayout(context)
@@ -95,18 +102,7 @@ class SearchOverlay private constructor(
         suggestionsBlock.visibility = GONE
         column.addView(suggestionsBlock, Ui.lp())
 
-        results.apply {
-            orientation = LinearLayout.VERTICAL
-            background = Ui.rounded(pal.card, dp(22).toFloat())
-            Ui.clipRounded(this, dp(22).toFloat())
-            isClickable = true
-        }
-        empty = Ui.text(context, 15f, pal.onScrimSecondary).apply {
-            setText(R.string.search_no_match)
-            gravity = Gravity.CENTER_HORIZONTAL
-            Ui.shadow(this)
-            visibility = GONE
-        }
+        results.orientation = LinearLayout.VERTICAL
         resultsScroll.apply {
             isVerticalScrollBarEnabled = false
             isFillViewport = true
@@ -116,7 +112,6 @@ class SearchOverlay private constructor(
                 // Taps below the results close it, as on the backdrop.
                 setOnClickListener { close() }
                 addView(results, Ui.lp())
-                addView(empty, Ui.lp().apply { topMargin = dp(24) })
             }, LayoutParams(-1, -2))
             visibility = GONE
         }
@@ -152,10 +147,13 @@ class SearchOverlay private constructor(
                 override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
                 override fun afterTextChanged(s: Editable?) = refresh()
             })
-            // Go opens the top result.
+            // Go opens the top app, or goes to the web when no app matches.
             setOnEditorActionListener { _, id, _ ->
                 if (id != EditorInfo.IME_ACTION_GO) return@setOnEditorActionListener false
-                AppMatch.search(apps, text.toString()) { it.label }.firstOrNull()?.let(::open)
+                val q = text.toString()
+                if (AppMatch.fold(q).isNotEmpty()) {
+                    AppMatch.search(apps, q) { it.label }.firstOrNull()?.let(::open) ?: openWeb(q)
+                }
                 true
             }
         }
@@ -194,12 +192,141 @@ class SearchOverlay private constructor(
         suggestionsBlock.visibility = GONE
         resultsScroll.visibility = VISIBLE
         spacer.visibility = GONE
-        val found = AppMatch.search(apps, query) { it.label }
         results.removeAllViews()
-        results.visibility = if (found.isEmpty()) GONE else VISIBLE
-        empty.visibility = if (found.isEmpty()) VISIBLE else GONE
-        for (a in found) results.addView(row(a), Ui.lp())
+        Answer.of(query, numbers)?.let { results.addView(answerCard(it), cardLp()) }
+        val found = AppMatch.search(apps, query) { it.label }
+        if (found.isNotEmpty()) results.addView(card(R.string.search_apps, found.map(::row)), cardLp())
+        val pages = SettingsPages.search(context, query)
+        if (pages.isNotEmpty()) results.addView(card(R.string.search_settings, pages.map(::settingsRow)), cardLp())
+        results.addView(card(null, listOf(webRow(query))), cardLp())
         resultsScroll.scrollTo(0, 0)
+    }
+
+    private fun cardLp() = Ui.lp().apply { bottomMargin = dp(10) }
+
+    /** A rounded card with an optional section title over its rows. */
+    private fun card(title: Int?, rows: List<View>): View = LinearLayout(context).apply {
+        orientation = LinearLayout.VERTICAL
+        background = Ui.rounded(pal.card, dp(22).toFloat())
+        Ui.clipRounded(this, dp(22).toFloat())
+        isClickable = true // Taps between rows don't fall through and close.
+        if (title != null) addView(Ui.text(context, 13f, pal.textSecondary, bold = true, lines = 1).apply {
+            setText(title)
+            setPadding(dp(16), dp(12), dp(16), dp(2))
+        })
+        rows.forEach { addView(it, Ui.lp()) }
+    }
+
+    /** The answer: big result, with what it answers under it. Tapping copies the number. */
+    private fun answerCard(a: Answer): View {
+        val (big, small, copy) = when (a) {
+            is Answer.Math -> Triple(
+                "= " + numbers.format(a.value, Answer.MATH_DIGITS),
+                field.text.toString().trim(),
+                numbers.plain(a.value, Answer.MATH_DIGITS),
+            )
+            is Answer.Converted -> a.conversion.let { c ->
+                Triple(
+                    numbers.format(c.result, Answer.UNIT_DIGITS) + " " + c.to.symbol,
+                    numbers.format(c.amount, Answer.UNIT_DIGITS) + " " + c.from.symbol + " =",
+                    numbers.plain(c.result, Answer.UNIT_DIGITS),
+                )
+            }
+            is Answer.Time -> {
+                val now = java.time.ZonedDateTime.now(a.place.zone)
+                val time = android.text.format.DateFormat.getTimeFormat(context).apply {
+                    timeZone = java.util.TimeZone.getTimeZone(a.place.zone)
+                }.format(java.util.Date())
+                val day = now.dayOfWeek.getDisplayName(java.time.format.TextStyle.FULL, numbers.locale)
+                val here = java.time.ZonedDateTime.now().offset.totalSeconds
+                Triple(time, listOf(a.place.name, day, timeDifference(Answer.minutesAhead(here, now.offset.totalSeconds))).joinToString(" · "), time)
+            }
+        }
+        return LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            background = Ui.pressable(pal.card, dp(22).toFloat(), pal.ripple)
+            setPadding(dp(18), dp(14), dp(18), dp(14))
+            addView(Ui.text(context, 13f, pal.textSecondary, lines = 2).apply { text = small })
+            addView(Ui.text(context, 30f, pal.text, bold = true, lines = 2).apply {
+                text = big
+                setTextIsSelectable(false)
+            }, Ui.lp().apply { topMargin = dp(4) })
+            addView(Ui.text(context, 12f, pal.textSecondary, lines = 1).apply { setText(R.string.search_tap_to_copy) },
+                Ui.lp().apply { topMargin = dp(6) })
+            setOnClickListener { copy(copy) }
+        }
+    }
+
+    private fun timeDifference(minutes: Int): String {
+        if (minutes == 0) return context.getString(R.string.search_time_same)
+        val m = Math.abs(minutes)
+        val amount = when {
+            m % 60 == 0 -> context.getString(R.string.search_hours, m / 60)
+            m < 60 -> context.getString(R.string.search_minutes, m)
+            else -> context.getString(R.string.search_hours_minutes, m / 60, m % 60)
+        }
+        return context.getString(if (minutes > 0) R.string.search_time_ahead else R.string.search_time_behind, amount)
+    }
+
+    /** Copying a result reveals nothing, so it works on the lock screen too. */
+    private fun copy(text: String) {
+        val cm = context.getSystemService(android.content.ClipboardManager::class.java)
+        cm.setPrimaryClip(android.content.ClipData.newPlainText(text, text))
+        // Android 13 shows its own confirmation.
+        if (Build.VERSION.SDK_INT < 33) android.widget.Toast.makeText(context, R.string.search_copied, android.widget.Toast.LENGTH_SHORT).show()
+    }
+
+    private fun settingsRow(p: SettingsPages.Page): View = LinearLayout(context).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        background = Ui.pressable(0, 0f, pal.ripple)
+        setPadding(dp(14), dp(8), dp(14), dp(8))
+        addView(ImageView(context).apply {
+            setImageResource(R.drawable.ic_settings)
+            imageTintList = ColorStateList.valueOf(pal.textSecondary)
+            scaleType = ImageView.ScaleType.CENTER
+        }, LinearLayout.LayoutParams(dp(40), dp(40)).apply { marginEnd = dp(14) })
+        addView(Ui.text(context, 16f, pal.text, lines = 1).apply { setText(p.label) }, LinearLayout.LayoutParams(0, -2, 1f))
+        setOnClickListener {
+            hideKeyboard()
+            host.guarded {
+                SettingsPages.open(host.context, p)
+                host.launched()
+            }
+        }
+    }
+
+    /** The last row: an address opens directly, anything else is searched with the chosen engine. */
+    private fun webRow(query: String): View = LinearLayout(context).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        background = Ui.pressable(0, 0f, pal.ripple)
+        setPadding(dp(14), dp(10), dp(14), dp(10))
+        addView(ImageView(context).apply {
+            setImageResource(R.drawable.ic_search)
+            imageTintList = ColorStateList.valueOf(pal.textSecondary)
+            scaleType = ImageView.ScaleType.CENTER
+        }, LinearLayout.LayoutParams(dp(40), dp(40)).apply { marginEnd = dp(14) })
+        val label = if (WebQuery.isAddress(query)) context.getString(R.string.search_open_address, query.trim())
+        else context.getString(R.string.search_web, query.trim())
+        addView(Ui.text(context, 16f, pal.text, lines = 2).apply { text = label }, LinearLayout.LayoutParams(0, -2, 1f))
+        setOnClickListener { openWeb(query) }
+    }
+
+    private fun openWeb(query: String) {
+        val engine = WebQuery.Engine.entries.getOrElse(Prefs.searchEngine) { WebQuery.Engine.GOOGLE }
+        val url = if (WebQuery.isAddress(query)) WebQuery.address(query) else WebQuery.search(engine, query)
+        hideKeyboard()
+        host.guarded {
+            runCatching {
+                host.context.startActivity(
+                    android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
+                        .addCategory(android.content.Intent.CATEGORY_BROWSABLE)
+                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                )
+            }
+            host.launched()
+        }
     }
 
     /** An icon with its name under it, for the suggestion row. */

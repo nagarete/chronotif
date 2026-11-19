@@ -40,4 +40,28 @@ class SearchActivityTest {
         assertTrue("Closing Search closes its window", activity.isFinishing)
         controller.destroy()
     }
+
+    private fun texts(v: android.view.View): List<String> = when (v) {
+        is android.widget.EditText -> emptyList()
+        is android.widget.TextView -> listOf(v.text.toString())
+        is ViewGroup -> (0 until v.childCount).flatMap { texts(v.getChildAt(it)) }
+        else -> emptyList()
+    }
+
+    @Test fun typingShowsTheAnswerFirstAndTheWebLast() {
+        val controller = Robolectric.buildActivity(SearchActivity::class.java, SearchActivity.intent(context)).setup()
+        shadowOf(Looper.getMainLooper()).idle()
+        val search = overlays(controller.get().window.decorView as ViewGroup).single()
+        val field = generateSequence(listOf<android.view.View>(search)) { level ->
+            level.flatMap { v -> if (v is ViewGroup) (0 until v.childCount).map(v::getChildAt) else emptyList() }.ifEmpty { null }
+        }.flatten().filterIsInstance<android.widget.EditText>().single()
+        field.setText("12*7.5+3")
+        shadowOf(Looper.getMainLooper()).idle()
+        val shown = texts(search).filter { it.isNotBlank() }
+        val answer = shown.indexOf("= 93")
+        val web = shown.indexOfFirst { it.startsWith("Search the web for") }
+        assertTrue("The answer shows: $shown", answer >= 0)
+        assertTrue("The web row is last: $shown", web > answer && web == shown.lastIndex)
+        controller.destroy()
+    }
 }

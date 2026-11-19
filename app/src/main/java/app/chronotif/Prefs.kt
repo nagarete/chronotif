@@ -114,6 +114,11 @@ object Prefs {
         get() = sp.getBoolean("app_search", true)
         set(v) = sp.edit().putBoolean("app_search", v).apply()
 
+    /** Search's web row: an index into [app.chronotif.core.WebQuery.Engine], Google by default. */
+    var searchEngine: Int
+        get() = sp.getInt("search_engine", 0)
+        set(v) = sp.edit().putInt("search_engine", v).apply()
+
     /**
      * When each app last notified, for Search's suggestion row: app id (package|user) to
      * arrival time. Times only, never content, and only the most recent few apps are kept.

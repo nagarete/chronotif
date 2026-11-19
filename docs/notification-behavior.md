@@ -69,9 +69,15 @@ Search opens without the accessibility service, so it works alongside banking ap
 
 Pulling down with the list at its top, on the Panel or the lock-screen view, opens Search. On the Panel the pull has to start after the Panel has finished opening, so the status-bar swipe that opened it can't run on into search. A pull shorter than about 80dp springs back. The field gets focus and the keyboard comes up.
 
-Search finds apps, never notifications. Before you type, it shows a row of up to four apps, the ones that notified most recently, newest first, once each. That counts an app whose notification has since been dismissed. Calls, Media players, Running and Chronotif itself don't count. Typing hides the row and lists apps whose name starts with the query, then those where a later word starts with it ("music" finds YouTube Music), then those containing it anywhere ("tok" finds TikTok), alphabetical within each. Case and accents don't matter. A work-profile or dual copy of an app is its own entry, with the profile's badge.
+Search never searches notifications. Before you type, it shows a row of up to four apps, the ones that notified most recently, newest first, once each. That counts an app whose notification has since been dismissed. Calls, Media players, Running and Chronotif itself don't count. Typing hides the row and shows, top to bottom: an answer, apps, Settings pages, and a web row.
 
-Results show while locked. Tapping an app on the lock screen asks to unlock, then opens it. Search shows no notifications, so opening it is never a check. Back, a tap on empty space, or a swipe up closes Search. On the lock-screen view, closing goes back to the notifications rather than unlocking. *Settings → Panel → Pull down for Search* turns the pull-down off; the other ways in stay.
+The answer is one card for quick math (`12*7.5+3`, `200 + 15%`), a unit conversion (`5 km in mi`, `30 c` goes to °F), or the time in a city or one-time-zone country (`time in tokyo`, `bali time`). Numbers are read and written the way the phone's language does: in English `50,000` is fifty thousand, in Indonesian `50.000`. Math shows up to 10 significant digits and conversions 6, with trailing zeros dropped. Tapping the card copies the number without grouping, also on the lock screen, since a result reveals nothing.
+
+Apps are listed by name: those whose name starts with the query, then those where a later word starts with it ("music" finds YouTube Music), then those containing it anywhere ("tok" finds TikTok), alphabetical within each. Case and accents don't matter. A work-profile or dual copy of an app is its own entry, with the profile's badge.
+
+Settings pages come from a fixed list of the pages Android lets apps open, matched by name and common words ("wifi", "brightness", "hotspot"), at most four. The web row is always last: text that looks like an address (`klikbca.com`) opens directly in the default browser, anything else is searched there with the engine chosen in *Settings → Search* (Google by default). Go on the keyboard opens the top app, or the web when no app matches. Chronotif sends nothing itself.
+
+Results show while locked. Tapping an app, a Settings page or the web row on the lock screen asks to unlock, then opens it. Search shows no notifications, so opening it is never a check. Back, a tap on empty space, or a swipe up closes Search. On the lock-screen view, closing goes back to the notifications rather than unlocking. *Settings → Search → Pull down for Search* turns the pull-down off; the other ways in stay.
 
 ## Verification cases
 
@@ -97,6 +103,8 @@ Results show while locked. Tapping an app on the lock screen asks to unlock, the
 - With BCA open and the accessibility service off, hold the edge handle. Search opens over BCA; Back returns to it.
 - Add the Search tile and the Search widget. Each opens Search with the keyboard up, also from the lock screen, where tapping an app asks to unlock first.
 - Long-press Chronotif's icon and tap Search. Search opens.
+- Type `12*7.5+3`: the answer card shows "= 93"; tap it and paste somewhere: `93`. Type `5 km in mi`, `30 c`, `time in tokyo`: each shows its answer above the apps.
+- Type `wifi`: Wi-Fi is under Settings. Type `klikbca.com`: the last row opens it. Type `nasi goreng`: the last row searches it in the default browser.
 
 ## Automated verification
 
