@@ -164,13 +164,6 @@ q {
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
-.label span {
-  padding: 0.15rem 0.55rem;
-  border-radius: 999px;
-  background: var(--accent);
-  color: #fff;
-  letter-spacing: 0.06em;
-}
 
 .lede {
   max-width: 36rem;
