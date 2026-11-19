@@ -16,7 +16,11 @@ stay accessible without competing for the same attention.
 
 
 
-https://github.com/user-attachments/assets/a41733a2-c261-46bb-b3b3-9c979e62cc8f
+
+
+https://github.com/user-attachments/assets/9d86370d-1485-4374-9aa4-5f64a284c57f
+
+
 
 
 
