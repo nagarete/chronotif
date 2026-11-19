@@ -37,7 +37,7 @@ import app.chronotif.R
  * front and centre, EARLIER is folded behind a pill. Content follows the lock-screen privacy
  * rules, and anything beyond dismissing goes through the system unlock first. Tap outside a
  * card or swipe up (or unlock with fingerprint/face) to continue to the phone; back reveals the
- * system lock screen. Pulling down opens App search. Left alone, the display sleeps after the keyguard's short timeout, with
+ * system lock screen. Pulling down opens Search. Left alone, the display sleeps after the keyguard's short timeout, with
  * Chronotif still showing (see [useKeyguardTimeout]).
  */
 class LockActivity : Activity(), NotifList.Host {
@@ -227,16 +227,16 @@ class LockActivity : Activity(), NotifList.Host {
         })
     }
 
-    // --- Swipe up anywhere (once the list can't scroll further) to unlock; pull down at the top for App search.
+    // --- Swipe up anywhere (once the list can't scroll further) to unlock; pull down at the top for Search.
 
     private var downY = 0f
     private var atBottomOnDown = false
     private var tracker: VelocityTracker? = null
 
-    /** Pulling down at the top of the list opens App search; opening an app from it unlocks first. */
+    /** Pulling down at the top of the list opens Search; opening an app from it unlocks first. */
     private val pull by lazy {
         PullToSearch(list = scroll, atTop = { !scroll.canScrollVertically(-1) }) {
-            AppSearchView.show(scroll, this)
+            SearchOverlay.show(scroll, this)
         }
     }
 

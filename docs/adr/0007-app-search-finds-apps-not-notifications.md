@@ -1,5 +1,7 @@
 # App search finds apps, not notifications, and shows results while locked
 
+Superseded by ADR 0008.
+
 The user asked for a pull-down search like the iPhone's lock-screen Spotlight. We built App search: pulled down from the top of the Panel or the lock-screen view, it finds apps by name and suggests the four apps that notified most recently. It never searches notifications. Chronotif's job is to show notifications in time order, and those are already all on screen; what a pull-down saves is the unlock-then-find-the-app step. The suggestions come from Chronotif's own record of which apps notified, so no usage-access permission is needed, and listing apps uses the package visibility Chronotif already has. Results show while locked, and tapping one unlocks and then launches it.
 
 ## Considered Options

@@ -14,6 +14,7 @@ class App : Application() {
         Prefs.init(this)
         DemoMode.init(this)
         Updater.sync(this)
+        SearchShortcut.publish(this)
         registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
             override fun onActivityStarted(a: Activity) {
                 if (a is PanelActivity || a is LockActivity) StatusBarSwipe.ownUiVisible(true)

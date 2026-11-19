@@ -5,7 +5,7 @@ package app.chronotif.core
 import java.text.Normalizer
 
 /**
- * App search's pure rules (ADR 0007): how a typed query matches app names, and which apps the
+ * Search's pure rules (ADR 0008): how a typed query matches app names, and which apps the
  * suggestion row shows. Apps aren't events, so results rank by how well the name matches, not by time.
  */
 object AppMatch {

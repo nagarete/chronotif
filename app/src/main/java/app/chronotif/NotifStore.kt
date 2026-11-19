@@ -151,7 +151,7 @@ object NotifStore {
         entries.remove(sbn.key)
         val e = Entry(sbn, rankingOf(sbn.key, map), alertTime)
         entries[sbn.key] = e
-        // App search suggests the apps that notified most recently; calls, players, Running and
+        // Search suggests the apps that notified most recently; calls, players, Running and
         // Chronotif itself aren't suggestions.
         if (e.kind == Kind.NOTIFICATION && e.pkg != BuildConfig.APPLICATION_ID) Prefs.notified(e.appId, alertTime)
     }
