@@ -307,6 +307,7 @@ class SetupActivity : Activity() {
         toggle(R.string.header_weekday, null, { Prefs.headerWeekday }) { Prefs.headerWeekday = it }
         toggle(R.string.header_year, null, { Prefs.headerYear }) { Prefs.headerYear = it }
         toggle(R.string.header_short_names, null, { Prefs.headerShortNames }) { Prefs.headerShortNames = it }
+        toggle(R.string.header_settings, null, { Prefs.headerSettings }) { Prefs.headerSettings = it }
         refresh()
     }
 
