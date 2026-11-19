@@ -5,6 +5,7 @@ package app.chronotif
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import android.telephony.TelephonyManager
 import app.chronotif.core.Money
 import java.net.HttpURLConnection
@@ -20,6 +21,7 @@ import kotlin.concurrent.thread
  * file for everyone.
  */
 object ExchangeRates {
+    private const val TAG = "ExchangeRates"
     private const val SOURCE = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml"
     private val MAX_AGE_MS = TimeUnit.DAYS.toMillis(1)
     /** After a failed download, wait this long before trying again, so typing doesn't retry per key. */
@@ -45,7 +47,7 @@ object ExchangeRates {
         if (now - failedAt < RETRY_MS) return
         fetching = true
         thread(name = "exchange-rates") {
-            val got = runCatching { download() }.getOrNull()
+            val got = runCatching { download() }.onFailure { Log.w(TAG, "Couldn't download exchange rates", it) }.getOrNull()
             main.post {
                 fetching = false
                 if (got != null) {
@@ -66,7 +68,10 @@ object ExchangeRates {
         c.readTimeout = 15_000
         c.setRequestProperty("User-Agent", "Chronotif/${BuildConfig.VERSION_NAME}")
         return try {
-            if (c.responseCode != HttpURLConnection.HTTP_OK) null
+            if (c.responseCode != HttpURLConnection.HTTP_OK) {
+                Log.w(TAG, "Exchange rates: HTTP ${c.responseCode}")
+                null
+            }
             else Money.parseEcb(c.inputStream.bufferedReader().use { it.readText() })
         } finally {
             c.disconnect()
