@@ -209,7 +209,7 @@ class SearchOverlay private constructor(
         background = Ui.pressable(0, dp(14).toFloat(), pal.ripple)
         setPadding(dp(2), dp(4), dp(2), dp(4))
         val icon = ImageView(context)
-        Launchables.icon(context, a) { icon.setImageDrawable(it) }
+        Launchables.icon(context, a) { icon.setImageDrawable(RoundedIcon(it)) }
         addView(icon, LinearLayout.LayoutParams(dp(52), dp(52)))
         addView(Ui.text(context, 12f, pal.text, lines = 1).apply {
             text = a.label
@@ -225,7 +225,7 @@ class SearchOverlay private constructor(
         background = Ui.pressable(0, 0f, pal.ripple)
         setPadding(dp(14), dp(8), dp(14), dp(8))
         val icon = ImageView(context)
-        Launchables.icon(context, a) { icon.setImageDrawable(it) }
+        Launchables.icon(context, a) { icon.setImageDrawable(RoundedIcon(it)) }
         addView(icon, LinearLayout.LayoutParams(dp(40), dp(40)).apply { marginEnd = dp(14) })
         addView(Ui.text(context, 16f, pal.text, lines = 1).apply { text = a.label }, LinearLayout.LayoutParams(0, -2, 1f))
         setOnClickListener { open(a) }
