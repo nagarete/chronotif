@@ -129,6 +129,20 @@ object Prefs {
         get() = sp.getBoolean("search_calls", false)
         set(v) = sp.edit().putBoolean("search_calls", v).apply()
 
+    /** Search converts currencies with the ECB's daily rates. Off until turned on: it's a download. */
+    var currencyRates: Boolean
+        get() = sp.getBoolean("currency_rates", false)
+        set(v) = sp.edit().putBoolean("currency_rates", v).apply()
+
+    /** The last downloaded rates, in [app.chronotif.core.Money.encode]'s form. */
+    var exchangeRates: String?
+        get() = sp.getString("exchange_rates", null)
+        set(v) = sp.edit().putString("exchange_rates", v).apply()
+
+    var exchangeRatesFetchedAt: Long
+        get() = sp.getLong("exchange_rates_at", 0L)
+        set(v) = sp.edit().putLong("exchange_rates_at", v).apply()
+
     /** Search finds calendar events. Off until turned on, which asks for the Calendar permission. */
     var searchCalendar: Boolean
         get() = sp.getBoolean("search_calendar", false)

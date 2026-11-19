@@ -130,6 +130,13 @@
     <string name="search_find_calendar">Find calendar events</string>
     <string name="search_find_calendar_desc">Search lists matching events from the past month to a year ahead. Events are read only on this phone, and hidden while it\'s locked.</string>
     <string name="search_permission_denied">Allow the permission in Chronotif\'s app info to turn this on.</string>
+    <string name="search_currency_off_title">Convert currencies</string>
+    <string name="search_currency_off_desc">Tap to turn on. Chronotif downloads the European Central Bank\'s daily rates when you type a currency and newer ones are out. Nothing you type is sent.</string>
+    <string name="search_currency_loading">Getting the European Central Bank\'s rates…</string>
+    <string name="search_currency_failed">Couldn\'t get exchange rates. Check your connection and type again.</string>
+    <string name="search_currency_note">European Central Bank rate, %1$s · Tap to copy</string>
+    <string name="search_currency_rates">Currency rates</string>
+    <string name="search_currency_rates_desc">Search converts currencies (100 usd, $20, rp 50.000 to sgd) with the European Central Bank\'s daily reference rates. They\'re downloaded only when you type a currency and the bank has published newer ones than you have, which it does on working days around 16:00 in Frankfurt. Nothing you type is sent.</string>
     <string name="search_engine">Web search engine</string>
     <string name="search_engine_google">Google</string>
     <string name="search_engine_duckduckgo">DuckDuckGo</string>
@@ -187,7 +194,7 @@
     <string name="lock_privacy_desc">Always hide content on the lock screen. When off, Chronotif follows the system setting and each app\'s privacy choice. Opening, replying and actions always require unlocking.</string>
 
     <string name="setup_privacy">Privacy</string>
-    <string name="privacy_body">No accounts, no analytics. Notifications never leave this device. Only the time of your last check and these settings are stored. The only network use is the optional update check below, which downloads from GitHub and sends nothing.</string>
+    <string name="privacy_body">No accounts, no analytics. Notifications never leave this device. Only the time of your last check and these settings are stored. The only network use is the optional update check below, which downloads from GitHub, and Search\'s optional currency rates, downloaded from the European Central Bank. Neither sends anything about you.</string>
 
     <string name="setup_updates">Updates</string>
     <string name="update_auto">Update automatically</string>

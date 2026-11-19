@@ -68,6 +68,18 @@ class Numbers(val locale: Locale) {
         }.format(rounded)
     }
 
+    /** Money: always [fraction] decimals ("12.50"), grouped ("1,250,000"). */
+    fun money(value: Double, fraction: Int): String =
+        (NumberFormat.getNumberInstance(locale) as DecimalFormat).apply {
+            isGroupingUsed = true
+            minimumFractionDigits = fraction
+            maximumFractionDigits = fraction
+            roundingMode = RoundingMode.HALF_EVEN
+        }.format(value)
+
+    fun plainMoney(value: Double, fraction: Int): String =
+        money(value, fraction).filter { it != group && it != NBSP && it != NNBSP }
+
     /** The same number for pasting: no grouping, this language's decimal point. */
     fun plain(value: Double, significant: Int, maxFraction: Int = 20): String =
         format(value, significant, maxFraction).filter { it != group && it != NBSP && it != NNBSP }

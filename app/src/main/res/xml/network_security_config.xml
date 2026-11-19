@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!--
+  Search's currency rates come from www.ecb.europa.eu, whose certificate chains to Sectigo Public
+  Server Authentication Root E46 (2021). Older Androids (Android 12, for one) don't ship that root, so the
+  download failed there. The root is bundled and trusted for this one domain only; every other connection
+  uses the system's roots as before.
+-->
+<network-security-config>
+    <domain-config>
+        <domain includeSubdomains="false">www.ecb.europa.eu</domain>
+        <trust-anchors>
+            <certificates src="system" />
+            <!-- SHA-256 C9:0F:26:F0:FB:1B:40:18:B2:22:27:51:9B:5C:A2:B5:3E:2C:A5:B3:BE:5C:F1:8E:FE:1B:EF:47:38:0C:53:83, expires 2046. -->
+            <certificates src="@raw/sectigo_server_root_e46" />
+        </trust-anchors>
+    </domain-config>
+</network-security-config>

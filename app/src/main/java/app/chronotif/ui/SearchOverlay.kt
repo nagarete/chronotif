@@ -27,6 +27,7 @@ import android.window.OnBackInvokedCallback
 import android.window.OnBackInvokedDispatcher
 import app.chronotif.CalendarEvent
 import app.chronotif.Contact
+import app.chronotif.ExchangeRates
 import app.chronotif.Launchables
 import app.chronotif.Launchable
 import app.chronotif.PersonalData
@@ -35,6 +36,7 @@ import app.chronotif.Prefs
 import app.chronotif.SettingsPages
 import app.chronotif.core.Answer
 import app.chronotif.core.AppMatch
+import app.chronotif.core.Money
 import app.chronotif.core.Numbers
 import app.chronotif.core.PersonalMatch
 import app.chronotif.core.WebQuery
@@ -220,7 +222,10 @@ class SearchOverlay private constructor(
         if (query != shownQuery) allContacts = false
         shownQuery = query
         results.removeAllViews()
-        Answer.of(query, numbers)?.let { results.addView(answerCard(it), cardLp()) }
+        Answer.of(query, numbers)?.let { a ->
+            val card = if (a is Answer.Currency) currencyCard(a.query) else answerCard(a)
+            card?.let { results.addView(it, cardLp()) }
+        }
         val found = AppMatch.search(apps, query) { it.label }
         if (found.isNotEmpty()) results.addView(card(R.string.search_apps, found.map(::row)), cardLp())
         // Who you know and where you'll be stay private until the phone is unlocked.
@@ -258,7 +263,7 @@ class SearchOverlay private constructor(
     }
 
     /** The answer: big result, with what it answers under it. Tapping copies the number. */
-    private fun answerCard(a: Answer): View {
+    private fun answerCard(a: Answer): View? {
         val (big, small, copy) = when (a) {
             is Answer.Math -> Triple(
                 "= " + numbers.format(a.value, Answer.MATH_DIGITS),
@@ -281,20 +286,52 @@ class SearchOverlay private constructor(
                 val here = java.time.ZonedDateTime.now().offset.totalSeconds
                 Triple(time, listOf(a.place.name, day, timeDifference(Answer.minutesAhead(here, now.offset.totalSeconds))).joinToString(" · "), time)
             }
+            is Answer.Currency -> return currencyCard(a.query)
         }
-        return LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            background = Ui.pressable(pal.card, dp(22).toFloat(), pal.ripple)
-            setPadding(dp(18), dp(14), dp(18), dp(14))
-            addView(Ui.text(context, 13f, pal.textSecondary, lines = 2).apply { text = small })
-            addView(Ui.text(context, 30f, pal.text, bold = true, lines = 2).apply {
-                text = big
-                setTextIsSelectable(false)
-            }, Ui.lp().apply { topMargin = dp(4) })
-            addView(Ui.text(context, 12f, pal.textSecondary, lines = 1).apply { setText(R.string.search_tap_to_copy) },
-                Ui.lp().apply { topMargin = dp(6) })
-            setOnClickListener { copy(copy) }
+        return resultCard(small, big, context.getString(R.string.search_tap_to_copy)) { copy(copy) }
+    }
+
+    private fun resultCard(small: String, big: String, note: String, onClick: () -> Unit): View = LinearLayout(context).apply {
+        orientation = LinearLayout.VERTICAL
+        background = Ui.pressable(pal.card, dp(22).toFloat(), pal.ripple)
+        setPadding(dp(18), dp(14), dp(18), dp(14))
+        if (small.isNotEmpty()) addView(Ui.text(context, 13f, pal.textSecondary, lines = 2).apply { text = small })
+        addView(Ui.text(context, if (big.length > 24) 20f else 30f, pal.text, bold = true, lines = 3).apply {
+            text = big
+            setTextIsSelectable(false)
+        }, Ui.lp().apply { topMargin = dp(4) })
+        addView(Ui.text(context, 12f, pal.textSecondary, lines = 2).apply { text = note },
+            Ui.lp().apply { topMargin = dp(6) })
+        setOnClickListener { onClick() }
+    }
+
+    /**
+     * Currency (ADR 0008). Off, the card offers to turn on the daily rates; on, it converts with
+     * the saved rates and fetches newer ones in the background once the ECB should have published them.
+     */
+    private fun currencyCard(q: Money.Query): View? {
+        val to = Money.target(q, ExchangeRates.localCurrency(context))
+        if (q.from == to) return null
+        val amount = numbers.money(q.amount, Money.fractionDigits(q.from)) + " " + q.from + " ="
+        if (!Prefs.currencyRates) {
+            return resultCard(amount, context.getString(R.string.search_currency_off_title),
+                context.getString(R.string.search_currency_off_desc)) {
+                Prefs.currencyRates = true
+                ExchangeRates.refreshIfStale(::refresh)
+                refresh()
+            }
         }
+        ExchangeRates.refreshIfStale(::refresh)
+        val rates = ExchangeRates.rates
+        if (rates == null) {
+            val state = if (ExchangeRates.failed) R.string.search_currency_failed else R.string.search_currency_loading
+            return resultCard(amount, "… $to", context.getString(state)) {}
+        }
+        val result = rates.convert(q.amount, q.from, to) ?: return null
+        val digits = Money.fractionDigits(to)
+        val date = rates.date.format(java.time.format.DateTimeFormatter.ofLocalizedDate(java.time.format.FormatStyle.MEDIUM).withLocale(numbers.locale))
+        return resultCard(amount, numbers.money(result, digits) + " " + to,
+            context.getString(R.string.search_currency_note, date)) { copy(numbers.plainMoney(result, digits)) }
     }
 
     private fun timeDifference(minutes: Int): String {

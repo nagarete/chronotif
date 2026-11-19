@@ -137,8 +137,9 @@ Settings tile. The service subscribes to no accessibility events and can't retri
 other apps' screen content; notification content comes separately through notification access.
 
 The app has no third-party dependencies and responds to system events without polling,
-a foreground service, or wakelocks. Its only network use is the optional GitHub updater,
-which is off by default.
+a foreground service, or wakelocks. Its only network use is the optional GitHub updater and
+Search's optional currency rates from the European Central Bank, both off by default and
+download-only.
 
 ## Build from source
 
