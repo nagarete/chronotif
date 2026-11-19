@@ -303,6 +303,15 @@ To build that nightly locally:
 ./gradlew testDebugUnitTest lintDebug assembleRelease -PnightlyBuild=1
 ```
 
+Release notes for chronotif.com/releases live in `website/src/releases.json`, written for people
+using the app, not as a list of pull requests. `next` describes the coming stable: add to it in
+the same pull request as a user-visible change that lands on main. Before tagging stable, move
+`next` into the top of `stable` with that day's date (`YYYY-MM-DD`, UTC) and remove `next` until
+there's something new to say. The website redeploys after each published release, so the notes
+must be on main when the tag is pushed. A release video goes in `website/public/video/` as
+`release-<version>.mp4` with a `-poster.webp` beside it (see `website/video/README.md`); the
+entry shows it only once the file exists.
+
 To publish stable, push a tag matching `versionName`:
 
 ```sh

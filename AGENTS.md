@@ -10,6 +10,7 @@ Each of these is changed together with the code it describes, in the same commit
 - **Terms**: `GLOSSARY.md`. Use its words in code, docs and commit messages.
 - **Decisions**: `docs/adr/`. When a change reverses an ADR, add a new ADR. In the old ADR, leave the text as it is and add a "Superseded by" note.
 - **Principles and PR checklist**: `CONTRIBUTING.md` and `.github/pull_request_template.md`.
+- **Release notes**: `website/src/releases.json`, rendered at chronotif.com/releases. A user-visible change adds a line to its `next` entry. The release steps are in `docs/guide.md`.
 - **Website demo**: `website/src/demo.js` mirrors `core/Attention.kt`, and `website/index.html` describes the same model. Update both when visible behaviour changes.
 
 ## Ordering

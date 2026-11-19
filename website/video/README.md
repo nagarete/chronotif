@@ -77,12 +77,21 @@ Features: `MUSIC=raw/music/bubbles.mp3 ./edit.sh features`.
 
 ## On the website
 
-The site plays a smaller copy of the trailer, kept in git at `../public/video/` (720×1280, about
-1.4 MB) with a still from 15 s as its poster. After re-rendering the trailer, rebuild both:
+The site plays smaller copies (720×1280, about 1.5–2.5 MB each) kept in git at
+`../public/video/`, each with a WebP poster:
+
+| File | From | Poster at | Where |
+|---|---|---|---|
+| `vs-stock.mp4` | `out/chronotif-vs-stock-br-drift.mp4` ([trailer-vs.md](trailer-vs.md)) | 17 s | Homepage |
+| `release-0.2.5.mp4` | `out/chronotif-features.mp4` | 12 s | /releases, 0.2.5 |
+| `release-0.2.6.mp4` | `out/chronotif-search.mp4` | 4 s | /releases, 0.2.6 |
+
+A release's video is named after its version, and its entry in `../src/releases.json` gives the
+music credit shown under it. After re-rendering a video, rebuild its copy and poster:
 
 ```sh
-ffmpeg -i out/chronotif-trailer.mp4 -vf scale=720:1280 -c:v libx264 -preset slow -crf 26 \
-  -pix_fmt yuv420p -movflags +faststart -c:a aac -b:a 96k ../public/video/trailer.mp4
-ffmpeg -ss 15 -i out/chronotif-trailer.mp4 -frames:v 1 -c:v libwebp -quality 80 \
-  -vf scale=720:-1 ../public/video/trailer-poster.webp
+ffmpeg -i out/chronotif-vs-stock-br-drift.mp4 -vf scale=720:1280 -c:v libx264 -preset slow -crf 26 \
+  -pix_fmt yuv420p -movflags +faststart -c:a aac -b:a 96k ../public/video/vs-stock.mp4
+ffmpeg -ss 17 -i out/chronotif-vs-stock-br-drift.mp4 -frames:v 1 -c:v libwebp -quality 80 \
+  -vf scale=720:-1 ../public/video/vs-stock-poster.webp
 ```

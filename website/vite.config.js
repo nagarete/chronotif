@@ -1,4 +1,5 @@
 import { defineConfig } from "vite";
+import { releasesHtml, releaseTeaser } from "./releases.mjs";
 
 const REPO = "nagarete/chronotif";
 const RELEASES = `https://github.com/${REPO}/releases`;
@@ -84,8 +85,13 @@ export default defineConfig(async () => {
     APK_SIZE: stable.apkSize.replace(" ", "&nbsp;"),
     NIGHTLY_APK_URL: nightly.apkUrl,
     NIGHTLY_RELEASE_URL: nightly.releaseUrl,
+    RELEASES: releasesHtml({ nightlyReleaseUrl: nightly.releaseUrl }),
+    RELEASE_TEASER: releaseTeaser(),
   };
   return {
+    build: {
+      rollupOptions: { input: { main: "index.html", releases: "releases.html" } },
+    },
     plugins: [
       {
         name: "chronotif-release",

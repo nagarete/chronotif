@@ -5,7 +5,11 @@ footage. Built from `trailer/vs.html` by `trailer/render.mjs --page vs.html`. Th
 shows what Chronotif does; this one starts from what's wrong with the stock shade and then puts the
 two side by side.
 
-Music: "Tranquil Mindscape" by HoliznaCC0 (CC0 1.0), the same track as the first trailer.
+Music: "Tranquil Mindscape" by HoliznaCC0 (CC0 1.0), the same track as the first trailer. The
+cut on the website, `out/chronotif-vs-stock-br-drift.mp4`, uses "Aggressive Phonk Drift for Car
+Edits" by Alex Morgan, from the album [Phonk & Drift](https://freemusicarchive.org/music/alex-morgan/phonk-drift)
+(CC BY 4.0, credit required; the track page says it's AI-generated). Its end card has no credit,
+so the website credits it under the video.
 
 All the apps and people are made up: Murmur (chat), Daybook (calendar), Fernbank (bank), Parcelly
 (deliveries), Glimmer (photos), Maya Chen, Emma Wilson, Leo Park and the Hiking crew group. The
@@ -31,3 +35,4 @@ The Chronotif side follows `docs/notification-behavior.md`: newest first, a retu
 to the top of New, and App stacks only in Earlier. If the app's behaviour changes, update it.
 
 Render: `node trailer/render.mjs raw/vs-silent.mp4 --page vs.html && ./mux.sh raw/vs-silent.mp4 raw/music/tranquil.mp3 out/chronotif-vs-stock.mp4`.
+For the website cut, mux `raw/music/am-drift.mp3` into `out/chronotif-vs-stock-br-drift.mp4` instead.
