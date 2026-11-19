@@ -34,8 +34,11 @@ class Contact(
 )
 
 class WhatsApp(val chat: WhatsApp.Entry?, val call: WhatsApp.Entry?, val video: WhatsApp.Entry?) {
-    /** A row WhatsApp added to the contact: opening it starts the chat or call in [app]. */
-    class Entry(val dataId: Long, val mimeType: String, val app: String)
+    /**
+     * A row WhatsApp added to the contact: opening it starts the chat or call in [app]. [phone] is
+     * the WhatsApp number in international form, digits only, read from the row's account id.
+     */
+    class Entry(val dataId: Long, val mimeType: String, val app: String, val phone: String?)
 }
 
 class CalendarEvent(val id: Long, val title: String, val begin: Long, val end: Long, val allDay: Boolean)
@@ -122,14 +125,16 @@ object PersonalData {
         val types = WHATSAPP_APPS.flatMap { listOf(chatType(it), callType(it), videoType(it)) }
         context.contentResolver.query(
             ContactsContract.Data.CONTENT_URI,
-            arrayOf(ContactsContract.Data._ID, ContactsContract.Data.CONTACT_ID, ContactsContract.Data.MIMETYPE),
+            arrayOf(ContactsContract.Data._ID, ContactsContract.Data.CONTACT_ID, ContactsContract.Data.MIMETYPE, ContactsContract.Data.DATA1),
             "${ContactsContract.Data.MIMETYPE} IN (${types.joinToString { "?" }})",
             types.toTypedArray(), null,
         )?.use { c ->
             while (c.moveToNext()) {
                 val type = c.getString(2)
                 val app = WHATSAPP_APPS.first { type == chatType(it) || type == callType(it) || type == videoType(it) }
-                val entry = WhatsApp.Entry(c.getLong(0), type, app)
+                // DATA1 is the WhatsApp account, "6281234567890@s.whatsapp.net".
+                val phone = c.getString(3)?.substringBefore('@')?.takeIf { it.isNotEmpty() && it.all(Char::isDigit) }
+                val entry = WhatsApp.Entry(c.getLong(0), type, app, phone)
                 val target = when (type) {
                     chatType(app) -> chats
                     callType(app) -> calls
@@ -226,12 +231,25 @@ object PersonalData {
         start(context, Intent(Intent.ACTION_SENDTO, Uri.fromParts("smsto", number, null)))
     }
 
+    /**
+     * Opening WhatsApp's own Contacts entry only works while WhatsApp has a task open: from cold it
+     * closes again without showing anything. So a chat goes through WhatsApp's documented chat
+     * link, and a call opens WhatsApp first with the call entry on top of it.
+     */
     private fun openWhatsApp(context: Context, entry: WhatsApp.Entry?): Boolean {
         if (entry == null) return false
-        val intent = Intent(Intent.ACTION_VIEW)
+        if (entry.mimeType == chatType(entry.app) && entry.phone != null) {
+            val chat = Intent(Intent.ACTION_VIEW, Uri.parse("https://api.whatsapp.com/send?phone=${entry.phone}")).setPackage(entry.app)
+            if (start(context, chat)) return true
+        }
+        val open = Intent(Intent.ACTION_VIEW)
             .setDataAndType(ContentUris.withAppendedId(ContactsContract.Data.CONTENT_URI, entry.dataId), entry.mimeType)
             .setPackage(entry.app)
-        return start(context, intent)
+        val home = context.packageManager.getLaunchIntentForPackage(entry.app)
+            ?: return start(context, open)
+        return runCatching {
+            context.startActivities(arrayOf(home.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), open))
+        }.isSuccess || start(context, open)
     }
 
     fun openEvent(context: Context, event: CalendarEvent) = start(context,
