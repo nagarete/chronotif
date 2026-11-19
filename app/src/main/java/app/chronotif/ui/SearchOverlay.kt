@@ -384,6 +384,11 @@ class SearchOverlay private constructor(
                 PersonalData.message(host.context, c)
             })
         }
+        if (c.whatsapp?.video != null) {
+            addView(actionButton(R.drawable.ic_video, context.getString(R.string.search_video_call, c.name)) {
+                PersonalData.videoCall(host.context, c)
+            })
+        }
         if (c.callNumber != null || c.whatsapp?.call != null) {
             addView(actionButton(R.drawable.ic_call, context.getString(R.string.search_call, c.name)) {
                 PersonalData.call(host.context, c)

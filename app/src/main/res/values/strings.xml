@@ -121,6 +121,7 @@
     <string name="search_whatsapp" translatable="false">WhatsApp</string>
     <string name="search_unlock_for_more">Unlock to see all results</string>
     <string name="search_call">Call %1$s</string>
+    <string name="search_video_call">Video call %1$s</string>
     <string name="search_message">Message %1$s</string>
     <string name="search_find_contacts">Find contacts</string>
     <string name="search_find_contacts_desc">Search lists matching contacts, with buttons to call or message them. Contacts are read only on this phone, and hidden while it\'s locked.</string>

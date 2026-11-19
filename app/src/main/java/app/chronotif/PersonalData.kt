@@ -29,11 +29,14 @@ class Contact(
     val numbers: List<String>,
     /** What the call and message buttons use; null when the contact has no number. */
     val callNumber: String?,
-    /** The contact's WhatsApp chat and voice-call entries, when WhatsApp has added them to Contacts. */
+    /** The contact's WhatsApp chat and voice-call entries, when WhatsApp or WhatsApp Business added them to Contacts. */
     val whatsapp: WhatsApp? = null,
 )
 
-class WhatsApp(val chat: Long?, val call: Long?)
+class WhatsApp(val chat: WhatsApp.Entry?, val call: WhatsApp.Entry?, val video: WhatsApp.Entry?) {
+    /** A row WhatsApp added to the contact: opening it starts the chat or call in [app]. */
+    class Entry(val dataId: Long, val mimeType: String, val app: String)
+}
 
 class CalendarEvent(val id: Long, val title: String, val begin: Long, val end: Long, val allDay: Boolean)
 
@@ -108,28 +111,42 @@ object PersonalData {
     }
 
     /**
-     * WhatsApp adds a chat and a voice-call entry to each contact who uses it. Opening one of those
-     * entries is how the Contacts app starts a WhatsApp chat or call, and Search does the same.
+     * WhatsApp adds a chat and a voice-call entry to each contact who uses it, and WhatsApp
+     * Business adds its own. Opening one of those entries is how the Contacts app starts a chat or
+     * call, and Search does the same, preferring WhatsApp when a contact has both.
      */
     private fun readWhatsApp(context: Context): Map<Long, WhatsApp> {
-        val chats = HashMap<Long, Long>()
-        val calls = HashMap<Long, Long>()
+        val chats = HashMap<Long, WhatsApp.Entry>()
+        val calls = HashMap<Long, WhatsApp.Entry>()
+        val videos = HashMap<Long, WhatsApp.Entry>()
+        val types = WHATSAPP_APPS.flatMap { listOf(chatType(it), callType(it), videoType(it)) }
         context.contentResolver.query(
             ContactsContract.Data.CONTENT_URI,
             arrayOf(ContactsContract.Data._ID, ContactsContract.Data.CONTACT_ID, ContactsContract.Data.MIMETYPE),
-            "${ContactsContract.Data.MIMETYPE} IN (?, ?)",
-            arrayOf(WHATSAPP_CHAT, WHATSAPP_CALL), null,
+            "${ContactsContract.Data.MIMETYPE} IN (${types.joinToString { "?" }})",
+            types.toTypedArray(), null,
         )?.use { c ->
             while (c.moveToNext()) {
-                val target = if (c.getString(2) == WHATSAPP_CHAT) chats else calls
-                target.putIfAbsent(c.getLong(1), c.getLong(0))
+                val type = c.getString(2)
+                val app = WHATSAPP_APPS.first { type == chatType(it) || type == callType(it) || type == videoType(it) }
+                val entry = WhatsApp.Entry(c.getLong(0), type, app)
+                val target = when (type) {
+                    chatType(app) -> chats
+                    callType(app) -> calls
+                    else -> videos
+                }
+                val held = target[c.getLong(1)]
+                if (held == null || WHATSAPP_APPS.indexOf(app) < WHATSAPP_APPS.indexOf(held.app)) target[c.getLong(1)] = entry
             }
         }
-        return (chats.keys + calls.keys).associateWith { WhatsApp(chats[it], calls[it]) }
+        return (chats.keys + calls.keys + videos.keys).associateWith { WhatsApp(chats[it], calls[it], videos[it]) }
     }
 
-    private const val WHATSAPP_CHAT = "vnd.android.cursor.item/vnd.com.whatsapp.profile"
-    private const val WHATSAPP_CALL = "vnd.android.cursor.item/vnd.com.whatsapp.voip.call"
+    /** WhatsApp first, then WhatsApp Business. */
+    private val WHATSAPP_APPS = listOf("com.whatsapp", "com.whatsapp.w4b")
+    private fun chatType(app: String) = "vnd.android.cursor.item/vnd.$app.profile"
+    private fun callType(app: String) = "vnd.android.cursor.item/vnd.$app.voip.call"
+    private fun videoType(app: String) = "vnd.android.cursor.item/vnd.$app.video.call"
 
     /** The contact's photo, delivered on the main thread; nothing when it has none. */
     fun photo(context: Context, contact: Contact, done: (Drawable) -> Unit) {
@@ -192,23 +209,28 @@ object PersonalData {
      * number ready, so Chronotif needs no permission to place calls.
      */
     fun call(context: Context, contact: Contact) {
-        if (openWhatsApp(context, contact.whatsapp?.call, WHATSAPP_CALL)) return
+        if (openWhatsApp(context, contact.whatsapp?.call)) return
         val number = contact.callNumber ?: return
         start(context, Intent(Intent.ACTION_DIAL, Uri.fromParts("tel", number, null)))
     }
 
+    /** A WhatsApp video call; only offered when WhatsApp added one to the contact. */
+    fun videoCall(context: Context, contact: Contact) {
+        openWhatsApp(context, contact.whatsapp?.video)
+    }
+
     /** A WhatsApp chat when the contact is on WhatsApp, otherwise the SMS app. */
     fun message(context: Context, contact: Contact) {
-        if (openWhatsApp(context, contact.whatsapp?.chat, WHATSAPP_CHAT)) return
+        if (openWhatsApp(context, contact.whatsapp?.chat)) return
         val number = contact.callNumber ?: return
         start(context, Intent(Intent.ACTION_SENDTO, Uri.fromParts("smsto", number, null)))
     }
 
-    private fun openWhatsApp(context: Context, dataId: Long?, type: String): Boolean {
-        if (dataId == null) return false
+    private fun openWhatsApp(context: Context, entry: WhatsApp.Entry?): Boolean {
+        if (entry == null) return false
         val intent = Intent(Intent.ACTION_VIEW)
-            .setDataAndType(ContentUris.withAppendedId(ContactsContract.Data.CONTENT_URI, dataId), type)
-            .setPackage("com.whatsapp")
+            .setDataAndType(ContentUris.withAppendedId(ContactsContract.Data.CONTENT_URI, entry.dataId), entry.mimeType)
+            .setPackage(entry.app)
         return start(context, intent)
     }
 
