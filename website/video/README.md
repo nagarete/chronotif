@@ -64,19 +64,19 @@ the window in front, or a missed step captures the home screen.
 
 ## Music
 
-All tracks come from the Free Music Archive. The licence was checked on each track's own page
-(HoliznaCC0 on 2026-11-18, Alex Morgan on 2026-11-19). The files are kept in `raw/music/`, not in git.
-CC BY tracks must be credited: the videos that use them say so on the end card (the `credit` field
-in a cut's captions). Alex Morgan's track pages say they're AI-generated.
+All tracks are by HoliznaCC0 on the Free Music Archive, released under CC0 1.0 (public domain; no
+credit needed, use anywhere). The licence was checked on each track's own page (2026-11-18 and
+2026-11-19). Use only CC0 music, so nothing needs crediting, and only tracks the page tags
+Instrumental. The files are kept in `raw/music/`, not in git. Each video uses a different track.
 
-| Video | Track | Licence | Source |
-|---|---|---|---|
-| Trailer | Tranquil Mindscape, HoliznaCC0 | CC0 1.0 | freemusicarchive.org/music/holiznacc0/public-domain-lofi/tranquil-mindscape-lofi-happy-reflection/ |
-| Features | Brazilian Phonk With Heavy Bass Drop, Alex Morgan | CC BY 4.0 | freemusicarchive.org/music/alex-morgan/phonk-drift/brazilian-phonk-with-heavy-bass-drop/ |
-| Search | Brazilian Phonk Bounce for Dance Reels, Alex Morgan | CC BY 4.0 | freemusicarchive.org/music/alex-morgan/phonk-drift/brazilian-phonk-bounce-for-dance-reels/ |
+| Video | Track | Source |
+|---|---|---|
+| Trailer | Tranquil Mindscape | freemusicarchive.org/music/holiznacc0/public-domain-lofi/tranquil-mindscape-lofi-happy-reflection/ |
+| Features | Phonk Remix | freemusicarchive.org/music/holiznacc0/phonk-aura-farming/phonk-remix/ |
+| Search | Pantheon | freemusicarchive.org/music/holiznacc0/phonk-aura-farming/pantheon/ |
 
 Trailer: `node trailer/render.mjs raw/trailer-silent.mp4 && ./mux.sh raw/trailer-silent.mp4 raw/music/tranquil.mp3 out/chronotif-trailer.mp4`.
-Features: `MUSIC=raw/music/am-heavy-bass.mp3 MUSIC_START=1.25 ./edit.sh features`.
+Features: `MUSIC=raw/music/phonk-remix.mp3 MUSIC_START=28.75 ./edit.sh features`.
 Search: see `search.md`.
 
 ## On the website

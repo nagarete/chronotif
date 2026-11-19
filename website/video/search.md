@@ -11,12 +11,13 @@ frame and caption style as the features video. The apps, people, numbers and eve
 up: Murmur, Daybook, Fernbank, Parcelly, Glimmer, Hum Music, Emma Wilson, Emeka Obi, and a weekly
 "Design review".
 
-Music: "Brazilian Phonk Bounce for Dance Reels" by Alex Morgan, from the album
-[Phonk & Drift](https://freemusicarchive.org/music/alex-morgan/phonk-drift) (CC BY 4.0). The end card
-credits it, as the licence requires. The track page says it's AI-generated.
+Music: "Pantheon" by HoliznaCC0, from the album
+[PHONK - AURA FARMING](https://freemusicarchive.org/music/holiznacc0/phonk-aura-farming) (CC0 1.0, no
+credit required; tagged Instrumental).
 
-Render: `node trailer/render.mjs raw/search-silent.mp4 --page search.html && ./mux.sh raw/search-silent.mp4 raw/music/am-bounce.mp3 out/chronotif-search.mp4 1.25`.
-The track starts at 1.25 s, so its first drop (3.5 s into the track) lands as the title card gives way.
+Render: `node trailer/render.mjs raw/search-silent.mp4 --page search.html && ./mux.sh raw/search-silent.mp4 raw/music/phonk-pantheon.mp3 out/chronotif-search.mp4 38.25`.
+The track starts at 38.25 s, so the hit after its one dip (40.5 s into the track) lands as the title
+card gives way, and it stays loud to the end.
 
 ## Chapters
 
@@ -34,7 +35,7 @@ The track starts at 1.25 s, so its first drop (3.5 s into the track) lands as th
 | 0:46 | Settings and the web | Jump to a Settings page, or hand the rest to your browser. | `wifi` finds Wi-Fi; `chronotif.com` becomes "Open chronotif.com" |
 | 0:51 | More ways in | A home-screen widget, a Quick Settings tile, the app icon, or a long press on the edge handle. | The Search widget on a home screen opening Search |
 | 0:55 | Private | Nothing you type is sent. Contacts and events are read on your phone and never stored. | Card |
-| 0:58 | Help shape it | Ideas or bugs? Tell us. `github.com/nagarete/chronotif/issues`, `chronotif.com`, music credit | End card |
+| 0:58 | Help shape it | Ideas or bugs? Tell us. `github.com/nagarete/chronotif/issues`, `chronotif.com` | End card |
 
 The made-up exchange rate (86.12 EUR for 100 USD) and the times are for the picture only.
 If Search's layout or rules change (`docs/notification-behavior.md`, Search), update the page and
