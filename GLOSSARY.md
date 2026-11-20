@@ -47,6 +47,10 @@ One continuous period from the display waking until it sleeps. Chronotif and the
 Chronotif's standing surfaces (the edge handle, the status-bar swipe and the lock-screen view) are withheld. Notifications are still tracked and the panel can still be opened on purpose, e.g. from the Quick Settings tile. The user's surface settings are kept for when Chronotif is turned back on.
 _Avoid_: Disabled, Paused
 
+**Pile**:
+How the lock-screen view holds New at rest: below the clock, the newest card whole with the next ones as slivers behind it, still newest first. Opening it lays the same cards out in the same order. It is a resting state of the view, not a grouping.
+_Avoid_: Stack (Conversation and App stacks), Peek, compact view
+
 **Media player**:
 A playback control for an app that is playing or paused, shown above everything else and never counted as New. A paused or stopped Media player may be swiped away using Android's normal cancellation for clearable notifications, or the sending app's deleteIntent for protected media. The player stays visible if no real dismissal occurs. Active playback cannot be dismissed.
 _Avoid_: Now playing card

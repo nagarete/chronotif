@@ -16,8 +16,10 @@ import android.os.Handler
 import android.os.Looper
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.VelocityTracker
+import android.view.View
 import android.view.WindowInsets
 import android.view.WindowManager
 import android.widget.FrameLayout
@@ -31,13 +33,15 @@ import app.chronotif.Entry
 import app.chronotif.LockSession
 import app.chronotif.NotifStore
 import app.chronotif.R
+import kotlin.math.abs
 
 /**
- * Shown over the (still locked) keyguard when the screen turns on. NEW notifications are
- * front and centre, EARLIER is folded behind a pill. Content follows the lock-screen privacy
- * rules, and anything beyond dismissing goes through the system unlock first. Tap outside a
- * card or swipe up (or unlock with fingerprint/face) to continue to the phone; back reveals the
- * system lock screen. Pulling down opens Search. Left alone, the display sleeps after the keyguard's short timeout, with
+ * Shown over the (still locked) keyguard when the screen turns on. It rests with the clock big
+ * and New as a Pile at the bottom (ADR 0011); scrolling up unfolds the list, New then Earlier,
+ * and a tap on the Pile does the same ([LockPile]). Content follows the lock-screen privacy
+ * rules, and anything beyond dismissing goes through the system unlock first. Tap outside a card,
+ * swipe up from Tap to unlock (or unlock with fingerprint/face) to continue to the phone; back
+ * folds the list back into the Pile, then reveals the system lock screen. Pulling down opens Search. Left alone, the display sleeps after the keyguard's short timeout, with
  * Chronotif still showing (see [useKeyguardTimeout]).
  */
 class LockActivity : Activity(), NotifList.Host {
@@ -45,6 +49,9 @@ class LockActivity : Activity(), NotifList.Host {
     override val context: Context get() = this
 
     private lateinit var scroll: ScrollView
+    private lateinit var listBox: LinearLayout
+    private lateinit var hint: View
+    private lateinit var pile: LockPile
     private lateinit var list: NotifList
     private val main = Handler(Looper.getMainLooper())
     private val render: () -> Unit = { list.render() }
@@ -87,21 +94,37 @@ class LockActivity : Activity(), NotifList.Host {
             includeFontPadding = false
             setShadowLayer(dp(8).toFloat(), 0f, 0f, 0x40000000)
         }
-        column.addView(date, Ui.lp(-2).apply { topMargin = dp(28) })
-        column.addView(clock, Ui.lp(-2))
-
+        // The clock stays put over the list; the list scrolls up under it (see LockPile).
+        val clockBox = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            addView(date, Ui.lp(-2).apply { topMargin = dp(28) })
+            addView(clock, Ui.lp(-2))
+        }
+        val clockRoom = View(this)
         val content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(12), dp(16), dp(12), dp(16))
             // Taps that no card, chip or pill takes (empty space, headers) unlock.
             setOnClickListener { unlock(null) }
+            addView(clockRoom, LinearLayout.LayoutParams(-1, 0))
         }
+        listBox = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(12), 0, dp(12), dp(16))
+            setOnClickListener { unlock(null) }
+        }
+        content.addView(listBox, LinearLayout.LayoutParams(-1, -2))
         scroll = ScrollView(this).apply {
             isVerticalScrollBarEnabled = false
             isFillViewport = true
+            overScrollMode = View.OVER_SCROLL_NEVER
             addView(content)
         }
-        column.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+        val stage = FrameLayout(this).apply {
+            addView(scroll, FrameLayout.LayoutParams(-1, -1))
+            addView(clockBox, FrameLayout.LayoutParams(-1, -2, Gravity.TOP))
+        }
+        column.addView(stage, LinearLayout.LayoutParams(-1, 0, 1f))
 
         val hint = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -118,6 +141,7 @@ class LockActivity : Activity(), NotifList.Host {
             setOnClickListener { unlock(null) }
         }
         column.addView(hint, Ui.lp(-1))
+        this.hint = hint
         column.setOnClickListener { unlock(null) }
         root.addView(column, FrameLayout.LayoutParams(-1, -1))
         root.setOnApplyWindowInsetsListener { _, insets ->
@@ -127,7 +151,8 @@ class LockActivity : Activity(), NotifList.Host {
         }
         setContentView(root)
 
-        list = NotifList(this, content, onLock = true)
+        list = NotifList(this, listBox, onLock = true)
+        pile = LockPile(stage, scroll, clockRoom, clockBox, listBox, list) { openPile() }
 
         val filter = IntentFilter().apply {
             addAction(Intent.ACTION_SCREEN_OFF)
@@ -136,8 +161,25 @@ class LockActivity : Activity(), NotifList.Host {
         registerReceiver(receiver, filter, if (Build.VERSION.SDK_INT >= 33) RECEIVER_EXPORTED else 0)
 
         if (Build.VERSION.SDK_INT >= 33) {
-            onBackInvokedDispatcher.registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT) { finish() }
+            onBackInvokedDispatcher.registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT) { back() }
         }
+    }
+
+    /** Unfolds the Pile and scrolls New to the top of the screen. */
+    private fun openPile() = scroll.smoothScrollTo(0, pile.openAt)
+
+    /** Back folds the open list back into the Pile, then shows the stock lock screen. */
+    internal fun back() {
+        if (pile.resting) finish() else scroll.smoothScrollTo(0, 0)
+    }
+
+    // Before Android 13, Back arrives as a key.
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (Build.VERSION.SDK_INT < 33 && event.keyCode == KeyEvent.KEYCODE_BACK) {
+            if (event.action == KeyEvent.ACTION_UP && !event.isCanceled) back()
+            return true
+        }
+        return super.dispatchKeyEvent(event)
     }
 
     override fun onResume() {
@@ -227,10 +269,21 @@ class LockActivity : Activity(), NotifList.Host {
         })
     }
 
-    // --- Swipe up anywhere (once the list can't scroll further) to unlock; pull down at the top for Search.
+    // --- Tap the Pile to open it; swipe up from Tap to unlock to unlock; pull down at the top for Search.
 
     private var downY = 0f
-    private var atBottomOnDown = false
+    private var downAt = 0L
+    private var onHint = false
+    /** The gesture started on the Pile's card while folded: a tap opens the Pile rather than the app. */
+    private var onPile = false
+    private var moved = false
+    private val slop by lazy { android.view.ViewConfiguration.get(this).scaledTouchSlop }
+
+    private fun cancelChildren(ev: MotionEvent) = MotionEvent.obtain(ev).also {
+        it.action = MotionEvent.ACTION_CANCEL
+        super.dispatchTouchEvent(it)
+        it.recycle()
+    }
     private var tracker: VelocityTracker? = null
 
     /** Pulling down at the top of the list opens Search; opening an app from it unlocks first. */
@@ -248,22 +301,23 @@ class LockActivity : Activity(), NotifList.Host {
             tracker = null
             return super.dispatchTouchEvent(ev)
         }
-        val pulling = pull.onTouch(ev) {
-            MotionEvent.obtain(ev).also {
-                it.action = MotionEvent.ACTION_CANCEL
-                super.dispatchTouchEvent(it)
-                it.recycle()
-            }
-        }
+        val pulling = pull.onTouch(ev) { cancelChildren(ev) }
         if (pulling) return true
         when (ev.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 downY = ev.rawY
-                atBottomOnDown = !scroll.canScrollVertically(1)
+                downAt = ev.eventTime
+                moved = false
+                onPile = pile.hits(ev)
+                val r = android.graphics.Rect()
+                onHint = hint.getGlobalVisibleRect(r) && r.contains(ev.rawX.toInt(), ev.rawY.toInt())
                 tracker?.recycle()
                 tracker = VelocityTracker.obtain().also { it.addMovement(ev) }
             }
-            MotionEvent.ACTION_MOVE -> tracker?.addMovement(ev)
+            MotionEvent.ACTION_MOVE -> {
+                tracker?.addMovement(ev)
+                if (abs(ev.rawY - downY) > slop) moved = true
+            }
             MotionEvent.ACTION_UP -> {
                 val t = tracker
                 t?.addMovement(ev)
@@ -271,7 +325,14 @@ class LockActivity : Activity(), NotifList.Host {
                 val vy = t?.yVelocity ?: 0f
                 t?.recycle()
                 tracker = null
-                if (atBottomOnDown && downY - ev.rawY > dp(110) && vy < -dp(500)) {
+                // A plain tap on the folded Pile opens it; holding it still opens its Preview.
+                if (onPile && !moved && ev.eventTime - downAt < android.view.ViewConfiguration.getLongPressTimeout()) {
+                    cancelChildren(ev)
+                    openPile()
+                    return true
+                }
+                // Swiping up from Tap to unlock unlocks; swiping up on the list scrolls it.
+                if (onHint && downY - ev.rawY > dp(60) && vy < -dp(300)) {
                     unlock(null)
                     return true
                 }

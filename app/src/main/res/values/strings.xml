@@ -77,6 +77,8 @@
     <string name="tip_pictures_body">Tap the picture in a Preview to see it full screen. Pinch to zoom, swipe sideways through a chat\'s pictures, and save them to your gallery.</string>
     <string name="tip_move_title">Move the edge handle</string>
     <string name="tip_move_body">Hold it until it buzzes, then drag it to either side and any height.</string>
+    <string name="tip_lock_title">Lock screen</string>
+    <string name="tip_lock_body">New waits at the bottom as a pile under the clock. Tap it or drag it up to see everything, and press Back to put it away again.</string>
     <string name="tip_close_title">Close the panel</string>
     <string name="tip_close_body">Tap an empty space, press Back, or flick up at the end of the list.</string>
     <string name="settings_sections">Sections</string>

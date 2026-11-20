@@ -15,7 +15,8 @@
       "Tap an open stack's name to close it, as well as Show less.",
       "Snooze a notification from its Preview (press and hold the card) for 15 minutes, an hour, three hours, until tomorrow morning, or until a time you pick. It comes back as new.",
       "The Preview has a Clear button, and Settings → Panel → Swipe to clear lets you stop cards clearing when swiped by accident.",
-      "Settings → Search lists what Search can do, with examples to try, and the Search tip on the Tips page sums it up."
+      "Settings → Search lists what Search can do, with examples to try, and the Search tip on the Tips page sums it up.",
+      "The lock screen leaves room for the time: the clock stays big, and new notifications wait at the bottom as a pile. Tap it or drag it up to see everything, and press Back to put it away."
     ],
     "video": {
       "src": "/video/release-0.2.7.mp4",

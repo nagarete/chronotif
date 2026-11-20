@@ -8,6 +8,14 @@ An untouched notification wake is one continuous session that lasts as long as t
 
 The first reported failure was approximately ten seconds of Chronotif followed by approximately ten seconds of the stock lock screen, caused by an inactivity timer that finished the activity. Removing that timer exposed a second failure: a window covering the keyguard gets the normal screen timeout (the one used while an app is open), so the display stayed on for the full screen-timeout setting. Chronotif's window now requests the keyguard's own short timeout (`config_lockScreenDisplayTimeout`, ten seconds when the ROM doesn't define it). Touches extend it as they do on the stock lock screen. The device's display settings are not changed.
 
+## The lock-screen view at rest
+
+The lock-screen view wakes with the clock big and New resting at the bottom as a Pile (ADR 0011): the newest card or Conversation stack whole, one or two slivers behind it, and "N more" under it when New holds more than one. Earlier isn't shown. With nothing New, it rests as the clock and an "N earlier" line. A Media player or ongoing call sits whole under the clock, above the Pile.
+
+The Pile is the list itself, scrolled to its top. Scrolling up anywhere unfolds it under the finger: the cards folded under the top one slide out from behind it, New then Earlier, the same cards in the same order, and the slivers and count fade. The clock stays where it is until the list reaches it, then the list pushes it up and it fades, so the list takes its place. Tapping the Pile or its count unfolds it and scrolls New to the top. The Pile isn't a grouping: it holds all of New in time order and never gathers an app's cards. While it rests, only its top card can be swiped away or held for its Preview. Back folds the list back into the Pile, and Back again shows the stock lock screen. Each wake starts at the Pile.
+
+Unlocking after the view was up for a moment checks all of New, the cards folded under the Pile included. Tapping empty space, or swiping up from *Tap to unlock* at the bottom, unlocks; swiping up anywhere else scrolls. Pulling down at the top opens Search.
+
 ## Conversation stacks
 
 Revised in the October 2026 interview comparing Chronotif with iOS (ADR 0002). Each conversation that lists its messages is shown as a Conversation stack: one card per incoming message, under the conversation's title and Avatar, with the message's own time.
@@ -98,7 +106,10 @@ Results show while locked, except contacts and calendar events: with either swit
 ## Verification cases
 
 - Leave a notification wake untouched. Chronotif remains visible and the display sleeps after the stock lock-screen timeout (about ten seconds), not the normal screen timeout, without an extra stock lock-screen interval.
-- Press Back while Chronotif is visible. The stock lock screen appears.
+- Wake the phone with three New notifications. The clock is big, the newest card sits whole at the bottom with slivers behind it and "2 more"; Earlier isn't shown. Swipe the top card sideways: it clears and the next one takes its place.
+- Drag the list up slowly from the Pile. The cards slide out from under the top one as the finger moves, with no jump; the clock stays until the first card reaches it, then is pushed up and fades. Tap the Pile instead: it unfolds and scrolls New to the top.
+- Scroll the list open and press Back: it folds back into the Pile. Press Back again: the stock lock screen appears. Swipe up from *Tap to unlock*: the unlock prompt shows. Fling the list up: it only scrolls.
+- Wake the phone with nothing New and some checked notifications, on *Whenever there are notifications*. The clock shows with "N earlier" at the bottom; tapping it opens Earlier.
 - Let one app post three notifications within a few minutes, and another notification from it hours earlier, then check. Earlier shows the three as one collapsed App stack and the old one apart from them; tapping the stack opens the three in place.
 - Receive several messages in one conversation. New shows a collapsed stack with the count on the Avatar; tapping it shows one card per message. Messages from before the last check sit in the conversation's own Earlier stack.
 - Swipe one message card away. Only that message disappears; the chat stays in the system shade. Swipe the collapsed stack and the conversation is cleared everywhere.
