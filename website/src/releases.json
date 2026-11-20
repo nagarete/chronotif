@@ -1,4 +1,9 @@
 {
+  "next": {
+    "version": "0.2.7",
+    "headline": "The panel comes down under your finger, and the edge handle is yours to shape.",
+    "notes": []
+  },
   "stable": [
     {
       "version": "0.2.6",
