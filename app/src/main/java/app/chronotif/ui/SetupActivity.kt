@@ -168,6 +168,25 @@ class SetupActivity : Activity() {
             Prefs.handleRight = it == 1
             applyHandle()
         }
+        // Debug build only, while the look is chosen; it goes once one is picked.
+        if (BuildConfig.APPLICATION_ID.endsWith(".debug")) {
+            body.addView(text("Look (debug build only)", 15f), gap(12))
+            val looks = listOf("A · Frosted", "B · Solid", "C · Frosted + count")
+            val group = RadioGroup(this).apply { orientation = RadioGroup.VERTICAL }
+            looks.forEachIndexed { i, l ->
+                group.addView(RadioButton(this).apply {
+                    id = View.generateViewId()
+                    text = l
+                    setTextColor(palette.text)
+                    isChecked = i == Prefs.handleLook
+                    setOnClickListener {
+                        Prefs.handleLook = i
+                        applyHandle()
+                    }
+                })
+            }
+            body.addView(group)
+        }
         body.addView(text(getString(R.string.handle_position), 15f), gap(12))
         body.addView(SeekBar(this).apply {
             max = 100

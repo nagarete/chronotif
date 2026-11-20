@@ -71,7 +71,7 @@
     <string name="status_swipe_enabled">Use status-bar swipe</string>
     <string name="status_swipe_service_desc">Lets you open Chronotif by tapping or swiping down on the left half of the status bar. Chronotif uses this only to place an invisible touch area there. It doesn\'t read other apps\' screens. Turn the swipe off any time in Chronotif\'s setup.</string>
     <string name="handle_enabled">Edge handle</string>
-    <string name="handle_enabled_desc">A thin handle at the screen edge. Tap or swipe it to open the panel. It lights up when something is new.</string>
+    <string name="handle_enabled_desc">A tab at the screen edge. Tap it or swipe down on it to open the panel, or hold it for Search. It lights up when something is new, and steps aside in fullscreen apps and while you type.</string>
     <string name="handle_side">Side</string>
     <string name="side_left">Left</string>
     <string name="side_right">Right</string>

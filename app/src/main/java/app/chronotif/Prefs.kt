@@ -8,6 +8,9 @@ import app.chronotif.core.Attention
 
 /** The only persisted state: the last-check watermark, when apps last notified, and a handful of settings. */
 object Prefs {
+    const val LOOK_FROSTED = 0
+    const val LOOK_SOLID = 1
+    const val LOOK_COUNT = 2
     const val LOCK_OFF = 0
     const val LOCK_WHEN_NEW = 1
     const val LOCK_ALWAYS = 2
@@ -51,6 +54,14 @@ object Prefs {
     var handleY: Float
         get() = sp.getFloat("handle_y", 0.22f)
         set(v) = sp.edit().putFloat("handle_y", v).apply()
+
+    /**
+     * The edge handle's look, while the three candidates are tried out. Only the debug build
+     * offers the choice; it goes once one is picked.
+     */
+    var handleLook: Int
+        get() = sp.getInt("handle_look", LOOK_FROSTED)
+        set(v) = sp.edit().putInt("handle_look", v).apply()
 
     var handleHideLandscape: Boolean
         get() = sp.getBoolean("handle_hide_landscape", true)
