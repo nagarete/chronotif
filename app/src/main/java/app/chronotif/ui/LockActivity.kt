@@ -45,7 +45,8 @@ import kotlin.math.abs
  * and New as a Pile at the bottom (ADR 0011), and a Media player's artwork large between them (ADR 0012); scrolling up unfolds the list, New then Earlier,
  * and a tap on the Pile does the same ([LockPile]). Content follows the lock-screen privacy
  * rules, and anything beyond dismissing goes through the system unlock first. Tap outside a card,
- * swipe up from Tap to unlock (or unlock with fingerprint/face) to continue to the phone; back
+ * swipe up from Tap to unlock (or unlock with fingerprint/face) to continue to the phone, or tap the
+ * clock or the date to unlock into the alarms or the calendar; back
  * folds the list back into the Pile, then reveals the system lock screen. Pulling down opens Search. Left alone, the display sleeps after the keyguard's short timeout, with
  * Chronotif still showing (see [useKeyguardTimeout]). Double-tapping empty space turns the screen
  * black and lets Android put the display to sleep (ADR 0014, see [sleep]).
@@ -106,6 +107,13 @@ class LockActivity : Activity(), NotifList.Host {
             gravity = Gravity.CENTER_HORIZONTAL
             addView(date, Ui.lp(-2).apply { topMargin = dp(28) })
             addView(clock, Ui.lp(-2))
+        }
+        // As in the Panel header: the clock opens the alarms and the date the calendar, after the unlock.
+        with(PanelHeader) {
+            clock.tapTarget(this@LockActivity, R.string.header_open_alarms) { alarmsIntents(this@LockActivity) }
+            date.tapTarget(this@LockActivity, R.string.header_open_calendar) {
+                listOf(calendarIntent(System.currentTimeMillis()))
+            }
         }
         this.clockBox = clockBox
         clockFace = listOf(date, clock)
@@ -319,7 +327,7 @@ class LockActivity : Activity(), NotifList.Host {
 
     private lateinit var root: FrameLayout
     private lateinit var clockBox: View
-    /** The date and the clock: never empty space, even though a tap on them unlocks. */
+    /** The date and the clock, which open the calendar and the alarms: never empty space. */
     private lateinit var clockFace: List<View>
     /** The black cover while Android counts down to sleep, or null while the view shows. */
     private var dark: View? = null

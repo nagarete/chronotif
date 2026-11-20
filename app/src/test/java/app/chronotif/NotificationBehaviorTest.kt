@@ -655,6 +655,36 @@ class NotificationBehaviorTest {
         }
     }
 
+    private fun unlockSucceeds() {
+        ReflectionHelpers.getStaticField<KeyguardManager.KeyguardDismissCallback>(
+            ShadowKeyguardManager::class.java, "callback").onDismissSucceeded()
+        shadowOf(Looper.getMainLooper()).idle()
+    }
+
+    @Test
+    fun onTheLockScreenTheClockOpensAlarmsAndTheDateTheCalendarAfterTheUnlock() {
+        plain("Lunch?", 4000, 1, "example.chat")
+        withLockView { activity ->
+            val clock = views(activity.window.decorView).filterIsInstance<TextClock>().maxBy { it.textSize }
+            assertTrue(clock.performClick())
+            assertNull("Nothing opens before the unlock", shadowOf(activity).nextStartedActivity)
+            unlockSucceeds()
+            assertEquals(android.provider.AlarmClock.ACTION_SHOW_ALARMS, shadowOf(activity).nextStartedActivity.action)
+            assertTrue(activity.isFinishing)
+            assertEquals("The unlock checks New", 0, NotifStore.newCount())
+        }
+        ShadowKeyguardManager.reset()
+        plain("Meeting", 5000, 2, "example.calendar")
+        withLockView { activity ->
+            val date = views(activity.window.decorView).filterIsInstance<TextClock>().minBy { it.textSize }
+            assertTrue(date.performClick())
+            unlockSucceeds()
+            val opened = shadowOf(activity).nextStartedActivity
+            assertEquals(Intent.ACTION_VIEW, opened.action)
+            assertTrue(opened.data.toString(), opened.data.toString().startsWith("content://com.android.calendar/time/"))
+        }
+    }
+
     @Test
     fun withDoubleTapToSleepOffATapOnEmptySpaceAsksToUnlockAtOnce() {
         Prefs.lockDoubleTapSleep = false

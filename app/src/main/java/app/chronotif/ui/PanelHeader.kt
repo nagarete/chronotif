@@ -128,22 +128,24 @@ internal object PanelHeader {
 
     /**
      * A button for TalkBack ("Open alarms") that opens the first of [intents] Android lets it
-     * start; does nothing when none can be opened.
+     * start; does nothing when none can be opened. On the lock-screen view it asks to unlock first.
      */
-    private fun View.tapTarget(host: NotifList.Host, label: Int, intents: () -> List<Intent>) {
+    fun View.tapTarget(host: NotifList.Host, label: Int, intents: () -> List<Intent>) {
         background = Ui.pressable(0, dp(8).toFloat(), Palette(context).pill)
         setOnClickListener {
-            val opened = intents().any { intent ->
-                try {
-                    host.context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                    true
-                } catch (_: ActivityNotFoundException) {
-                    false
-                } catch (_: SecurityException) {
-                    false
+            host.guarded {
+                val opened = intents().any { intent ->
+                    try {
+                        host.context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                        true
+                    } catch (_: ActivityNotFoundException) {
+                        false
+                    } catch (_: SecurityException) {
+                        false
+                    }
                 }
+                if (opened) host.launched()
             }
-            if (opened) host.launched()
         }
         accessibilityDelegate = object : View.AccessibilityDelegate() {
             override fun onInitializeAccessibilityNodeInfo(v: View, info: AccessibilityNodeInfo) {
