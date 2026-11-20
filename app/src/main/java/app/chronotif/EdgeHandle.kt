@@ -28,9 +28,10 @@ import app.chronotif.ui.dp
 import kotlin.math.abs
 
 /**
- * An always-available tab on the screen edge. Tap it, or swipe down or inward on it, to open the
- * panel; hold it to open Search. What's drawn is exactly what takes touches, so it's easy to hit
- * and never catches a touch where nothing shows. It takes the accent colour while anything is NEW.
+ * An always-available handle on the screen edge, in the shape and fill the user picks (a half
+ * circle by default). Tap it, or swipe down or inward on it, to open the panel; hold it to open
+ * Search. What's drawn fills the area that takes touches, so it's easy to hit and never catches a
+ * touch where nothing shows. It takes the accent colour while anything is NEW.
  *
  * It steps aside while a fullscreen app hides the status bar or the keyboard is up, and asks
  * Android to keep the Back gesture off it. MIUI/HyperOS keep their own Back strip on the lower
@@ -59,7 +60,7 @@ class EdgeHandle(service: Context) {
     private val onChange: () -> Unit = { view?.newCount = NotifStore.newCount() }
 
     private companion object {
-        /** Width and height of each [Prefs.handleShape], in dp, and the circle's gap from the edge. */
+        /** Width and height of each [Prefs.handleShape] in dp, and the circle's gap from the edge. */
         val SIZES = mapOf(
             Prefs.SHAPE_TAB to (20 to 120),
             Prefs.SHAPE_HALF_SMALL to (28 to 56),

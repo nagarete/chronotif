@@ -168,30 +168,30 @@ class SetupActivity : Activity() {
             Prefs.handleRight = it == 1
             applyHandle()
         }
-        // Debug build only, while the look is chosen; it goes once one is picked.
+        body.addView(text(getString(R.string.handle_shape), 15f), gap(12))
+        val shapes = listOf(
+            R.string.shape_half to Prefs.SHAPE_HALF_SMALL,
+            R.string.shape_half_large to Prefs.SHAPE_HALF_LARGE,
+            R.string.shape_tab to Prefs.SHAPE_TAB,
+            R.string.shape_circle to Prefs.SHAPE_CIRCLE,
+        )
+        radios(shapes.map { it.first }, selected = shapes.indexOfFirst { it.second == Prefs.handleShape }, vertical = true) {
+            Prefs.handleShape = shapes[it].second
+            applyHandle()
+        }
+        body.addView(text(getString(R.string.handle_fill), 15f), gap(12))
+        val fills = listOf(
+            R.string.fill_frosted to Prefs.LOOK_FROSTED,
+            R.string.fill_solid to Prefs.LOOK_SOLID,
+            R.string.fill_count to Prefs.LOOK_COUNT,
+        )
+        radios(fills.map { it.first }, selected = fills.indexOfFirst { it.second == Prefs.handleLook }, vertical = true) {
+            Prefs.handleLook = fills[it].second
+            applyHandle()
+        }
+        body.addView(text(getString(R.string.fill_count_desc), 13f, secondary = true), gap(4))
+        // Debug build only, until screenshots on real phones show whether it helps.
         if (BuildConfig.APPLICATION_ID.endsWith(".debug")) {
-            fun choice(title: String, labels: List<String>, current: Int, pick: (Int) -> Unit) {
-                body.addView(text(title, 15f), gap(12))
-                val group = RadioGroup(this).apply { orientation = RadioGroup.VERTICAL }
-                labels.forEachIndexed { i, l ->
-                    group.addView(RadioButton(this).apply {
-                        id = View.generateViewId()
-                        text = l
-                        setTextColor(palette.text)
-                        isChecked = i == current
-                        setOnClickListener {
-                            pick(i)
-                            applyHandle()
-                        }
-                    })
-                }
-                body.addView(group)
-            }
-            choice("Shape (debug build only)",
-                listOf("Tab, 20 x 120 dp", "Half circle S, 28 x 56 dp", "Half circle L, 36 x 72 dp", "Circle, 44 dp"),
-                Prefs.handleShape) { Prefs.handleShape = it }
-            choice("Fill (debug build only)", listOf("Frosted", "Solid", "Frosted + count"),
-                Prefs.handleLook) { Prefs.handleLook = it }
             body.addView(android.widget.CheckBox(this).apply {
                 text = "Secure (screenshot test)"
                 setTextColor(palette.text)

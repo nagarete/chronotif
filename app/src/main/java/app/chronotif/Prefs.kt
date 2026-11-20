@@ -64,15 +64,12 @@ object Prefs {
         get() = sp.getBoolean("handle_secure_test", false)
         set(v) = sp.edit().putBoolean("handle_secure_test", v).apply()
 
-    /** The edge handle's shape, while the candidates are tried out; see [handleLook]. */
+    /** The edge handle's shape: one of the SHAPE_ constants. */
     var handleShape: Int
         get() = sp.getInt("handle_shape", SHAPE_HALF_SMALL)
         set(v) = sp.edit().putInt("handle_shape", v).apply()
 
-    /**
-     * The edge handle's look, while the three candidates are tried out. Only the debug build
-     * offers the choice; it goes once one is picked.
-     */
+    /** The edge handle's fill: one of the LOOK_ constants. */
     var handleLook: Int
         get() = sp.getInt("handle_look", LOOK_FROSTED)
         set(v) = sp.edit().putInt("handle_look", v).apply()
