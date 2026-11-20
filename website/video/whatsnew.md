@@ -11,6 +11,14 @@ blur comes in once the panel settles), `EdgeHandle.kt` (shapes, sizes, styles an
 `SetupActivity.kt` (the rail, the expanded sidebar, the Edge handle and Tips pages). The apps and
 notifications are the same made-up ones as the other videos.
 
+Music: "Re Adusjtment" (FMA's spelling) by HoliznaCC0, from the album
+[PHONK - AURA FARMING](https://freemusicarchive.org/music/holiznacc0/phonk-aura-farming) (CC0 1.0, no
+credit required; tagged Instrumental).
+
+Render: `node trailer/render.mjs raw/whatsnew-silent.mp4 --page whatsnew.html && ./mux.sh raw/whatsnew-silent.mp4 raw/music/phonk-readjustment.mp3 out/chronotif-0.2.7.mp4 9.4`.
+The track starts at 9.4 s, so its drop (12 s into the track) lands as the title card gives way.
+The site plays a 720p copy, `../public/video/release-0.2.7.mp4`, on chronotif.com/releases under 0.2.7.
+
 ## Chapters
 
 | Time | Chapter | Caption | What it shows |
