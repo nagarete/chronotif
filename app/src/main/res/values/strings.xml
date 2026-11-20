@@ -62,7 +62,6 @@
     <string name="setup_general">General</string>
     <string name="setup_about">Privacy and about</string>
     <string name="setup_tips">Tips</string>
-    <string name="summary_tips">Gestures and shortcuts</string>
     <string name="tip_open_title">Open the panel</string>
     <string name="tip_open_body">Tap the edge handle or swipe down on it. With the status-bar swipe on, pull down from the left half of the status bar and the panel follows your finger. The Chronotif Quick Settings tile opens it too.</string>
     <string name="tip_check_title">New and Earlier</string>
@@ -84,14 +83,6 @@
     <string name="settings_sections">Sections</string>
     <string name="settings_group_features">Features</string>
     <string name="settings_group_app">App</string>
-    <string name="summary_on">On</string>
-    <string name="summary_off">Off</string>
-    <string name="summary_permission_needed">Permission needed</string>
-    <string name="summary_swipe_access">Needs accessibility access</string>
-    <string name="summary_clock_date">Clock and date</string>
-    <string name="summary_date_only">Date only</string>
-    <string name="summary_handle">%1$s · %2$s</string>
-    <string name="summary_updates_auto">%1$s · automatic</string>
     <string name="style_count_short">With count</string>
     <string name="perm_listener">Notification access</string>
     <string name="perm_listener_desc">Read, open, dismiss and act on notifications.</string>
@@ -108,6 +99,28 @@
     <string name="grant">Grant</string>
     <string name="reconnect">Reconnect</string>
     <string name="open">Open</string>
+    <string name="allow">Allow</string>
+    <string name="step_allowed">Allowed</string>
+    <string name="setup_all_set">All set</string>
+    <plurals name="setup_steps_left">
+        <item quantity="one">%d step left</item>
+        <item quantity="other">%d steps left</item>
+    </plurals>
+    <string name="setup_next_listener">Allow Notification access so Chronotif can show your notifications.</string>
+    <string name="setup_next_reconnect">Notification access is on, but Chronotif isn\'t connected. Reconnect it below.</string>
+    <string name="setup_next_overlay">Allow Display over other apps so the edge handle and lock-screen view can show.</string>
+    <string name="setup_done_desc">Chronotif has what it needs. Open the panel with the edge handle, the Quick Settings tile or the status-bar swipe.</string>
+    <string name="setup_xiaomi">On Xiaomi phones</string>
+    <string name="setup_progress">Setup</string>
+    <string name="settings_theme">Settings theme</string>
+    <string name="theme_system">System</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <string name="handle_look">Look</string>
+    <string name="handle_colours">Colour</string>
+    <string name="handle_placement">Placement</string>
+    <string name="search_finds">What Search finds</string>
+    <string name="setup_progress_count">%1$d/%2$d</string>
 
     <string name="setup_panel">Panel</string>
     <string name="status_swipe_title">Status-bar swipe</string>

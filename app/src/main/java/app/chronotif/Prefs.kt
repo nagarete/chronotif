@@ -111,6 +111,15 @@ object Prefs {
         get() = sp.getString("settings_section_name", null)
         set(v) = sp.edit().putString("settings_section_name", v).apply()
 
+    /** Settings in light or dark: one of the THEME_ constants. */
+    var settingsTheme: Int
+        get() = sp.getInt("settings_theme", THEME_SYSTEM)
+        set(v) = sp.edit().putInt("settings_theme", v).apply()
+
+    const val THEME_SYSTEM = 0
+    const val THEME_LIGHT = 1
+    const val THEME_DARK = 2
+
     /** The edge handle's shape: one of the SHAPE_ constants. */
     var handleShape: Int
         get() = sp.getInt("handle_shape", SHAPE_HALF_SMALL)

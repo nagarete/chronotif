@@ -8,10 +8,15 @@ import android.content.ActivityNotFoundException
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.res.ColorStateList
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.Typeface
+import android.graphics.drawable.ClipDrawable
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.Icon
+import android.graphics.drawable.InsetDrawable
+import android.graphics.drawable.LayerDrawable
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -23,13 +28,11 @@ import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowInsets
-import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.SeekBar
-import android.widget.Switch
 import android.widget.TextView
 import app.chronotif.BuildConfig
 import app.chronotif.EdgeHandle
@@ -43,10 +46,12 @@ import kotlin.math.abs
 
 /**
  * Setup and settings, not needed in daily use. Each section is its own page, and a drawer lists the
- * sections, a row each with its icon and a summary of its settings. On a narrow screen the page has
- * the full width and the drawer slides in over it from the menu button; on a wide one the drawer
- * stays open beside the page. Settings reopen on the last section, or on General while a permission
- * is missing.
+ * sections in groups. On a narrow screen the page has the full width and the drawer slides in over
+ * it from the menu button; on a wide one the drawer stays open beside the page. Settings reopen on
+ * the last section, or on General while a permission is missing.
+ *
+ * The look is Material 3: settings sit in rows joined into rounded groups, in colours taken from
+ * the wallpaper ([M3]). General starts with the setup checklist.
  */
 @Suppress("SetTextI18n")
 class SetupActivity : Activity() {
@@ -66,8 +71,8 @@ class SetupActivity : Activity() {
     /** The open section's page content. */
     private lateinit var body: LinearLayout
     private lateinit var page: ScrollView
-    /** Above the page: the open section's name, after the menu button. */
-    private lateinit var pageTitle: TextView
+    /** Where the setting helpers add their rows: a [SettingGroup], or [body] between groups. */
+    private lateinit var target: LinearLayout
     /** The sections, full height: over the page on a narrow screen, beside it on a wide one. */
     private lateinit var drawer: View
     private lateinit var rows: LinearLayout
@@ -85,7 +90,6 @@ class SetupActivity : Activity() {
         /** A listener the system is still binding looks disconnected for a moment after launch. */
         const val SETTLE_MS = 2000L
         const val REQUEST_SEARCH_PERMISSION = 10
-        const val WARN = 0xFFFF9F0A.toInt()
     }
 
     private var settled = false
@@ -94,38 +98,60 @@ class SetupActivity : Activity() {
         refreshAll()
     }
 
+    private val c by lazy { M3(this) }
+
+    /** Light or dark as picked in General, or as the system is: the whole screen, system parts too. */
+    override fun attachBaseContext(base: Context) {
+        super.attachBaseContext(base)
+        val night = when (Prefs.settingsTheme) {
+            Prefs.THEME_LIGHT -> android.content.res.Configuration.UI_MODE_NIGHT_NO
+            Prefs.THEME_DARK -> android.content.res.Configuration.UI_MODE_NIGHT_YES
+            else -> return
+        }
+        applyOverrideConfiguration(android.content.res.Configuration().apply {
+            uiMode = (base.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK.inv()) or night
+        })
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Ui.edgeToEdge(window)
+        window.decorView.setBackgroundColor(c.surface)
+        val light = android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or
+            android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS
+        window.insetsController?.setSystemBarsAppearance(if (c.dark) 0 else light, light)
         wide = resources.configuration.screenWidthDp >= 600
         body = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(16), dp(4), dp(16), dp(32))
+            setPadding(dp(16), 0, dp(16), dp(32))
         }
-        page = ScrollView(this).apply { addView(body) }
-        pageTitle = text("", 20f, bold = true).apply {
-            maxLines = 1
-            ellipsize = android.text.TextUtils.TruncateAt.END
+        target = body
+        page = ScrollView(this).apply {
+            addView(body)
+            isVerticalScrollBarEnabled = false
         }
-        val bar = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(if (wide) 16 else 6), dp(6), dp(16), dp(6))
-            if (!wide) addView(menuButton(), LinearLayout.LayoutParams(dp(48), dp(48)).apply { marginEnd = dp(6) })
-            addView(pageTitle, LinearLayout.LayoutParams(0, dp(48), 1f))
-        }
-        pageTitle.gravity = Gravity.CENTER_VERTICAL
         val main = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            addView(bar, Ui.lp())
+            if (!wide) addView(LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(8), dp(4), dp(16), 0)
+                addView(menuButton(), LinearLayout.LayoutParams(dp(48), dp(48)))
+            }, Ui.lp())
             addView(page, LinearLayout.LayoutParams(-1, 0, 1f))
         }
         rows = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(0, dp(8), 0, dp(16))
+            setPadding(dp(12), dp(16), dp(12), dp(16))
         }
         drawer = Swipes(this, onRight = {}, onLeft = { if (!wide) expand(false) }).apply {
-            setBackgroundColor(sideBg)
+            background = if (wide) GradientDrawable().apply { setColor(c.drawer) }
+            else GradientDrawable().apply {
+                setColor(c.drawer)
+                val r = dp(28).toFloat()
+                cornerRadii = if (layoutDirection == View.LAYOUT_DIRECTION_RTL) floatArrayOf(r, r, 0f, 0f, 0f, 0f, r, r)
+                else floatArrayOf(0f, 0f, r, r, r, r, 0f, 0f)
+            }
             addView(ScrollView(context).apply { isVerticalScrollBarEnabled = false; addView(rows) })
             elevation = if (wide) 0f else dp(16).toFloat()
         }
@@ -137,7 +163,7 @@ class SetupActivity : Activity() {
         root.addView(row, FrameLayout.LayoutParams(-1, -1))
         if (!wide) {
             scrim = View(this).apply {
-                setBackgroundColor(0x73000000)
+                setBackgroundColor(0x52000000)
                 setOnClickListener { expand(false) }
             }
             root.addView(scrim, FrameLayout.LayoutParams(-1, -1))
@@ -154,6 +180,7 @@ class SetupActivity : Activity() {
         else Section.entries.firstOrNull { it.name == Prefs.settingsSection } ?: Section.GENERAL
         expanded = wide
         show(current)
+        renderDrawer()
         applyExpanded(animate = false)
     }
 
@@ -205,14 +232,21 @@ class SetupActivity : Activity() {
         renderDrawer()
     }
 
-    // --- Drawer ---
-
-    private val dark get() = palette.dark
-    private val sideBg get() = if (dark) 0xFF1A1B1D.toInt() else 0xFFEDEDF0.toInt()
-    private val cardBg get() = if (dark) 0xFF2A2B2F.toInt() else 0xFFFFFFFF.toInt()
+    // --- Setup state ---
 
     /** Notification access and display over other apps: without them Chronotif can't work. */
     private fun missingPermission() = !ListenerService.isEnabled(this) || !Settings.canDrawOverlays(this)
+
+    private fun disconnected() = settled && ListenerService.isEnabled(this) && ListenerService.instance == null
+
+    private fun listenerReady() = ListenerService.isEnabled(this) && !disconnected()
+
+    /** The setup steps done, out of [setupSteps]: notification access (connected), and display over other apps. */
+    private fun stepsDone() = listOf(listenerReady(), Settings.canDrawOverlays(this)).count { it }
+
+    private val setupSteps = 2
+
+    // --- Drawer ---
 
     private fun expand(open: Boolean) {
         if (expanded == open) return
@@ -266,107 +300,86 @@ class SetupActivity : Activity() {
         if (!wide) expand(false)
     }
 
-    /** The app's name, then the sections in groups, a row each: icon, name and summary. */
+    /** The app's name, setup progress while it's unfinished, then the sections in groups. */
     private fun renderDrawer() {
         rows.removeAllViews()
         rows.addView(LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(24), dp(12), dp(24), dp(12))
-            addView(text(getString(R.string.app_name), 22f, bold = true))
+            setPadding(dp(16), dp(12), dp(16), dp(10))
+            addView(text(getString(R.string.app_name), 22f, weight = 600))
             addView(text(getString(R.string.version, BuildConfig.VERSION_NAME), 13f, secondary = true), gap(2))
         }, Ui.lp())
+        val done = stepsDone()
+        if (done < setupSteps) rows.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(14), dp(10), dp(14), dp(10))
+            background = c.pressable(c.high, dp(20).toFloat())
+            addView(text(getString(R.string.setup_progress), 13f, weight = 600))
+            addView(View(context).apply {
+                background = LayerDrawable(arrayOf(
+                    Ui.rounded(c.highest, dp(3).toFloat()),
+                    ClipDrawable(Ui.rounded(c.primary, dp(3).toFloat()), Gravity.START, ClipDrawable.HORIZONTAL).apply {
+                        level = 10000 * done / setupSteps
+                    },
+                ))
+            }, LinearLayout.LayoutParams(0, dp(6), 1f).apply { marginStart = dp(12); marginEnd = dp(12) })
+            addView(text(getString(R.string.setup_progress_count, done, setupSteps), 13f))
+            setOnClickListener { select(Section.GENERAL) }
+        }, Ui.lp().apply { bottomMargin = dp(6) })
         val groups = listOf(
             null to listOf(Section.GENERAL, Section.TIPS),
             R.string.settings_group_features to listOf(Section.PANEL, Section.HANDLE, Section.SWIPE, Section.LOCK, Section.SEARCH),
             R.string.settings_group_app to listOf(Section.UPDATES, Section.ABOUT),
         )
         for ((title, sections) in groups) {
-            rows.addView(View(this).apply { setBackgroundColor(palette.chip) },
-                LinearLayout.LayoutParams(-1, maxOf(1, dp(1) / 2)).apply { topMargin = dp(8); bottomMargin = dp(8) })
             if (title != null) {
-                rows.addView(text(getString(title), 14f, bold = true, secondary = true).apply {
-                    setPadding(dp(24), dp(6), dp(24), dp(6))
+                rows.addView(text(getString(title), 13f, weight = 600, secondary = true).apply {
+                    setPadding(dp(16), dp(14), dp(16), dp(6))
                 }, Ui.lp())
             }
-            for (s in sections) rows.addView(drawerRow(s), Ui.lp().apply {
-                marginStart = dp(8)
-                marginEnd = dp(8)
-            })
+            for (s in sections) rows.addView(drawerRow(s), Ui.lp())
         }
     }
 
     private fun drawerRow(s: Section): View {
-        val (summary, warn) = summary(s)
         val on = s == current
-        val tint = when {
-            warn -> WARN
-            on -> palette.accent
-            else -> palette.text
-        }
+        val tint = if (on) c.onPrimaryContainer else c.textSecondary
+        val missing = if (s == Section.GENERAL) setupSteps - stepsDone() else 0
         return LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            minimumHeight = dp(60)
-            setPadding(dp(16), dp(8), dp(16), dp(8))
-            background = Ui.pressable(if (on) selectedBg else 0, dp(30).toFloat(), palette.ripple)
+            minimumHeight = dp(52)
+            setPadding(dp(16), 0, dp(16), 0)
+            background = c.pressable(if (on) c.primaryContainer else 0, dp(26).toFloat())
             addView(ImageView(context).apply {
                 setImageResource(s.icon)
-                imageTintList = android.content.res.ColorStateList.valueOf(tint)
+                imageTintList = ColorStateList.valueOf(tint)
                 scaleType = ImageView.ScaleType.CENTER
-            }, LinearLayout.LayoutParams(dp(28), dp(28)))
-            addView(LinearLayout(context).apply {
-                orientation = LinearLayout.VERTICAL
-                addView(text(getString(s.title), 16f, bold = on).apply {
-                    maxLines = 1
-                    if (warn) setTextColor(WARN)
-                })
-                addView(text(summary, 13f, secondary = true).apply {
-                    maxLines = 1
-                    ellipsize = android.text.TextUtils.TruncateAt.END
-                })
-            }, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(20) })
+            }, LinearLayout.LayoutParams(dp(24), dp(24)))
+            addView(text(getString(s.title), 15f, weight = if (on) 600 else 500).apply {
+                maxLines = 1
+                if (on) setTextColor(c.onPrimaryContainer)
+            }, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(14) })
+            if (missing > 0) addView(text(missing.toString(), 11f, weight = 700).apply {
+                setTextColor(c.onErrorContainer)
+                gravity = Gravity.CENTER
+                minWidth = dp(20)
+                setPadding(dp(6), dp(2), dp(6), dp(2))
+                background = Ui.rounded(c.errorContainer, dp(10).toFloat())
+            })
             isSelected = on
             setOnClickListener { select(s) }
         }
     }
 
-    private val selectedBg get() = if (dark) 0xFF34374A.toInt() else 0xFFE6E9FA.toInt()
-
     private fun menuButton() = ImageView(this).apply {
         setImageResource(R.drawable.ic_menu)
-        imageTintList = android.content.res.ColorStateList.valueOf(palette.text)
+        imageTintList = ColorStateList.valueOf(c.text)
         scaleType = ImageView.ScaleType.CENTER
-        background = Ui.pressable(0, dp(24).toFloat(), palette.ripple)
+        background = c.pressable(0, dp(24).toFloat())
         contentDescription = getString(R.string.settings_sections)
         setOnClickListener { expand(!expanded) }
-    }
-
-    private fun outlined(color: Int, radius: Int, selected: Boolean) = GradientDrawable().apply {
-        setColor(color)
-        cornerRadius = radius.toFloat()
-        if (selected) setStroke(dp(2), palette.accent)
-    }
-
-    /** A section's one-line summary, and whether it needs attention. */
-    private fun summary(s: Section): Pair<String, Boolean> = when (s) {
-        Section.GENERAL -> if (missingPermission()) getString(R.string.summary_permission_needed) to true
-            else getString(if (Prefs.enabled) R.string.summary_on else R.string.summary_off) to false
-        Section.TIPS -> getString(R.string.summary_tips) to false
-        Section.PANEL -> getString(if (Prefs.headerClock) R.string.summary_clock_date else R.string.summary_date_only) to false
-        Section.HANDLE -> (if (!Prefs.handleEnabled) getString(R.string.summary_off) else getString(R.string.summary_handle,
-            getString(shapes.first { it.second == Prefs.handleShape }.first),
-            getString(if (Prefs.handleRight) R.string.side_right else R.string.side_left))) to false
-        Section.SWIPE -> getString(when {
-            !StatusBarSwipe.isEnabled(this) -> R.string.summary_swipe_access
-            Prefs.statusSwipeEnabled -> R.string.summary_on
-            else -> R.string.summary_off
-        }) to false
-        Section.LOCK -> getString(listOf(R.string.lock_off, R.string.lock_new, R.string.lock_any)[Prefs.lockMode.coerceIn(0, 2)]) to false
-        Section.SEARCH -> getString(engines[Prefs.searchEngine.coerceIn(0, engines.size - 1)]) to false
-        Section.UPDATES -> getString(if (Prefs.nightlyUpdates) R.string.update_nightly else R.string.update_stable).let {
-            if (Prefs.autoUpdate) getString(R.string.summary_updates_auto, it) else it
-        } to false
-        Section.ABOUT -> getString(R.string.version, BuildConfig.VERSION_NAME) to false
     }
 
     private val shapes = listOf(
@@ -386,7 +399,10 @@ class SetupActivity : Activity() {
         body.removeAllViews()
         refreshers.clear()
         pendingPermission.clear()
-        pageTitle.text = getString(s.title)
+        target = body
+        body.addView(text(getString(s.title), 30f, weight = 500).apply {
+            setPadding(dp(4), dp(if (wide) 28 else 12), dp(4), 0)
+        }, Ui.lp())
         when (s) {
             Section.GENERAL -> general()
             Section.TIPS -> tips()
@@ -399,7 +415,12 @@ class SetupActivity : Activity() {
             Section.ABOUT -> about()
         }
         refreshers.forEach { it() }
+        reshapeGroups()
         page.scrollTo(0, 0)
+    }
+
+    private fun reshapeGroups() {
+        for (i in 0 until body.childCount) (body.getChildAt(i) as? SettingGroup)?.reshape()
     }
 
     /** Builds [current] again where it was scrolled to, after a change its previews show. */
@@ -411,42 +432,23 @@ class SetupActivity : Activity() {
     }
 
     private fun general() {
-        body.addView(text(getString(R.string.setup_intro), 14f, secondary = true), gap(4))
-        toggle(R.string.enabled, R.string.enabled_desc, { Prefs.enabled }) {
-            Prefs.enabled = it
-            applyHandle()
-            StatusBarSwipe.instance?.refresh()
-            TileService.requestListeningState(this, ComponentName(this, PanelTile::class.java))
-        }
-        label(R.string.setup_permissions)
-        permission(R.string.perm_listener, R.string.perm_listener_desc,
-            granted = { ListenerService.isEnabled(this) }, broken = { disconnected() }) { openListenerSettings() }
-        // Granted but unbound: the system can't restart the listener (MIUI without autostart),
-        // and only toggling access off and on reconnects it.
-        val disconnectedHint = text(
-            getString(if (isXiaomi) R.string.perm_disconnected_xiaomi else R.string.perm_disconnected),
-            13f, secondary = true,
-        )
-        body.addView(disconnectedHint, gap(4))
-        refreshers += { disconnectedHint.visibility = if (disconnected()) View.VISIBLE else View.GONE }
-        val restricted = text(getString(R.string.perm_restricted_hint), 13f, secondary = true)
-        body.addView(restricted, gap(4))
-        refreshers += {
-            restricted.visibility =
-                if (Build.VERSION.SDK_INT >= 33 && !ListenerService.isEnabled(this)) View.VISIBLE else View.GONE
-        }
-        permission(R.string.perm_overlay, R.string.perm_overlay_desc,
-            granted = { Settings.canDrawOverlays(this) }) {
-            open(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
-        }
-        if (isXiaomi) {
-            permission(R.string.perm_xiaomi, R.string.perm_xiaomi_desc, granted = null) {
-                open(
-                    Intent("miui.intent.action.APP_PERM_EDITOR")
-                        .setClassName("com.miui.securitycenter", "com.miui.permcenter.permissions.PermissionsEditorActivity")
-                        .putExtra("extra_pkgname", packageName),
-                )
+        footnote(getString(R.string.setup_intro), top = 6)
+        progressCard()
+        group(R.string.setup_permissions) {
+            step(R.string.perm_listener, R.string.perm_listener_desc,
+                done = { ListenerService.isEnabled(this) }, broken = { disconnected() },
+                hint = {
+                    when {
+                        disconnected() -> getString(if (isXiaomi) R.string.perm_disconnected_xiaomi else R.string.perm_disconnected)
+                        Build.VERSION.SDK_INT >= 33 && !ListenerService.isEnabled(this) -> getString(R.string.perm_restricted_hint)
+                        else -> null
+                    }
+                }) { openListenerSettings() }
+            step(R.string.perm_overlay, R.string.perm_overlay_desc, done = { Settings.canDrawOverlays(this) }) {
+                open(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
             }
+        }
+        if (isXiaomi) group(R.string.setup_xiaomi) {
             permission(R.string.perm_autostart, R.string.perm_autostart_desc, granted = null) {
                 open(
                     Intent().setComponent(
@@ -454,172 +456,214 @@ class SetupActivity : Activity() {
                     ),
                 )
             }
+            permission(R.string.perm_xiaomi, R.string.perm_xiaomi_desc, granted = null) {
+                open(
+                    Intent("miui.intent.action.APP_PERM_EDITOR")
+                        .setClassName("com.miui.securitycenter", "com.miui.permcenter.permissions.PermissionsEditorActivity")
+                        .putExtra("extra_pkgname", packageName),
+                )
+            }
+        }
+        group {
+            toggle(R.string.enabled, R.string.enabled_desc, { Prefs.enabled }) {
+                Prefs.enabled = it
+                applyHandle()
+                StatusBarSwipe.instance?.refresh()
+                TileService.requestListeningState(this, ComponentName(this, PanelTile::class.java))
+            }
+        }
+        group {
+            val themes = listOf(Prefs.THEME_SYSTEM, Prefs.THEME_LIGHT, Prefs.THEME_DARK)
+            segmented(R.string.settings_theme, listOf(getString(R.string.theme_system), getString(R.string.theme_light),
+                getString(R.string.theme_dark)), themes.indexOf(Prefs.settingsTheme).coerceAtLeast(0)) {
+                if (Prefs.settingsTheme == themes[it]) return@segmented
+                Prefs.settingsTheme = themes[it]
+                // Let the pick show before the screen redraws in the new colours.
+                body.postDelayed({ recreate() }, 150)
+            }
         }
     }
 
-    /** The gestures nobody can see: a line each, always a tap away in the drawer. */
-    private fun tips() {
-        listOf(
-            R.string.tip_open_title to R.string.tip_open_body,
-            R.string.tip_check_title to R.string.tip_check_body,
-            R.string.tip_search_title to R.string.tip_search_body,
-            R.string.tip_preview_title to R.string.tip_preview_body,
-            R.string.tip_stacks_title to R.string.tip_stacks_body,
-            R.string.tip_pictures_title to R.string.tip_pictures_body,
-            R.string.tip_move_title to R.string.tip_move_body,
-            R.string.tip_close_title to R.string.tip_close_body,
-            R.string.tip_lock_title to R.string.tip_lock_body,
-        ).forEach { (title, tip) ->
-            body.addView(LinearLayout(this).apply {
+    /** How much of setup is left, in words, with a ring; "All set" once nothing is. */
+    private fun progressCard() {
+        val ring = ProgressRing(this)
+        val title = text("", 17f, weight = 600).apply { setTextColor(c.onPrimaryContainer) }
+        val desc = text("", 13.5f).apply { setTextColor(c.onPrimaryContainer); alpha = 0.85f }
+        body.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(18), dp(18), dp(18), dp(18))
+            background = Ui.rounded(c.primaryContainer, dp(28).toFloat())
+            addView(ring, LinearLayout.LayoutParams(dp(60), dp(60)))
+            addView(LinearLayout(context).apply {
                 orientation = LinearLayout.VERTICAL
-                background = Ui.rounded(cardBg, dp(14).toFloat())
-                setPadding(dp(14), dp(12), dp(14), dp(12))
-                addView(text(getString(title), 15f, bold = true))
-                addView(text(getString(tip), 13.5f, secondary = true), gap(4))
-            }, gap(10))
+                addView(title)
+                addView(desc, gap(4))
+            }, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(16) })
+        }, gap(16))
+        refreshers += {
+            val done = stepsDone()
+            val left = setupSteps - done
+            ring.set(done, setupSteps, c.onPrimaryContainer)
+            title.text = if (left == 0) getString(R.string.setup_all_set)
+            else resources.getQuantityString(R.plurals.setup_steps_left, left, left)
+            desc.text = getString(when {
+                !ListenerService.isEnabled(this) -> R.string.setup_next_listener
+                disconnected() -> R.string.setup_next_reconnect
+                !Settings.canDrawOverlays(this) -> R.string.setup_next_overlay
+                else -> R.string.setup_done_desc
+            })
+        }
+    }
+
+    /** The gestures nobody can see: a row each, always a tap away in the drawer. */
+    private fun tips() {
+        group {
+            listOf(
+                R.string.tip_open_title to R.string.tip_open_body,
+                R.string.tip_check_title to R.string.tip_check_body,
+                R.string.tip_search_title to R.string.tip_search_body,
+                R.string.tip_preview_title to R.string.tip_preview_body,
+                R.string.tip_stacks_title to R.string.tip_stacks_body,
+                R.string.tip_pictures_title to R.string.tip_pictures_body,
+                R.string.tip_move_title to R.string.tip_move_body,
+                R.string.tip_close_title to R.string.tip_close_body,
+                R.string.tip_lock_title to R.string.tip_lock_body,
+            ).forEach { (title, tip) -> item(title, getString(tip)) }
         }
     }
 
     private fun panel() {
         header()
-        body.addView(text(getString(R.string.tile_hint), 13f, secondary = true), gap(16))
-        val buttons = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        buttons.addView(Button(this).apply {
-            setText(R.string.open_panel)
-            setOnClickListener { Panel.open(context) }
-        })
-        if (Build.VERSION.SDK_INT >= 33) buttons.addView(Button(this).apply {
-            text = "+ " + getString(R.string.tile_label)
-            setOnClickListener {
-                getSystemService(StatusBarManager::class.java).requestAddTileService(
-                    ComponentName(context, PanelTile::class.java),
-                    getString(R.string.tile_label),
-                    Icon.createWithResource(context, R.drawable.ic_tile),
-                    mainExecutor,
-                ) {}
+        group {
+            item(null, getString(R.string.tile_hint), content = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                addView(button(getString(R.string.open_panel), filled = true) { Panel.open(context) })
+                if (Build.VERSION.SDK_INT >= 33) addView(button("+ " + getString(R.string.tile_label), filled = false) {
+                    getSystemService(StatusBarManager::class.java).requestAddTileService(
+                        ComponentName(context, PanelTile::class.java),
+                        getString(R.string.tile_label),
+                        Icon.createWithResource(context, R.drawable.ic_tile),
+                        mainExecutor,
+                    ) {}
+                }, Ui.lp(-2).apply { marginStart = dp(8) })
+            })
+            toggle(R.string.swipe_to_clear, R.string.swipe_to_clear_desc, { Prefs.swipeToClear }) {
+                Prefs.swipeToClear = it
             }
-        }, gap(0).apply { marginStart = dp(8) })
-        body.addView(buttons, gap(8))
-        toggle(R.string.swipe_to_clear, R.string.swipe_to_clear_desc, { Prefs.swipeToClear }) {
-            Prefs.swipeToClear = it
         }
     }
 
     private fun handle() {
-        toggle(R.string.handle_enabled, R.string.handle_enabled_desc, { Prefs.handleEnabled }) {
-            Prefs.handleEnabled = it
-            applyHandle()
+        group {
+            toggle(R.string.handle_enabled, R.string.handle_enabled_desc, { Prefs.handleEnabled }) {
+                Prefs.handleEnabled = it
+                applyHandle()
+            }
         }
-        label(R.string.handle_side)
-        segmented(listOf(getString(R.string.side_left), getString(R.string.side_right)), if (Prefs.handleRight) 1 else 0) {
-            Prefs.handleRight = it == 1
-            applyHandle()
+        group(R.string.handle_look) {
+            segmented(R.string.handle_side, listOf(getString(R.string.side_left), getString(R.string.side_right)),
+                if (Prefs.handleRight) 1 else 0) {
+                Prefs.handleRight = it == 1
+                applyHandle()
+            }
+            tiles(R.string.handle_shape, shapes.map { (name, shape) -> getString(name) to { EdgeHandle.preview(this, shape) } },
+                columns = 3, selected = shapes.indexOfFirst { it.second == Prefs.handleShape }) {
+                Prefs.handleShape = shapes[it].second
+                applyHandle()
+            }
+            val looks = listOf(Prefs.LOOK_FROSTED, Prefs.LOOK_SOLID, Prefs.LOOK_COUNT)
+            segmented(R.string.handle_fill, listOf(getString(R.string.fill_frosted), getString(R.string.fill_solid),
+                getString(R.string.style_count_short)), looks.indexOf(Prefs.handleLook),
+                note = getString(R.string.fill_count_desc)) {
+                Prefs.handleLook = looks[it]
+                applyHandle()
+                reshow()
+            }
         }
-        label(R.string.handle_shape)
-        tiles(shapes.map { (name, shape) -> getString(name) to { EdgeHandle.preview(this, shape) } }, columns = 3,
-            selected = shapes.indexOfFirst { it.second == Prefs.handleShape }) {
-            Prefs.handleShape = shapes[it].second
-            applyHandle()
+        group(R.string.handle_colours) {
+            val usual = listOf(Prefs.COLOUR_GREY, Prefs.COLOUR_WHITE, Prefs.COLOUR_BLACK)
+            swatches(R.string.handle_colour, usual.map { EdgeHandle.idleColour(it) },
+                listOf(R.string.colour_grey, R.string.colour_white, R.string.colour_black), usual.indexOf(Prefs.handleColour)) {
+                Prefs.handleColour = usual[it]
+                applyHandle()
+                reshow()
+            }
+            val fresh = listOf(Prefs.NEW_ACCENT, Prefs.NEW_BLUE, Prefs.NEW_GREEN, Prefs.NEW_ORANGE, Prefs.NEW_RED,
+                Prefs.NEW_PURPLE, Prefs.NEW_UNCHANGED)
+            swatches(R.string.handle_new_colour, fresh.map { EdgeHandle.newColour(this, it) },
+                listOf(R.string.colour_accent, R.string.colour_blue, R.string.colour_green, R.string.colour_orange,
+                    R.string.colour_red, R.string.colour_purple, R.string.colour_unchanged),
+                fresh.indexOf(Prefs.handleNewColour)) {
+                Prefs.handleNewColour = fresh[it]
+                applyHandle()
+            }
         }
-        label(R.string.handle_fill)
-        val looks = listOf(Prefs.LOOK_FROSTED, Prefs.LOOK_SOLID, Prefs.LOOK_COUNT)
-        segmented(listOf(getString(R.string.fill_frosted), getString(R.string.fill_solid), getString(R.string.style_count_short)),
-            looks.indexOf(Prefs.handleLook)) {
-            Prefs.handleLook = looks[it]
-            applyHandle()
-            reshow()
-        }
-        body.addView(text(getString(R.string.fill_count_desc), 13f, secondary = true), gap(6))
-        label(R.string.handle_colour)
-        val usual = listOf(Prefs.COLOUR_GREY, Prefs.COLOUR_WHITE, Prefs.COLOUR_BLACK)
-        swatches(usual.map { EdgeHandle.idleColour(it) },
-            listOf(R.string.colour_grey, R.string.colour_white, R.string.colour_black), usual.indexOf(Prefs.handleColour)) {
-            Prefs.handleColour = usual[it]
-            applyHandle()
-            reshow()
-        }
-        label(R.string.handle_new_colour)
-        val fresh = listOf(Prefs.NEW_ACCENT, Prefs.NEW_BLUE, Prefs.NEW_GREEN, Prefs.NEW_ORANGE, Prefs.NEW_RED,
-            Prefs.NEW_PURPLE, Prefs.NEW_UNCHANGED)
-        swatches(fresh.map { EdgeHandle.newColour(this, it) },
-            listOf(R.string.colour_accent, R.string.colour_blue, R.string.colour_green, R.string.colour_orange,
-                R.string.colour_red, R.string.colour_purple, R.string.colour_unchanged),
-            fresh.indexOf(Prefs.handleNewColour)) {
-            Prefs.handleNewColour = fresh[it]
-            applyHandle()
-        }
-        label(R.string.handle_position)
-        body.addView(SeekBar(this).apply {
-            max = 100
-            progress = (Prefs.handleY * 100).toInt()
-            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-                override fun onProgressChanged(s: SeekBar, p: Int, fromUser: Boolean) {
-                    if (!fromUser) return
-                    Prefs.handleY = p / 100f
-                    applyHandle()
-                }
-                override fun onStartTrackingTouch(s: SeekBar) {}
-                override fun onStopTrackingTouch(s: SeekBar) {}
-            })
-        }, gap(4))
-        toggle(R.string.handle_landscape, null, { Prefs.handleHideLandscape }) {
-            Prefs.handleHideLandscape = it
-            applyHandle()
+        group(R.string.handle_placement) {
+            slider(R.string.handle_position, 100, (Prefs.handleY * 100).toInt()) {
+                Prefs.handleY = it / 100f
+                applyHandle()
+            }
+            toggle(R.string.handle_landscape, null, { Prefs.handleHideLandscape }) {
+                Prefs.handleHideLandscape = it
+                applyHandle()
+            }
         }
     }
 
     private fun swipe() {
         // The feature is optional, so the restricted-settings hint waits until someone tries it.
         var swipeAsked = false
-        permission(R.string.status_swipe_title, R.string.status_swipe_desc,
-            granted = { StatusBarSwipe.isEnabled(this) },
-            broken = { settled && StatusBarSwipe.isEnabled(this) && StatusBarSwipe.instance == null }) {
-            swipeAsked = true
-            open(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-        }
-        val swipeRestricted = text(getString(R.string.perm_restricted_hint), 13f, secondary = true)
-        body.addView(swipeRestricted, gap(4))
-        refreshers += {
-            swipeRestricted.visibility =
-                if (Build.VERSION.SDK_INT >= 33 && swipeAsked && !StatusBarSwipe.isEnabled(this)) View.VISIBLE else View.GONE
-        }
-        toggle(R.string.status_swipe_enabled, null, { Prefs.statusSwipeEnabled }) {
-            Prefs.statusSwipeEnabled = it
-            StatusBarSwipe.instance?.refresh()
+        group {
+            permission(R.string.status_swipe_title, R.string.status_swipe_desc,
+                granted = { StatusBarSwipe.isEnabled(this) },
+                broken = { settled && StatusBarSwipe.isEnabled(this) && StatusBarSwipe.instance == null }) {
+                swipeAsked = true
+                open(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            }
+            val swipeRestricted = item(null, getString(R.string.perm_restricted_hint))
+            refreshers += {
+                swipeRestricted.visibility =
+                    if (Build.VERSION.SDK_INT >= 33 && swipeAsked && !StatusBarSwipe.isEnabled(this)) View.VISIBLE else View.GONE
+            }
+            toggle(R.string.status_swipe_enabled, null, { Prefs.statusSwipeEnabled }) {
+                Prefs.statusSwipeEnabled = it
+                StatusBarSwipe.instance?.refresh()
+            }
         }
     }
 
     private fun lock() {
-        label(R.string.lock_mode)
-        tiles(listOf(R.string.lock_off, R.string.lock_new, R.string.lock_any).map { getString(it) to null }, columns = 3,
-            selected = Prefs.lockMode) { Prefs.lockMode = it }
-        toggle(R.string.lock_privacy, R.string.lock_privacy_desc, { Prefs.lockHideContent }) {
-            Prefs.lockHideContent = it
+        group {
+            tiles(R.string.lock_mode, listOf(R.string.lock_off, R.string.lock_new, R.string.lock_any).map { getString(it) to null },
+                columns = 3, selected = Prefs.lockMode) { Prefs.lockMode = it }
+            toggle(R.string.lock_privacy, R.string.lock_privacy_desc, { Prefs.lockHideContent }) {
+                Prefs.lockHideContent = it
+            }
         }
     }
 
     private fun search() {
-        toggle(R.string.search_pull_down, R.string.search_pull_down_desc, { Prefs.pullDownSearch }) {
-            Prefs.pullDownSearch = it
+        group {
+            toggle(R.string.search_pull_down, R.string.search_pull_down_desc, { Prefs.pullDownSearch }) {
+                Prefs.pullDownSearch = it
+            }
+            tiles(R.string.search_engine, engines.map { getString(it) to null }, columns = 2, selected = Prefs.searchEngine,
+                note = getString(R.string.search_engine_desc)) { Prefs.searchEngine = it }
         }
-        label(R.string.search_engine)
-        tiles(engines.map { getString(it) to null }, columns = 2, selected = Prefs.searchEngine) { Prefs.searchEngine = it }
-        body.addView(text(getString(R.string.search_engine_desc), 13f, secondary = true), gap(6))
-        permissionToggle(R.string.search_find_contacts, R.string.search_find_contacts_desc,
-            android.Manifest.permission.READ_CONTACTS, { Prefs.searchContacts }) { Prefs.searchContacts = it }
-        permissionToggle(R.string.search_calls, R.string.search_calls_desc,
-            android.Manifest.permission.CALL_PHONE, { Prefs.searchCalls }) { Prefs.searchCalls = it }
-        toggle(R.string.search_currency_rates, R.string.search_currency_rates_desc, { Prefs.currencyRates }) {
-            Prefs.currencyRates = it
+        group(R.string.search_finds) {
+            permissionToggle(R.string.search_find_contacts, R.string.search_find_contacts_desc,
+                android.Manifest.permission.READ_CONTACTS, { Prefs.searchContacts }) { Prefs.searchContacts = it }
+            permissionToggle(R.string.search_calls, R.string.search_calls_desc,
+                android.Manifest.permission.CALL_PHONE, { Prefs.searchCalls }) { Prefs.searchCalls = it }
+            toggle(R.string.search_currency_rates, R.string.search_currency_rates_desc, { Prefs.currencyRates }) {
+                Prefs.currencyRates = it
+            }
+            permissionToggle(R.string.search_find_calendar, R.string.search_find_calendar_desc,
+                android.Manifest.permission.READ_CALENDAR, { Prefs.searchCalendar }) { Prefs.searchCalendar = it }
         }
-        permissionToggle(R.string.search_find_calendar, R.string.search_find_calendar_desc,
-            android.Manifest.permission.READ_CALENDAR, { Prefs.searchCalendar }) { Prefs.searchCalendar = it }
         // The settings first; what Search can do is reference, below them.
-        label(R.string.search_can_do)
-        body.addView(LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            background = Ui.rounded(cardBg, dp(14).toFloat())
-            setPadding(dp(14), dp(4), dp(14), dp(12))
+        group(R.string.search_can_do) {
             listOf(
                 R.string.search_can_apps to R.string.search_can_apps_desc,
                 R.string.search_can_math to R.string.search_can_math_desc,
@@ -630,102 +674,88 @@ class SetupActivity : Activity() {
                 R.string.search_can_calendar to R.string.search_can_calendar_desc,
                 R.string.search_can_settings to R.string.search_can_settings_desc,
                 R.string.search_can_web to R.string.search_can_web_desc,
-            ).forEach { (title, desc) ->
-                addView(text(getString(title), 15f, bold = true), gap(8))
-                addView(text(getString(desc), 13.5f, secondary = true), gap(2))
-            }
-        }, gap(6))
-        body.addView(text(getString(R.string.search_can_private), 13f, secondary = true), gap(8))
+            ).forEach { (title, desc) -> item(title, getString(desc)) }
+        }
+        footnote(getString(R.string.search_can_private))
     }
 
     private fun updates() {
-        label(R.string.update_channel_label)
-        segmented(listOf(getString(R.string.update_stable), getString(R.string.update_nightly)), if (Prefs.nightlyUpdates) 1 else 0) {
-            Prefs.nightlyUpdates = it == 1
-            Prefs.updateFailedVersion = null
-        }
-        body.addView(text(getString(R.string.update_channel_desc), 13f, secondary = true), gap(6))
-        toggle(R.string.update_auto, R.string.update_auto_desc, { Prefs.autoUpdate }) {
-            Prefs.autoUpdate = it
-            Updater.sync(this)
-            if (it && Build.VERSION.SDK_INT >= 33) requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 0)
-            refreshers.forEach { r -> r() }
-        }
-        val install = permission(R.string.perm_install, R.string.perm_install_desc,
-            granted = { packageManager.canRequestPackageInstalls() }) {
-            open(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName")))
-        }
-        refreshers += { install.visibility = if (Prefs.autoUpdate) View.VISIBLE else View.GONE }
-        val updateStatus = text("", 13f, secondary = true).apply { visibility = View.GONE }
-        body.addView(Button(this).apply {
-            setText(R.string.update_check_now)
-            setOnClickListener {
-                isEnabled = false
-                Updater.run(context, manual = true, onStatus = {
-                    updateStatus.text = it
-                    updateStatus.visibility = View.VISIBLE
-                }, done = { isEnabled = true })
+        group {
+            segmented(R.string.update_channel_label, listOf(getString(R.string.update_stable), getString(R.string.update_nightly)),
+                if (Prefs.nightlyUpdates) 1 else 0, note = getString(R.string.update_channel_desc)) {
+                Prefs.nightlyUpdates = it == 1
+                Prefs.updateFailedVersion = null
             }
-        }, gap(12).apply { width = -2 })
-        body.addView(updateStatus, gap(4))
+        }
+        group {
+            toggle(R.string.update_auto, R.string.update_auto_desc, { Prefs.autoUpdate }) {
+                Prefs.autoUpdate = it
+                Updater.sync(this)
+                if (it && Build.VERSION.SDK_INT >= 33) requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 0)
+                refreshers.forEach { r -> r() }
+            }
+            val install = permission(R.string.perm_install, R.string.perm_install_desc,
+                granted = { packageManager.canRequestPackageInstalls() }) {
+                open(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName")))
+            }
+            refreshers += { install.visibility = if (Prefs.autoUpdate) View.VISIBLE else View.GONE }
+        }
+        val updateStatus = text("", 13f, secondary = true).apply { visibility = View.GONE }
+        lateinit var check: TextView
+        check = button(getString(R.string.update_check_now), filled = true) {
+            check.isEnabled = false
+            check.alpha = 0.6f
+            Updater.run(this, manual = true, onStatus = {
+                updateStatus.text = it
+                updateStatus.visibility = View.VISIBLE
+            }, done = { check.isEnabled = true; check.alpha = 1f })
+        }
+        body.addView(check, gap(16).apply { width = -2; marginStart = dp(4) })
+        body.addView(updateStatus, gap(8).apply { marginStart = dp(4) })
     }
 
     private fun about() {
-        label(R.string.setup_privacy)
-        body.addView(text(getString(R.string.privacy_body), 15f, secondary = true), gap(4))
-        body.addView(text(getString(R.string.version, BuildConfig.VERSION_NAME), 13f, secondary = true), gap(16))
+        group(R.string.setup_privacy) { item(null, getString(R.string.privacy_body)) }
+        footnote(getString(R.string.version, BuildConfig.VERSION_NAME))
     }
 
     /** The panel header's clock and date. Changes show the next time the panel opens. */
     private fun header() {
-        label(R.string.header_title)
-        body.addView(text(getString(R.string.header_desc), 13f, secondary = true))
-        val clockOptions = group()
-        val besideOptions = group()
-        fun refresh() {
-            clockOptions.visibility = if (Prefs.headerClock) View.VISIBLE else View.GONE
-            besideOptions.visibility = if (Prefs.headerDateBeside) View.VISIBLE else View.GONE
-        }
-        toggle(R.string.header_clock, null, { Prefs.headerClock }) {
-            Prefs.headerClock = it
-            refresh()
-        }
-        body.addView(clockOptions)
-        val sizeLabel = text("", 13f, secondary = true)
-        fun showSize() { sizeLabel.text = getString(R.string.header_clock_size, Prefs.headerClockSize) }
-        showSize()
-        clockOptions.addView(sizeLabel, gap(16))
-        clockOptions.addView(SeekBar(this).apply {
-            max = Prefs.CLOCK_SIZE_MAX - Prefs.CLOCK_SIZE_MIN
-            progress = Prefs.headerClockSize - Prefs.CLOCK_SIZE_MIN
-            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-                override fun onProgressChanged(s: SeekBar, p: Int, fromUser: Boolean) {
-                    if (!fromUser) return
-                    Prefs.headerClockSize = Prefs.CLOCK_SIZE_MIN + p
-                    showSize()
+        group(R.string.header_title) {
+            item(null, getString(R.string.header_desc))
+            // Hidden with the clock, or unless the date sits beside it.
+            val clockOptions = ArrayList<View>()
+            val besideOptions = ArrayList<View>()
+            fun refresh() {
+                clockOptions.forEach { it.visibility = if (Prefs.headerClock) View.VISIBLE else View.GONE }
+                besideOptions.forEach {
+                    it.visibility = if (Prefs.headerClock && Prefs.headerDateBeside) View.VISIBLE else View.GONE
                 }
-                override fun onStartTrackingTouch(s: SeekBar) {}
-                override fun onStopTrackingTouch(s: SeekBar) {}
-            })
-        }, gap(4))
-        label(R.string.header_date_position, into = clockOptions)
-        segmented(listOf(getString(R.string.header_date_under), getString(R.string.header_date_beside)),
-            if (Prefs.headerDateBeside) 1 else 0, into = clockOptions) {
-            Prefs.headerDateBeside = it == 1
+            }
+            toggle(R.string.header_clock, null, { Prefs.headerClock }) {
+                Prefs.headerClock = it
+                refresh()
+            }
+            clockOptions += slider(R.string.header_clock_size, Prefs.CLOCK_SIZE_MAX - Prefs.CLOCK_SIZE_MIN,
+                Prefs.headerClockSize - Prefs.CLOCK_SIZE_MIN, label = { getString(R.string.header_clock_size, Prefs.CLOCK_SIZE_MIN + it) }) {
+                Prefs.headerClockSize = Prefs.CLOCK_SIZE_MIN + it
+            }
+            clockOptions += segmented(R.string.header_date_position,
+                listOf(getString(R.string.header_date_under), getString(R.string.header_date_beside)),
+                if (Prefs.headerDateBeside) 1 else 0) {
+                Prefs.headerDateBeside = it == 1
+                refresh()
+            }
+            besideOptions += segmented(R.string.header_date_align,
+                listOf(getString(R.string.header_align_top), getString(R.string.header_align_center), getString(R.string.header_align_bottom)),
+                Prefs.headerDateAlign) { Prefs.headerDateAlign = it }
+            toggle(R.string.header_weekday, null, { Prefs.headerWeekday }) { Prefs.headerWeekday = it }
+            toggle(R.string.header_year, null, { Prefs.headerYear }) { Prefs.headerYear = it }
+            toggle(R.string.header_short_names, null, { Prefs.headerShortNames }) { Prefs.headerShortNames = it }
+            toggle(R.string.header_settings, null, { Prefs.headerSettings }) { Prefs.headerSettings = it }
             refresh()
         }
-        clockOptions.addView(besideOptions)
-        label(R.string.header_date_align, into = besideOptions)
-        segmented(listOf(getString(R.string.header_align_top), getString(R.string.header_align_center), getString(R.string.header_align_bottom)),
-            Prefs.headerDateAlign, into = besideOptions) { Prefs.headerDateAlign = it }
-        toggle(R.string.header_weekday, null, { Prefs.headerWeekday }) { Prefs.headerWeekday = it }
-        toggle(R.string.header_year, null, { Prefs.headerYear }) { Prefs.headerYear = it }
-        toggle(R.string.header_short_names, null, { Prefs.headerShortNames }) { Prefs.headerShortNames = it }
-        toggle(R.string.header_settings, null, { Prefs.headerSettings }) { Prefs.headerSettings = it }
-        refresh()
     }
-
-    private fun group() = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
 
     private fun applyHandle() {
         ListenerService.instance?.refreshHandle()
@@ -762,81 +792,97 @@ class SetupActivity : Activity() {
         false
     }
 
-    // --- Tiny view helpers ---
+    // --- Setting helpers ---
 
-    // Explicit colours: some themes (HyperOS dark) make plain text grey, unlike the switch labels.
-    private val palette by lazy { Palette(this) }
-
-    private fun text(s: CharSequence, sp: Float, bold: Boolean = false, secondary: Boolean = false) =
+    private fun text(s: CharSequence, sp: Float, weight: Int = 400, secondary: Boolean = false) =
         TextView(this).apply {
             text = s
             setTextSize(TypedValue.COMPLEX_UNIT_SP, sp)
-            if (bold) setTypeface(typeface, android.graphics.Typeface.BOLD)
-            setTextColor(if (secondary) palette.textSecondary else palette.text)
+            if (weight != 400) typeface = Typeface.create(Typeface.DEFAULT, weight, false)
+            setTextColor(if (secondary) c.textSecondary else c.text)
+            setLineSpacing(0f, 1.1f)
         }
 
     private fun gap(top: Int) = Ui.lp().apply { topMargin = dp(top) }
 
-    private fun disconnected() = settled && ListenerService.isEnabled(this) && ListenerService.instance == null
+    /**
+     * Rows joined into one [SettingGroup], under an optional heading. The helpers called in [block]
+     * add their rows to it.
+     */
+    private fun group(heading: Int? = null, block: () -> Unit): SettingGroup {
+        if (heading != null) body.addView(text(getString(heading), 14f, weight = 600).apply {
+            setTextColor(c.primary)
+            setPadding(dp(16), 0, dp(16), 0)
+        }, gap(24))
+        val g = SettingGroup(this, c)
+        body.addView(g, gap(if (heading != null) 10 else 16))
+        target = g
+        block()
+        target = body
+        return g
+    }
 
-    private fun permission(
-        title: Int,
-        desc: Int,
-        granted: (() -> Boolean)?,
-        broken: () -> Boolean = { false },
-        onClick: () -> Unit,
-    ): View {
-        val row = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
+    /** Small print between groups. */
+    private fun footnote(s: CharSequence, top: Int = 12) {
+        body.addView(text(s, 13f, secondary = true).apply { setPadding(dp(4), 0, dp(4), 0) }, gap(top))
+    }
+
+    /** A row: optional [title], optional [desc], then [content] below or [trailing] beside them. */
+    private fun item(
+        title: Int?,
+        desc: CharSequence? = null,
+        trailing: View? = null,
+        content: View? = null,
+        onClick: (() -> Unit)? = null,
+    ): LinearLayout {
         val texts = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            addView(text(getString(title), 16f))
-            addView(text(getString(desc), 13f, secondary = true))
+            if (title != null) addView(text(getString(title), 16f, weight = 500))
+            if (desc != null) addView(text(desc, 13.5f, secondary = true), if (title != null) gap(3) else Ui.lp())
         }
-        row.addView(texts, LinearLayout.LayoutParams(0, -2, 1f))
-        val button = Button(this).apply { setOnClickListener { onClick() } }
-        row.addView(button, Ui.lp(-2).apply { marginStart = dp(12) })
-        body.addView(row, gap(12))
-        val refresh = {
-            if (granted == null) {
-                button.setText(R.string.open)
-            } else {
-                // Stays tappable when granted: ROMs can drop a grant (or the binding) behind
-                // our back, and the settings screen is the only way to repair it.
-                button.setText(
-                    when {
-                        !granted() -> R.string.grant
-                        broken() -> R.string.reconnect
-                        else -> R.string.granted
-                    },
-                )
-            }
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(18), dp(14), dp(18), dp(14))
+            minimumHeight = dp(56)
+            if (title != null) tag = title
+            addView(LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                addView(texts, LinearLayout.LayoutParams(0, -2, 1f))
+                if (trailing != null) addView(trailing, Ui.lp(-2).apply { marginStart = dp(16) })
+            }, Ui.lp())
+            if (content != null) addView(content, gap(if (title != null || desc != null) 12 else 0))
+            if (onClick != null) setOnClickListener { onClick() }
         }
-        refresh()
-        refreshers += refresh
+        target.addView(row, Ui.lp())
         return row
     }
 
-    private fun toggle(title: Int, desc: Int?, value: () -> Boolean, onChange: (Boolean) -> Unit): Switch {
-        val s = Switch(this).apply {
-            text = getString(title)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
-            setTextColor(palette.text)
-            isChecked = value()
-            setOnCheckedChangeListener { _, v ->
-                onChange(v)
-                renderDrawer()
-            }
+    /** A pill-shaped button: filled for the thing to do next, tonal otherwise. */
+    private fun button(label: CharSequence, filled: Boolean, onClick: () -> Unit) = text(label, 14f, weight = 600).apply {
+        gravity = Gravity.CENTER
+        minHeight = dp(40)
+        setPadding(dp(20), 0, dp(20), 0)
+        setTextColor(if (filled) c.onPrimary else c.text)
+        background = c.pressable(if (filled) c.primary else c.highest, dp(20).toFloat())
+        setOnClickListener { onClick() }
+    }
+
+    private fun toggle(title: Int, desc: Int?, value: () -> Boolean, onChange: (Boolean) -> Unit): M3Switch {
+        val sw = M3Switch(this, c)
+        sw.setChecked(value(), animate = false)
+        val row = item(title, desc?.let { getString(it) }, trailing = sw)
+        row.accessibilityDelegate = M3Switch.RowAccessibility(sw)
+        row.setOnClickListener {
+            sw.setChecked(!sw.isChecked, animate = true)
+            onChange(sw.isChecked)
+            renderDrawer()
         }
-        body.addView(s, gap(12))
-        if (desc != null) body.addView(text(getString(desc), 13f, secondary = true))
-        return s
+        return sw
     }
 
     /** Switches waiting on a permission answer, by request code. */
-    private val pendingPermission = HashMap<Int, Pair<Switch, (Boolean) -> Unit>>()
+    private val pendingPermission = HashMap<Int, Pair<M3Switch, (Boolean) -> Unit>>()
 
     /**
      * A switch that needs [permission] (ADR 0008): turning it on asks for it, and it stays on only
@@ -844,8 +890,9 @@ class SetupActivity : Activity() {
      */
     private fun permissionToggle(title: Int, desc: Int, permission: String, value: () -> Boolean, set: (Boolean) -> Unit) {
         val code = REQUEST_SEARCH_PERMISSION + pendingPermission.size
-        val s = toggle(title, desc, { value() && checkSelfPermission(permission) == android.content.pm.PackageManager.PERMISSION_GRANTED }) { on ->
-            if (!on || checkSelfPermission(permission) == android.content.pm.PackageManager.PERMISSION_GRANTED) return@toggle set(on)
+        val granted = { checkSelfPermission(permission) == android.content.pm.PackageManager.PERMISSION_GRANTED }
+        val s = toggle(title, desc, { value() && granted() }) { on ->
+            if (!on || granted()) return@toggle set(on)
             requestPermissions(arrayOf(permission), code)
         }
         pendingPermission[code] = s to set
@@ -856,20 +903,104 @@ class SetupActivity : Activity() {
         val (s, set) = pendingPermission[requestCode] ?: return
         val granted = grantResults.firstOrNull() == android.content.pm.PackageManager.PERMISSION_GRANTED
         set(granted)
-        s.isChecked = granted
+        s.setChecked(granted, animate = true)
         if (!granted && permissions.firstOrNull()?.let(::shouldShowRequestPermissionRationale) == false) {
             android.widget.Toast.makeText(this, R.string.search_permission_denied, android.widget.Toast.LENGTH_LONG).show()
             open(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
         }
     }
 
-
-    /** A small heading over a setting. */
-    private fun label(title: Int, into: LinearLayout = body) {
-        into.addView(text(getString(title), 13f, secondary = true), gap(18))
+    /**
+     * A permission Chronotif asks for elsewhere, with a button that opens it. [granted] null means
+     * Android can't tell us, so the button just opens the page.
+     */
+    private fun permission(
+        title: Int,
+        desc: Int,
+        granted: (() -> Boolean)?,
+        broken: () -> Boolean = { false },
+        onClick: () -> Unit,
+    ): View {
+        val button = button("", filled = true, onClick)
+        val row = item(title, getString(desc), trailing = button)
+        val refresh = {
+            if (granted == null) {
+                button.setText(R.string.open)
+                styleButton(button, filled = false)
+            } else {
+                // Stays tappable when granted: ROMs can drop a grant (or the binding) behind
+                // our back, and the settings screen is the only way to repair it.
+                val ok = granted() && !broken()
+                button.setText(when {
+                    !granted() -> R.string.grant
+                    broken() -> R.string.reconnect
+                    else -> R.string.granted
+                })
+                styleButton(button, filled = !ok)
+            }
+        }
+        refresh()
+        refreshers += refresh
+        return row
     }
 
-    /** A pick of one, picked by tapping it. Notifies [onPick] and updates the drawer's summary. */
+    private fun styleButton(b: TextView, filled: Boolean) {
+        b.setTextColor(if (filled) c.onPrimary else c.text)
+        b.background = c.pressable(if (filled) c.primary else c.highest, dp(20).toFloat())
+    }
+
+    /**
+     * A setup step: a check once [done], else a button that does it. A [broken] step (done but not
+     * working) gets the button back, and [hint] explains what's wrong.
+     */
+    private fun step(
+        title: Int,
+        desc: Int,
+        done: () -> Boolean,
+        broken: () -> Boolean = { false },
+        hint: () -> String? = { null },
+        onClick: () -> Unit,
+    ) {
+        val mark = ImageView(this).apply { scaleType = ImageView.ScaleType.CENTER }
+        val titleView = text(getString(title), 16f, weight = 500)
+        val descView = text("", 13.5f, secondary = true)
+        val hintView = text("", 13f, secondary = true)
+        val action = button(getString(R.string.allow), filled = true, onClick)
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(16), dp(14), dp(18), dp(14))
+            tag = title
+            addView(mark, LinearLayout.LayoutParams(dp(28), dp(28)).apply { topMargin = dp(1) })
+            addView(LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                addView(titleView)
+                addView(descView, gap(3))
+                addView(hintView, gap(6))
+                addView(action, gap(12).apply { width = -2 })
+            }, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(14) })
+            // Done stays tappable: ROMs drop grants, and their settings page is where to fix it.
+            setOnClickListener { onClick() }
+        }
+        target.addView(row, Ui.lp())
+        refreshers += {
+            val ok = done() && !broken()
+            mark.background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                if (ok) setColor(c.goodContainer) else setStroke(dp(2), if (broken()) c.error else c.outline)
+            }
+            mark.setImageResource(if (ok) R.drawable.ic_check else 0)
+            mark.imageTintList = ColorStateList.valueOf(c.good)
+            descView.text = if (ok) getString(R.string.step_allowed) else getString(desc)
+            descView.setTextColor(if (ok) c.good else c.textSecondary)
+            val h = if (ok) null else hint()
+            hintView.text = h
+            hintView.visibility = if (h == null) View.GONE else View.VISIBLE
+            action.visibility = if (ok) View.GONE else View.VISIBLE
+            action.setText(if (broken()) R.string.reconnect else R.string.allow)
+        }
+    }
+
+    /** A pick of one, picked by tapping it. Notifies [onPick] and updates the drawer. */
     private fun choose(views: List<View>, selected: Int, style: (View, Boolean) -> Unit, onPick: (Int) -> Unit) {
         views.forEachIndexed { i, v ->
             style(v, i == selected)
@@ -881,66 +1012,150 @@ class SetupActivity : Activity() {
         }
     }
 
-    /** Two or three options side by side, one picked. */
-    private fun segmented(labels: List<String>, selected: Int, into: LinearLayout = body, onPick: (Int) -> Unit) {
+    /** Two or three options joined into a button group, the picked one a filled pill with a check. */
+    private fun segmented(title: Int, labels: List<String>, selected: Int, note: String? = null, onPick: (Int) -> Unit): View {
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            background = Ui.rounded(cardBg, dp(12).toFloat())
-            setPadding(dp(3), dp(3), dp(3), dp(3))
+            dividerDrawable = GradientDrawable().apply { setSize(dp(2), 0) }
+            showDividers = LinearLayout.SHOW_DIVIDER_MIDDLE
         }
-        val views = labels.map { l ->
-            text(l, 14f).apply {
+        val rtl = resources.configuration.layoutDirection == View.LAYOUT_DIRECTION_RTL
+        val full = dp(20).toFloat()
+        val tight = dp(6).toFloat()
+        val check = getDrawable(R.drawable.ic_check)!!.mutate()
+        val views = labels.mapIndexed { i, l ->
+            text(l, 14f, weight = 500).apply {
                 gravity = Gravity.CENTER
                 maxLines = 2
-                setPadding(dp(6), dp(9), dp(6), dp(9))
-            }.also { row.addView(it, LinearLayout.LayoutParams(0, -2, 1f)) }
+                minHeight = dp(40)
+                setPadding(dp(8), dp(8), dp(8), dp(8))
+                compoundDrawablePadding = dp(4)
+            }.also { row.addView(it, LinearLayout.LayoutParams(0, -1, 1f)) }
+        }
+        fun radii(i: Int, picked: Boolean): FloatArray {
+            if (picked) return FloatArray(8) { full }
+            val first = if (rtl) i == labels.size - 1 else i == 0
+            val last = if (rtl) i == 0 else i == labels.size - 1
+            val l = if (first) full else tight
+            val r = if (last) full else tight
+            return floatArrayOf(l, l, r, r, r, r, l, l)
         }
         choose(views, selected, { v, on ->
-            v.background = if (on) Ui.rounded(selectedBg, dp(9).toFloat()) else null
-            (v as TextView).setTextColor(if (on) palette.text else palette.textSecondary)
+            val i = views.indexOf(v)
+            v.background = c.pressable(if (on) c.primary else c.highest, radii(i, on))
+            (v as TextView).setTextColor(if (on) c.onPrimary else c.text)
+            v.setCompoundDrawablesRelativeWithIntrinsicBounds(if (on) check else null, null, null, null)
+            v.compoundDrawableTintList = ColorStateList.valueOf(c.onPrimary)
+            v.isSelected = on
         }, onPick)
-        into.addView(row, gap(8))
+        return item(title, note, content = row).also { labelStyle(it, title) }
     }
 
     /** Options as tiles in [columns], each with an optional picture above its name, one picked. */
-    private fun tiles(options: List<Pair<String, (() -> View)?>>, columns: Int, selected: Int, onPick: (Int) -> Unit) {
+    private fun tiles(
+        title: Int,
+        options: List<Pair<String, (() -> View)?>>,
+        columns: Int,
+        selected: Int,
+        note: String? = null,
+        onPick: (Int) -> Unit,
+    ): View {
+        val grid = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         val views = options.map { (name, picture) ->
             LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
-                gravity = Gravity.CENTER_HORIZONTAL
-                setPadding(dp(6), dp(10), dp(6), dp(10))
-                picture?.let { addView(it(), LinearLayout.LayoutParams(-1, dp(56)).apply { bottomMargin = dp(6) }) }
-                addView(text(name, 12.5f).apply {
+                gravity = Gravity.CENTER
+                setPadding(dp(6), dp(12), dp(6), dp(12))
+                minimumHeight = dp(52)
+                picture?.let { addView(it(), LinearLayout.LayoutParams(-1, dp(52)).apply { bottomMargin = dp(6) }) }
+                addView(text(name, 13f, weight = 500).apply {
                     gravity = Gravity.CENTER
                     maxLines = 3
                 })
             }
         }
-        choose(views, selected, { v, on -> v.background = outlined(if (on) selectedBg else cardBg, dp(12), on) }, onPick)
+        choose(views, selected, { v, on ->
+            v.background = c.pressable(if (on) c.primaryContainer else c.high, dp(if (on) 22 else 14).toFloat())
+            ((v as LinearLayout).getChildAt(v.childCount - 1) as TextView).setTextColor(if (on) c.onPrimaryContainer else c.text)
+            v.isSelected = on
+        }, onPick)
         views.chunked(columns).forEachIndexed { r, chunk ->
             val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-            for (c in 0 until columns) {
-                val v = chunk.getOrNull(c) ?: View(this)
-                row.addView(v, LinearLayout.LayoutParams(0, -1, 1f).apply { if (c > 0) marginStart = dp(8) })
+            for (col in 0 until columns) {
+                val v = chunk.getOrNull(col) ?: View(this)
+                row.addView(v, LinearLayout.LayoutParams(0, -1, 1f).apply { if (col > 0) marginStart = dp(6) })
             }
-            body.addView(row, gap(if (r == 0) 8 else 8))
+            grid.addView(row, gap(if (r == 0) 0 else 6))
         }
+        return item(title, note, content = grid).also { labelStyle(it, title) }
     }
 
     /** Colour dots, wrapping to fit; a null colour is "none", drawn struck through. */
-    private fun swatches(colours: List<Int?>, names: List<Int>, selected: Int, onPick: (Int) -> Unit) {
-        val size = dp(34)
-        val gap = dp(8)
-        val sideWidth = if (wide && expanded) dp(290) else dp(64)
-        val room = resources.displayMetrics.widthPixels - sideWidth - dp(32)
-        val perRow = (room / (size + gap)).coerceAtLeast(3)
-        val views = colours.mapIndexed { i, c -> Swatch(this, c, cardBg, palette.accent).apply { contentDescription = getString(names[i]) } }
-        choose(views, selected, { v, on -> (v as Swatch).picked = on }, onPick)
-        views.chunked(perRow).forEach { chunk ->
+    private fun swatches(title: Int, colours: List<Int?>, names: List<Int>, selected: Int, onPick: (Int) -> Unit): View {
+        val size = dp(40)
+        val gapPx = dp(6)
+        val sideWidth = if (wide) drawerWidth else 0
+        val room = resources.displayMetrics.widthPixels - sideWidth - dp(32 + 36)
+        val perRow = (room / (size + gapPx)).coerceAtLeast(3)
+        val views = colours.mapIndexed { i, col -> Swatch(this, col, c.high, c.primary).apply { contentDescription = getString(names[i]) } }
+        choose(views, selected, { v, on -> (v as Swatch).picked = on; v.isSelected = on }, onPick)
+        val grid = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        views.chunked(perRow).forEachIndexed { r, chunk ->
             val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-            chunk.forEach { row.addView(it, LinearLayout.LayoutParams(size, size).apply { marginEnd = gap }) }
-            body.addView(row, gap(8))
+            chunk.forEach { row.addView(it, LinearLayout.LayoutParams(size, size).apply { marginEnd = gapPx }) }
+            grid.addView(row, gap(if (r == 0) 0 else 4))
         }
+        return item(title, null, content = grid).also { labelStyle(it, title) }
+    }
+
+    /** A thick Material 3 slider; [label] replaces the title with one that shows the value. */
+    private fun slider(title: Int, max: Int, progress: Int, label: ((Int) -> String)? = null, onChange: (Int) -> Unit): View {
+        val bar = SeekBar(this).apply {
+            this.max = max
+            this.progress = progress
+            val r = dp(8).toFloat()
+            progressDrawable = LayerDrawable(arrayOf(
+                Ui.rounded(if (c.dark) c.highest else c.primaryContainer, r),
+                ClipDrawable(Ui.rounded(c.primary, r), Gravity.START, ClipDrawable.HORIZONTAL),
+            )).apply {
+                setId(0, android.R.id.background)
+                setId(1, android.R.id.progress)
+            }
+            // A narrow bar with a gap either side, cut out of the track.
+            thumb = InsetDrawable(GradientDrawable().apply {
+                setColor(c.primary)
+                cornerRadius = dp(2).toFloat()
+                setSize(dp(4), dp(40))
+            }, dp(6), 0, dp(6), 0)
+            splitTrack = true
+            minHeight = dp(16)
+            maxHeight = dp(16)
+            setPadding(dp(8), 0, dp(8), 0)
+            background = null
+        }
+        val row = item(title, null, content = bar).also { labelStyle(it, title) }
+        val titleView = (row.getChildAt(0) as LinearLayout).getChildAt(0).let { (it as LinearLayout).getChildAt(0) as TextView }
+        if (label != null) titleView.text = label(progress)
+        bar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(s: SeekBar, p: Int, fromUser: Boolean) {
+                if (!fromUser) return
+                if (label != null) titleView.text = label(p)
+                onChange(p)
+            }
+            override fun onStartTrackingTouch(s: SeekBar) {}
+            override fun onStopTrackingTouch(s: SeekBar) {}
+        })
+        return row
+    }
+
+    /** A control's title reads as a small label over it, so the control is what stands out. */
+    private fun labelStyle(row: View, title: Int) {
+        val texts = ((row as LinearLayout).getChildAt(0) as LinearLayout).getChildAt(0) as LinearLayout
+        (texts.getChildAt(0) as TextView).apply {
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+            setTextColor(c.textSecondary)
+        }
+        row.tag = title
     }
 
     /** One colour dot; picked, it's ringed in the accent colour. */
@@ -953,12 +1168,12 @@ class SetupActivity : Activity() {
         private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
 
         init {
-            background = Ui.pressable(0, context.dp(17).toFloat(), 0x22808080)
+            background = Ui.pressable(0, context.dp(20).toFloat(), 0x22808080)
         }
 
         override fun onDraw(canvas: Canvas) {
             val c = width / 2f
-            val r = c - context.dp(5)
+            val r = c - context.dp(6)
             paint.style = Paint.Style.FILL
             paint.color = colour?.let { it or 0xFF000000.toInt() } ?: empty
             canvas.drawCircle(c, c, r, paint)
@@ -976,7 +1191,7 @@ class SetupActivity : Activity() {
             if (picked) {
                 paint.strokeWidth = context.dp(2).toFloat()
                 paint.color = accent
-                canvas.drawCircle(c, c, c - context.dp(1), paint)
+                canvas.drawCircle(c, c, c - context.dp(2), paint)
             }
         }
     }
