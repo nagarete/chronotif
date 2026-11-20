@@ -72,6 +72,11 @@ object Prefs {
         get() = sp.getFloat("handle_y", 0.22f)
         set(v) = sp.edit().putFloat("handle_y", v).apply()
 
+    /** The settings section last open, reopened next time unless a permission is missing. */
+    var settingsSection: Int
+        get() = sp.getInt("settings_section", 0)
+        set(v) = sp.edit().putInt("settings_section", v).apply()
+
     /** The edge handle's shape: one of the SHAPE_ constants. */
     var handleShape: Int
         get() = sp.getInt("handle_shape", SHAPE_HALF_SMALL)

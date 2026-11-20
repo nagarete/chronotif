@@ -22,6 +22,7 @@ import app.chronotif.ui.SearchActivity
 import android.view.View
 import android.view.WindowInsets
 import android.view.WindowManager
+import android.widget.FrameLayout
 import app.chronotif.ui.Panel
 import app.chronotif.ui.Ui
 import app.chronotif.ui.dp
@@ -60,16 +61,59 @@ class EdgeHandle(service: Context) {
 
     private val onChange: () -> Unit = { view?.newCount = NotifStore.newCount() }
 
-    private companion object {
+    companion object {
         /** Width and height of each [Prefs.handleShape] in dp, and the circle's gap from the edge. */
-        val SIZES = mapOf(
+        private val SIZES = mapOf(
             Prefs.SHAPE_TAB to (20 to 120),
             Prefs.SHAPE_HALF_SMALL to (28 to 56),
             Prefs.SHAPE_HALF_LARGE to (36 to 72),
             Prefs.SHAPE_CIRCLE to (44 to 44),
             Prefs.SHAPE_LINE to (24 to 110),
         )
-        const val CIRCLE_GAP_DP = 2
+        private const val CIRCLE_GAP_DP = 2
+
+        /** Width and height in dp of a handle of [shape]. */
+        fun size(shape: Int): Pair<Int, Int> = SIZES[shape] ?: SIZES.getValue(Prefs.SHAPE_HALF_SMALL)
+
+        /** The handle's usual colour, as RGB: see [Prefs.handleColour]. */
+        fun idleColour(colour: Int = Prefs.handleColour): Int = when (colour) {
+            Prefs.COLOUR_WHITE -> 0xFFFFFF
+            Prefs.COLOUR_BLACK -> 0x1C1C1E
+            else -> 0x9A9AA2
+        }
+
+        /** The handle's colour while anything is New, as RGB, or null to keep the usual one: see [Prefs.handleNewColour]. */
+        fun newColour(context: Context, colour: Int = Prefs.handleNewColour): Int? = when (colour) {
+            Prefs.NEW_UNCHANGED -> null
+            Prefs.NEW_BLUE -> 0x0A84FF
+            Prefs.NEW_GREEN -> 0x30D158
+            Prefs.NEW_ORANGE -> 0xFF9F0A
+            Prefs.NEW_RED -> 0xFF453A
+            Prefs.NEW_PURPLE -> 0xBF5AF2
+            else -> Ui.accent(context) and 0xFFFFFF
+        }
+
+        /**
+         * A still picture of a right-side handle of [shape] in the current style and colours, against
+         * a line standing for the screen edge: drawn by the handle's own code, for settings.
+         */
+        fun preview(context: Context, shape: Int): View {
+            val (w, h) = size(shape)
+            val handle = HandleView(context, { _, _ -> }, { _, _ -> }, preview = true).apply {
+                this.shape = shape
+                look = Prefs.handleLook
+                idle = idleColour()
+                lit = newColour(context)
+            }
+            return FrameLayout(context).apply {
+                addView(View(context).apply { setBackgroundColor(0x40808080) },
+                    FrameLayout.LayoutParams(context.dp(2), -1, Gravity.END))
+                val gap = if (shape == Prefs.SHAPE_CIRCLE) context.dp(CIRCLE_GAP_DP) else 0
+                addView(handle, FrameLayout.LayoutParams(context.dp(w), context.dp(h), Gravity.END or Gravity.CENTER_VERTICAL).apply {
+                    marginEnd = context.dp(2) + gap
+                })
+            }
+        }
     }
 
     fun show() {
@@ -115,20 +159,8 @@ class EdgeHandle(service: Context) {
             params.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
         }
         v.right = Prefs.handleRight
-        v.idle = when (Prefs.handleColour) {
-            Prefs.COLOUR_WHITE -> 0xFFFFFF
-            Prefs.COLOUR_BLACK -> 0x1C1C1E
-            else -> 0x9A9AA2
-        }
-        v.lit = when (Prefs.handleNewColour) {
-            Prefs.NEW_UNCHANGED -> null
-            Prefs.NEW_BLUE -> 0x0A84FF
-            Prefs.NEW_GREEN -> 0x30D158
-            Prefs.NEW_ORANGE -> 0xFF9F0A
-            Prefs.NEW_RED -> 0xFF453A
-            Prefs.NEW_PURPLE -> 0xBF5AF2
-            else -> Ui.accent(ctx) and 0xFFFFFF
-        }
+        v.idle = idleColour()
+        v.lit = newColour(ctx)
         v.shape = Prefs.handleShape
         v.look = Prefs.handleLook
         v.newCount = NotifStore.newCount()
@@ -140,7 +172,7 @@ class EdgeHandle(service: Context) {
     @SuppressLint("RtlHardcoded")
     private fun layout() {
         val screenH = wm.currentWindowMetrics.bounds.height()
-        val (w, h) = SIZES[Prefs.handleShape] ?: SIZES.getValue(Prefs.SHAPE_HALF_SMALL)
+        val (w, h) = size(Prefs.handleShape)
         params.width = ctx.dp(w)
         params.height = ctx.dp(h)
         params.gravity = Gravity.TOP or if (Prefs.handleRight) Gravity.RIGHT else Gravity.LEFT
@@ -173,6 +205,8 @@ class EdgeHandle(service: Context) {
         context: Context,
         private val onDrag: (Float, Float) -> Unit,
         private val onDrop: (Float, Float) -> Unit,
+        /** Only drawn, for settings: no touches, no Back-gesture exclusion. */
+        private val preview: Boolean = false,
     ) : View(context) {
         var newCount = 0
             set(v) {
@@ -241,6 +275,7 @@ class EdgeHandle(service: Context) {
 
         override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
             super.onLayout(changed, left, top, right, bottom)
+            if (preview) return
             // Pixel-style Back gestures leave the tab alone; MIUI's own Back strip ignores this.
             systemGestureExclusionRects = listOf(Rect(0, 0, width, height))
         }
@@ -343,6 +378,7 @@ class EdgeHandle(service: Context) {
 
         @SuppressLint("ClickableViewAccessibility")
         override fun onTouchEvent(e: MotionEvent): Boolean {
+            if (preview) return false
             when (e.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     downX = e.rawX
