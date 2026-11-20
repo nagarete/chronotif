@@ -63,11 +63,19 @@ A media player stays a Media player while paused, even though apps drop the ongo
 
 A Media player is drawn from the app's media session, like the system shade's player: artwork, title and artist, previous / play-pause / next, and a seek bar you can drag with elapsed and total time. It has no output (cast) button, because Android offers apps no public way to open the output picker. Apps that share no session fall back to their notification actions. When several apps have players, all of them show, newest first. Paused or stopped Media players can be swiped left or right when the app allows it. A playing player cannot be swiped away. If Android keeps the notification after a swipe, the card returns. On the lock-screen view, players follow the same privacy rules as other cards: when content is hidden, only the app name and controls show.
 
+## Opening the Panel
+
+The status-bar swipe brings the Panel down under the finger, like the system shade: it appears with the first downward movement and follows it. Let go past a third of the screen, or flick down, and it opens; otherwise it slides back up. A tap on the status bar opens it at once, and so do the edge handle and the Quick Settings tile. While the Panel follows the finger, the light dim behind it follows too; the blur comes in once it has opened.
+
+The header and dim show at once and the cards right after. A long list fills in from the top. Every open starts like a new one: cards collapsed, no reply box, scrolled to the top.
+
+Being on screen counts as a check once the Panel's cards have shown for about 1.5 seconds and it has opened fully, or as soon as it's used. For a pull that opens, the 1.5 seconds count from when its cards first showed during the pull. A pull that slides back is never a check.
+
 ## Search
 
 Search opens without the accessibility service, so it works alongside banking apps that refuse to run with one (ADR 0008). It opens from five places: a pull-down in the Panel or lock-screen view, a long press on the edge handle, the Chronotif Search Quick Settings tile, a Search home-screen widget (a bar 2 to 5 cells wide, or a round 1x1 button), and the Search shortcut on a long press of the app icon. Launchers that bind gestures, such as Nova, can bind theirs to the shortcut. Opened anywhere but the pull-down, Search has its own window over whatever is on screen, the lock screen included. It never takes the digital-assistant slot, so Gemini keeps the power button.
 
-Pulling down with the list at its top, on the Panel or the lock-screen view, opens Search. On the Panel the pull has to start after the Panel has finished opening, so the status-bar swipe that opened it can't run on into search. A pull shorter than about 80dp springs back. The field gets focus and the keyboard comes up.
+Pulling down with the list at its top, on the Panel or the lock-screen view, opens Search. On the Panel the pull has to start after the Panel has finished opening. The status-bar swipe that opens it ends when the finger lifts, so it never runs on into Search. A pull shorter than about 80dp springs back. The field gets focus and the keyboard comes up.
 
 Search never searches notifications. Before you type, it shows a row of up to four apps, the ones that notified most recently, newest first, once each. That counts an app whose notification has since been dismissed. Calls, Media players, Running and Chronotif itself don't count. Typing hides the row and shows, top to bottom: an answer, apps, contacts, Settings pages, calendar events, and a web row.
 
@@ -104,6 +112,8 @@ Results show while locked, except contacts and calendar events: with either swit
 - Get notifications from two apps, dismiss one, then pull down at the top of the panel. Search opens with the keyboard up, and its row shows both apps, the newer first. Type "tok": TikTok is listed. Tap it: TikTok opens and the panel closes.
 - Pull down on the lock-screen view and tap a suggestion. The unlock prompt shows, then the app opens. Pull down again and press Back: the notifications are back, still locked.
 - Open the panel with the status-bar swipe and keep dragging down. Search doesn't open.
+- Pull a little way down from the status bar and let go slowly. The Panel slides back up and New is unchanged. Pull past a third of the screen, or flick down: it opens.
+- Close the Panel and swipe the status bar again straight away. The Panel opens, not the system shade.
 - With BCA open and the accessibility service off, hold the edge handle. Search opens over BCA; Back returns to it.
 - Add the Search tile and the Search widget. Each opens Search with the keyboard up, also from the lock screen, where tapping an app asks to unlock first.
 - Long-press Chronotif's icon and tap Search. Search opens.

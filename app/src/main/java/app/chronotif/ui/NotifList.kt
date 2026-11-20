@@ -6,6 +6,7 @@ import android.animation.LayoutTransition
 import android.content.Context
 import android.content.Intent
 import android.content.res.ColorStateList
+import android.os.SystemClock
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -50,11 +51,17 @@ class NotifList(
         fun replyElsewhere(e: Entry, actionIndex: Int) {}
     }
 
-    private class Row(val id: String, val make: () -> View, val bind: (View) -> Unit)
+    /**
+     * One row of the list. A row with a [sig] (everything its binding depends on) is only bound
+     * again when that changes, so reopening a kept panel updates just the cards that changed.
+     */
+    private class Row(val id: String, val make: () -> View, val sig: (() -> Any?)? = null, val bind: (View) -> Unit)
 
     private val ctx = container.context
     private val pal = Palette(ctx)
     private val views = HashMap<String, View>()
+    /** What each row was last bound with: see [Row.sig]. */
+    private val bound = HashMap<String, Any?>()
     private val expanded = HashSet<String>()
     private val openStacks = HashSet<String>()
     private val pendingDismiss = HashSet<String>()
@@ -70,11 +77,25 @@ class NotifList(
     var shownUpTo = 0L
         private set
 
+    private val transition = LayoutTransition().apply {
+        enableTransitionType(LayoutTransition.CHANGING)
+        setDuration(200)
+    }
+
     init {
-        container.layoutTransition = LayoutTransition().apply {
-            enableTransitionType(LayoutTransition.CHANGING)
-            setDuration(200)
-        }
+        container.layoutTransition = transition
+    }
+
+    /**
+     * Back to how a newly built list starts: cards collapsed, no reply box, Earlier shown and
+     * Running folded. A panel kept between opens calls this so each open starts the same.
+     */
+    fun resetUi() {
+        expanded.clear()
+        openStacks.clear()
+        replying = null
+        earlierRevealed = !onLock
+        runningRevealed = false
     }
 
     /** A conversation focuses its latest message card: see [messageCard]. */
@@ -118,7 +139,11 @@ class NotifList(
 
         fun card(e: Entry, style: CardView.Style, newSince: Long = Long.MAX_VALUE) {
             shownUpTo = maxOf(shownUpTo, e.alertTime)
-            rows += Row("c:${e.key}", { CardView(ctx, this) }) { v ->
+            val sig = {
+                listOf(e, style, e.key in expanded, replying, newSince, redacted(e), e.key in pendingDismiss,
+                    Ui.relTime(ctx, e.alertTime, now), conversationName(e), Apps.generation)
+            }
+            rows += Row("c:${e.key}", { CardView(ctx, this) }, sig) { v ->
                 v as CardView
                 val r = redacted(e)
                 val open = e.key in expanded && !r
@@ -237,6 +262,13 @@ class NotifList(
         reconcile(rows)
     }
 
+    /** A conversation's title can come from its shortcut, which the ranking carries rather than the notification. */
+    private fun conversationName(e: Entry): Any? = if (android.os.Build.VERSION.SDK_INT >= 31) {
+        e.ranking.conversationShortcutInfo?.let { listOf(it.id, it.longLabel, it.shortLabel) }
+    } else {
+        null
+    }
+
     private fun newStackId(key: String) = "new|$key"
     private fun earlierStackId(key: String) = "earlier|$key"
 
@@ -348,7 +380,11 @@ class NotifList(
         stackId: String, e: Entry, c: Content, m: Content.Msg, latest: Boolean, style: CardView.Style, now: Long,
     ): Row {
         val id = "${e.key}#${m.id}"
-        return Row("m:$stackId#${m.id}", { CardView(ctx, this) }) { v ->
+        val sig = {
+            listOf(e, c.redacted, m.id, m.time, latest, style, id in expanded, e.key in expanded, replying,
+                Ui.relTime(ctx, m.time, now), Apps.generation)
+        }
+        return Row("m:$stackId#${m.id}", { CardView(ctx, this) }, sig) { v ->
             v as CardView
             val open = id in expanded || (latest && e.key in expanded)
             val reply = replying?.takeIf { it.first == id || (latest && it.first == e.key) }?.second ?: -1
@@ -570,8 +606,13 @@ class NotifList(
 
     private fun dp(v: Int) = ctx.dp(v)
 
+    /** Rows still to be placed by [place], on a later frame. */
+    private var resume: Runnable? = null
+
     /** Keyed diff: reuse views by id, insert/move/remove only what changed. */
     private fun reconcile(rows: List<Row>) {
+        resume?.let(container::removeCallbacks)
+        resume = null
         val wanted = rows.mapTo(HashSet()) { it.id }
         for (i in container.childCount - 1 downTo 0) {
             val v = container.getChildAt(i)
@@ -579,11 +620,38 @@ class NotifList(
             if (id !in wanted) {
                 container.removeViewAt(i)
                 views.remove(id)
+                bound.remove(id)
             }
         }
-        rows.forEachIndexed { i, r ->
-            val v = views.getOrPut(r.id) { r.make().also { it.tag = r.id } }
-            r.bind(v)
+        // A whole list arriving at once doesn't animate in card by card.
+        if (views.isEmpty()) container.layoutTransition = null
+        place(rows, 0)
+    }
+
+    /**
+     * Places [rows] from [from] on. A phone with a hundred cards in Earlier would hold the list
+     * back for most of a second if they were all made, or even all updated, at once. So once a
+     * screenful is up, the rest are made and updated a few per frame; until then, cards further
+     * down keep what they showed before.
+     */
+    private fun place(rows: List<Row>, from: Int) {
+        val start = SystemClock.uptimeMillis()
+        for (i in from until rows.size) {
+            val r = rows[i]
+            var v = views[r.id]
+            if (i >= FIRST_SCREEN_ROWS && i > from && SystemClock.uptimeMillis() - start >= FRAME_BUDGET_MS) {
+                resume = Runnable {
+                    resume = null
+                    place(rows, i)
+                }.also(container::postOnAnimation)
+                return
+            }
+            if (v == null) v = r.make().also { it.tag = r.id; views[r.id] = it }
+            val sig = r.sig?.invoke()
+            if (sig == null || bound[r.id] != sig || !bound.containsKey(r.id)) {
+                r.bind(v)
+                bound[r.id] = sig
+            }
             if (container.getChildAt(i) !== v) {
                 if (v.parent === container) {
                     container.removeView(v)
@@ -592,5 +660,13 @@ class NotifList(
                 container.addView(v, i)
             }
         }
+        container.layoutTransition = transition
+    }
+
+    private companion object {
+        /** Rows made at once, whatever they cost: enough to fill the screen. */
+        const val FIRST_SCREEN_ROWS = 12
+        /** Time spent making rows per frame after that. */
+        const val FRAME_BUDGET_MS = 8L
     }
 }

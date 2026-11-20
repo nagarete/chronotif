@@ -161,6 +161,8 @@ class SetupActivity : Activity() {
         body.removeCallbacks(settle)
         settled = false
         Updater.foreground = false
+        // Settings changed here may change how the panel looks; the next open builds it afresh.
+        Panel.drop()
     }
 
     /** Back collapses a sidebar expanded over the page, before it leaves settings. */
