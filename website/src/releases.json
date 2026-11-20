@@ -12,7 +12,20 @@
       "The edge handle steps aside in fullscreen apps.",
       "Settings are split into sections, listed in a sidebar with a summary of each, and choices sit side by side instead of in long lists. Settings reopen where you left them.",
       "A Tips page in settings lists the gestures: pulling the panel down, holding a card for its Preview, moving the edge handle, and more."
-    ]
+    ],
+    "video": {
+      "src": "/video/release-0.2.7.mp4",
+      "poster": "/video/release-0.2.7-poster.webp",
+      "label": "What's new in Chronotif 0.2.7",
+      "music": {
+        "title": "Re Adusjtment",
+        "artist": "HoliznaCC0",
+        "album": "PHONK - AURA FARMING",
+        "url": "https://freemusicarchive.org/music/holiznacc0/phonk-aura-farming/re-adusjtment/",
+        "license": "CC0 1.0",
+        "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+      }
+    }
   },
   "stable": [
     {
@@ -32,12 +45,12 @@
         "poster": "/video/release-0.2.6-poster.webp",
         "label": "Search in Chronotif 0.2.6",
         "music": {
-          "title": "Brazilian Phonk Bounce for Dance Reels",
-          "artist": "Alex Morgan",
-          "album": "Phonk & Drift",
-          "url": "https://freemusicarchive.org/music/alex-morgan/phonk-drift",
-          "license": "CC BY 4.0",
-          "licenseUrl": "https://creativecommons.org/licenses/by/4.0/"
+          "title": "Pantheon",
+          "artist": "HoliznaCC0",
+          "album": "PHONK - AURA FARMING",
+          "url": "https://freemusicarchive.org/music/holiznacc0/phonk-aura-farming/pantheon/",
+          "license": "CC0 1.0",
+          "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
         }
       }
     },
@@ -58,12 +71,12 @@
         "poster": "/video/release-0.2.5-poster.webp",
         "label": "What's in Chronotif 0.2.5",
         "music": {
-          "title": "Brazilian Phonk With Heavy Bass Drop",
-          "artist": "Alex Morgan",
-          "album": "Phonk & Drift",
-          "url": "https://freemusicarchive.org/music/alex-morgan/phonk-drift",
-          "license": "CC BY 4.0",
-          "licenseUrl": "https://creativecommons.org/licenses/by/4.0/"
+          "title": "Phonk Remix",
+          "artist": "HoliznaCC0",
+          "album": "PHONK - AURA FARMING",
+          "url": "https://freemusicarchive.org/music/holiznacc0/phonk-aura-farming/phonk-remix/",
+          "license": "CC0 1.0",
+          "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
         }
       }
     },

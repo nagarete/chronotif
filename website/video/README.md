@@ -35,7 +35,8 @@ in seconds, so `trailer/render.mjs` steps through it frame by frame into `out/ch
 `node trailer/render.mjs out/x.mp4 --stills 2,8.5` writes stills next to the output to check a
 change. `trailer/vs.html` is a second trailer (`--page vs.html`) that sets the stock Android shade
 beside Chronotif; see `trailer-vs.md`. `trailer/search.html` is the Search video (`--page search.html`,
-see `search.md`). They show the same made-up apps and people as the phone takes, and must follow the same
+see `search.md`). `trailer/whatsnew.html` is the 0.2.7 video (`--page whatsnew.html`, see
+`whatsnew.md`). They show the same made-up apps and people as the phone takes, and must follow the same
 ordering rules as the app (`docs/notification-behavior.md`): newest first, Conversation stacks,
 and App stacks only in Earlier.
 
@@ -74,10 +75,11 @@ Instrumental. The files are kept in `raw/music/`, not in git. Each video uses a 
 | Trailer | Tranquil Mindscape | freemusicarchive.org/music/holiznacc0/public-domain-lofi/tranquil-mindscape-lofi-happy-reflection/ |
 | Features | Phonk Remix | freemusicarchive.org/music/holiznacc0/phonk-aura-farming/phonk-remix/ |
 | Search | Pantheon | freemusicarchive.org/music/holiznacc0/phonk-aura-farming/pantheon/ |
+| 0.2.7 | Re Adusjtment (FMA's spelling) | freemusicarchive.org/music/holiznacc0/phonk-aura-farming/re-adusjtment/ |
 
 Trailer: `node trailer/render.mjs raw/trailer-silent.mp4 && ./mux.sh raw/trailer-silent.mp4 raw/music/tranquil.mp3 out/chronotif-trailer.mp4`.
 Features: `MUSIC=raw/music/phonk-remix.mp3 MUSIC_START=28.75 ./edit.sh features`.
-Search: see `search.md`.
+Search: see `search.md`. 0.2.7: see `whatsnew.md`.
 
 ## On the website
 
@@ -89,9 +91,11 @@ The site plays smaller copies (720×1280, about 1.5–2.5 MB each) kept in git a
 | `vs-stock.mp4` | `out/chronotif-vs-stock-br-drift.mp4` ([trailer-vs.md](trailer-vs.md)) | 17 s | Homepage |
 | `release-0.2.5.mp4` | `out/chronotif-features.mp4` | 12 s | /releases, 0.2.5 |
 | `release-0.2.6.mp4` | `out/chronotif-search.mp4` | 4 s | /releases, 0.2.6 |
+| `release-0.2.7.mp4` | `out/chronotif-0.2.7.mp4` | 6.5 s | /releases, 0.2.7 |
 
 A release's video is named after its version, and its entry in `../src/releases.json` gives the
-music credit shown under it. After re-rendering a video, rebuild its copy and poster:
+music credit shown under it. The release copies carry the same CC0 tracks as `out/`; rebuild
+them whenever a video is re-scored, so the site and its credits never fall behind. After re-rendering a video, rebuild its copy and poster:
 
 ```sh
 ffmpeg -i out/chronotif-vs-stock-br-drift.mp4 -vf scale=720:1280 -c:v libx264 -preset slow -crf 26 \
