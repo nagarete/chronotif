@@ -170,22 +170,37 @@ class SetupActivity : Activity() {
         }
         // Debug build only, while the look is chosen; it goes once one is picked.
         if (BuildConfig.APPLICATION_ID.endsWith(".debug")) {
-            body.addView(text("Look (debug build only)", 15f), gap(12))
-            val looks = listOf("A · Frosted", "B · Solid", "C · Frosted + count")
-            val group = RadioGroup(this).apply { orientation = RadioGroup.VERTICAL }
-            looks.forEachIndexed { i, l ->
-                group.addView(RadioButton(this).apply {
-                    id = View.generateViewId()
-                    text = l
-                    setTextColor(palette.text)
-                    isChecked = i == Prefs.handleLook
-                    setOnClickListener {
-                        Prefs.handleLook = i
-                        applyHandle()
-                    }
-                })
+            fun choice(title: String, labels: List<String>, current: Int, pick: (Int) -> Unit) {
+                body.addView(text(title, 15f), gap(12))
+                val group = RadioGroup(this).apply { orientation = RadioGroup.VERTICAL }
+                labels.forEachIndexed { i, l ->
+                    group.addView(RadioButton(this).apply {
+                        id = View.generateViewId()
+                        text = l
+                        setTextColor(palette.text)
+                        isChecked = i == current
+                        setOnClickListener {
+                            pick(i)
+                            applyHandle()
+                        }
+                    })
+                }
+                body.addView(group)
             }
-            body.addView(group)
+            choice("Shape (debug build only)",
+                listOf("Tab, 20 x 120 dp", "Half circle S, 28 x 56 dp", "Half circle L, 36 x 72 dp", "Circle, 44 dp"),
+                Prefs.handleShape) { Prefs.handleShape = it }
+            choice("Fill (debug build only)", listOf("Frosted", "Solid", "Frosted + count"),
+                Prefs.handleLook) { Prefs.handleLook = it }
+            body.addView(android.widget.CheckBox(this).apply {
+                text = "Secure (screenshot test)"
+                setTextColor(palette.text)
+                isChecked = Prefs.handleSecureTest
+                setOnCheckedChangeListener { _, on ->
+                    Prefs.handleSecureTest = on
+                    applyHandle()
+                }
+            }, gap(8))
         }
         body.addView(text(getString(R.string.handle_position), 15f), gap(12))
         body.addView(SeekBar(this).apply {

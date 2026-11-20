@@ -45,7 +45,7 @@ class EdgeHandle(service: Context) {
     private val wm = ctx.getSystemService(WindowManager::class.java)
     private var view: HandleView? = null
     private val params = WindowManager.LayoutParams(
-        ctx.dp(WIDTH_DP), ctx.dp(HEIGHT_DP),
+        0, 0,
         WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
         WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
             WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
@@ -59,8 +59,14 @@ class EdgeHandle(service: Context) {
     private val onChange: () -> Unit = { view?.newCount = NotifStore.newCount() }
 
     private companion object {
-        const val WIDTH_DP = 20
-        const val HEIGHT_DP = 120
+        /** Width and height of each [Prefs.handleShape], in dp, and the circle's gap from the edge. */
+        val SIZES = mapOf(
+            Prefs.SHAPE_TAB to (20 to 120),
+            Prefs.SHAPE_HALF_SMALL to (28 to 56),
+            Prefs.SHAPE_HALF_LARGE to (36 to 72),
+            Prefs.SHAPE_CIRCLE to (44 to 44),
+        )
+        const val CIRCLE_GAP_DP = 6
     }
 
     fun show() {
@@ -107,7 +113,13 @@ class EdgeHandle(service: Context) {
         } else {
             params.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
         }
+        params.flags = if (Prefs.handleSecureTest) {
+            params.flags or WindowManager.LayoutParams.FLAG_SECURE
+        } else {
+            params.flags and WindowManager.LayoutParams.FLAG_SECURE.inv()
+        }
         v.right = Prefs.handleRight
+        v.shape = Prefs.handleShape
         v.look = Prefs.handleLook
         v.newCount = NotifStore.newCount()
         layout()
@@ -116,8 +128,11 @@ class EdgeHandle(service: Context) {
 
     private fun layout() {
         val screenH = wm.currentWindowMetrics.bounds.height()
+        val (w, h) = SIZES[Prefs.handleShape] ?: SIZES.getValue(Prefs.SHAPE_HALF_SMALL)
+        params.width = ctx.dp(w)
+        params.height = ctx.dp(h)
         params.gravity = Gravity.TOP or if (Prefs.handleRight) Gravity.END else Gravity.START
-        params.x = 0
+        params.x = if (Prefs.handleShape == Prefs.SHAPE_CIRCLE) ctx.dp(CIRCLE_GAP_DP) else 0
         params.y = ((screenH - params.height) * Prefs.handleY.coerceIn(0f, 1f)).toInt()
     }
 
@@ -131,6 +146,14 @@ class EdgeHandle(service: Context) {
                 }
             }
         var right = true
+            set(v) {
+                if (field != v) {
+                    field = v
+                    invalidate()
+                }
+            }
+        /** [Prefs.handleShape]. */
+        var shape = Prefs.SHAPE_HALF_SMALL
             set(v) {
                 if (field != v) {
                     field = v
@@ -151,7 +174,7 @@ class EdgeHandle(service: Context) {
         private val count = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
             textAlign = Paint.Align.CENTER
-            textSize = context.dp(12).toFloat()
+            textSize = context.dp(11).toFloat()
             typeface = Typeface.create(Typeface.DEFAULT, 600, false)
         }
         private val accent = Ui.accent(context)
@@ -169,38 +192,59 @@ class EdgeHandle(service: Context) {
 
         override fun onDraw(canvas: Canvas) {
             val fresh = newCount > 0
-            val r = context.dp(10).toFloat()
-            // Rounded on the inner side only: the outer corners sit past the screen edge.
-            if (right) tab.set(0f, 0f, width + r, height.toFloat()) else tab.set(-r, 0f, width.toFloat(), height.toFloat())
-            if (look == Prefs.LOOK_SOLID) {
-                fill.color = if (fresh) accent else 0xC76E6E76.toInt()
-                canvas.drawRoundRect(tab, r, r, fill)
-                return
+            val solid = look == Prefs.LOOK_SOLID
+            fill.color = when {
+                solid && fresh -> accent
+                solid -> 0xC76E6E76.toInt()
+                fresh -> (accent and 0x00FFFFFF) or 0x4D000000
+                else -> 0x52808088
             }
-            // Frosted: see-through, with a lit inner edge and a grip line.
-            fill.color = if (fresh) (accent and 0x00FFFFFF) or 0x42000000 else 0x4D808088
-            canvas.drawRoundRect(tab, r, r, fill)
-            line.color = 0x47FFFFFF
+            line.color = 0x4DFFFFFF
             line.strokeWidth = 1f
-            val edge = if (right) 0.5f else width - 0.5f
-            canvas.drawLine(edge, r, edge, height - r, line)
+            val w = width.toFloat()
+            val h = height.toFloat()
+            // Where the mark sits: the middle of what shows.
+            val cx: Float
+            when (shape) {
+                Prefs.SHAPE_TAB -> {
+                    // Rounded on the inner side only: the outer corners sit past the screen edge.
+                    val r = context.dp(10).toFloat()
+                    if (right) tab.set(0f, 0f, w + r, h) else tab.set(-r, 0f, w, h)
+                    canvas.drawRoundRect(tab, r, r, fill)
+                    if (!solid) canvas.drawLine(if (right) 0.5f else w - 0.5f, r, if (right) 0.5f else w - 0.5f, h - r, line)
+                    cx = w / 2
+                }
+                Prefs.SHAPE_CIRCLE -> {
+                    canvas.drawCircle(w / 2, h / 2, w / 2, fill)
+                    if (!solid) canvas.drawCircle(w / 2, h / 2, w / 2 - 0.5f, line)
+                    cx = w / 2
+                }
+                else -> {
+                    // A half circle, its flat side on the screen edge.
+                    val edge = if (right) w else 0f
+                    canvas.drawCircle(edge, h / 2, w, fill)
+                    if (!solid) canvas.drawCircle(edge, h / 2, w - 0.5f, line)
+                    cx = if (right) w * 0.58f else w * 0.42f
+                }
+            }
+            if (solid) return
+            val cy = h / 2
             if (look == Prefs.LOOK_COUNT && fresh) {
-                val w = context.dp(16).toFloat()
-                val h = context.dp(28).toFloat()
-                val cx = width / 2f
-                val cy = height / 2f
+                val r = context.dp(9).toFloat()
                 fill.color = accent
-                canvas.drawRoundRect(cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2, w / 2, w / 2, fill)
+                canvas.drawCircle(cx, cy, r, fill)
                 val label = if (newCount > 99) "99" else newCount.toString()
                 canvas.drawText(label, cx, cy - (count.ascent() + count.descent()) / 2, count)
                 return
             }
-            val gw = context.dp(if (fresh) 6 else 5).toFloat()
-            val gh = height * 0.5f
-            val gx = (width - gw) / 2
-            val gy = (height - gh) / 2
             fill.color = if (fresh) accent else 0xF2787880.toInt()
-            canvas.drawRoundRect(gx, gy, gx + gw, gy + gh, gw / 2, gw / 2, fill)
+            if (shape == Prefs.SHAPE_TAB) {
+                val gw = context.dp(if (fresh) 6 else 5).toFloat()
+                val gh = h * 0.5f
+                canvas.drawRoundRect(cx - gw / 2, cy - gh / 2, cx + gw / 2, cy + gh / 2, gw / 2, gw / 2, fill)
+            } else {
+                canvas.drawCircle(cx, cy, context.dp(if (fresh) 5 else 4).toFloat(), fill)
+            }
         }
 
         @SuppressLint("ClickableViewAccessibility")

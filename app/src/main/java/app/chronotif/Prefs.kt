@@ -8,6 +8,10 @@ import app.chronotif.core.Attention
 
 /** The only persisted state: the last-check watermark, when apps last notified, and a handful of settings. */
 object Prefs {
+    const val SHAPE_TAB = 0
+    const val SHAPE_HALF_SMALL = 1
+    const val SHAPE_HALF_LARGE = 2
+    const val SHAPE_CIRCLE = 3
     const val LOOK_FROSTED = 0
     const val LOOK_SOLID = 1
     const val LOOK_COUNT = 2
@@ -54,6 +58,16 @@ object Prefs {
     var handleY: Float
         get() = sp.getFloat("handle_y", 0.22f)
         set(v) = sp.edit().putFloat("handle_y", v).apply()
+
+    /** Debug build only: marks the edge handle secure, to see what screenshots then do with it. */
+    var handleSecureTest: Boolean
+        get() = sp.getBoolean("handle_secure_test", false)
+        set(v) = sp.edit().putBoolean("handle_secure_test", v).apply()
+
+    /** The edge handle's shape, while the candidates are tried out; see [handleLook]. */
+    var handleShape: Int
+        get() = sp.getInt("handle_shape", SHAPE_HALF_SMALL)
+        set(v) = sp.edit().putInt("handle_shape", v).apply()
 
     /**
      * The edge handle's look, while the three candidates are tried out. Only the debug build
