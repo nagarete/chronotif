@@ -452,7 +452,15 @@ class SetupActivity : Activity() {
     }
 
     private fun general() {
-        footnote(getString(R.string.setup_intro), top = 6)
+        group {
+            toggle(R.string.enabled, R.string.enabled_desc, { Prefs.enabled }) {
+                Prefs.enabled = it
+                applyHandle()
+                StatusBarSwipe.instance?.refresh()
+                TileService.requestListeningState(this, ComponentName(this, PanelTile::class.java))
+            }
+        }
+        footnote(getString(R.string.setup_intro))
         progressCard()
         group(R.string.setup_permissions) {
             step(R.string.perm_listener, R.string.perm_listener_desc,
@@ -482,14 +490,6 @@ class SetupActivity : Activity() {
                         .setClassName("com.miui.securitycenter", "com.miui.permcenter.permissions.PermissionsEditorActivity")
                         .putExtra("extra_pkgname", packageName),
                 )
-            }
-        }
-        group {
-            toggle(R.string.enabled, R.string.enabled_desc, { Prefs.enabled }) {
-                Prefs.enabled = it
-                applyHandle()
-                StatusBarSwipe.instance?.refresh()
-                TileService.requestListeningState(this, ComponentName(this, PanelTile::class.java))
             }
         }
         group {
