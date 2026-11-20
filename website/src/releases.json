@@ -9,7 +9,8 @@
       "Swiping the status bar again right after closing the panel no longer opens the system shade.",
       "The edge handle is easier to hit: a half-circle outline the size of a fingertip, and all of it responds. Pick another shape, style or colour under Settings → Edge handle, including one that doesn't light up for new notifications.",
       "Hold the edge handle and drag it to move it, to either side and any height. Holding it without moving still opens Search, when you let go.",
-      "The edge handle steps aside in fullscreen apps."
+      "The edge handle steps aside in fullscreen apps.",
+      "Settings are split into sections, listed in a sidebar with a summary of each, and choices sit side by side instead of in long lists. Settings reopen where you left them."
     ]
   },
   "stable": [
