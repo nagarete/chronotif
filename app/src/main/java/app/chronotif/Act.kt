@@ -11,11 +11,15 @@ import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 
-/** Performs notification interactions on behalf of the user. */
+/**
+ * Performs notification interactions on behalf of the user. A made-up notification ([Entry.isSample])
+ * is never acted on: its source handles what the user does with it, and this is the backstop.
+ */
 object Act {
 
     /** Opens the notification. Returns true if there was something to open. */
     fun open(context: Context, e: Entry): Boolean {
+        if (e.isSample) return false
         val pi = e.n.contentIntent ?: return false
         val sent = send(context, pi)
         if (sent && e.n.flags and Notification.FLAG_AUTO_CANCEL != 0) dismiss(e)
@@ -23,18 +27,18 @@ object Act {
     }
 
     fun dismiss(e: Entry) {
-        if (e.clearable) ListenerService.instance?.cancelNotification(e.key)
+        if (e.clearable && !e.isSample) ListenerService.instance?.cancelNotification(e.key)
     }
 
     fun dismissAll(entries: List<Entry>) {
-        val keys = entries.filter { it.clearable }.map { it.key }
+        val keys = entries.filter { it.clearable && !it.isSample }.map { it.key }
         if (keys.isNotEmpty()) ListenerService.instance?.cancelNotifications(keys.toTypedArray())
     }
 
     /** Hides [e] until [until], when Android posts it again and it counts as New (ADR 0010). */
     fun snooze(e: Entry, until: Long) {
         val service = ListenerService.instance ?: return
-        if (!e.clearable) return
+        if (!e.clearable || e.isSample) return
         Prefs.snoozed(e.key, until)
         service.snoozeNotification(e.key, (until - System.currentTimeMillis()).coerceAtLeast(60_000L))
     }
@@ -47,12 +51,13 @@ object Act {
 
     fun reply(context: Context, a: Notification.Action, text: CharSequence): Boolean {
         val inputs = a.remoteInputs ?: return false
+        val pi = a.actionIntent ?: return false
         val results = Bundle()
         for (input in inputs) if (input.allowFreeFormInput) results.putCharSequence(input.resultKey, text)
         val fill = Intent()
         RemoteInput.addResultsToIntent(inputs, fill, results)
         RemoteInput.setResultsSource(fill, RemoteInput.SOURCE_FREE_FORM_INPUT)
-        return send(context, a.actionIntent, fill)
+        return send(context, pi, fill)
     }
 
     /**

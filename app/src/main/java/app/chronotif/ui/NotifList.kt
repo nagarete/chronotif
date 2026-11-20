@@ -14,13 +14,11 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import app.chronotif.Act
+import app.chronotif.CardSource
 import app.chronotif.Apps
 import app.chronotif.Content
 import app.chronotif.Entry
 import app.chronotif.LockPolicy
-import app.chronotif.MediaDismiss
-import app.chronotif.NotifStore
-import app.chronotif.Prefs
 import app.chronotif.R
 import app.chronotif.Viewable
 import app.chronotif.core.Attention
@@ -35,7 +33,9 @@ class NotifList(
     private val host: Host,
     private val container: LinearLayout,
     private val onLock: Boolean,
-    private val mediaDismiss: (Context, Entry) -> Boolean = MediaDismiss::dismiss,
+    /** Whose notifications these are, and where what the user does with them goes. */
+    val source: CardSource = CardSource.Real,
+    private val mediaDismiss: (Context, Entry) -> Boolean = source::dismissMedia,
 ) : CardCallbacks {
 
     interface Host {
@@ -155,7 +155,7 @@ class NotifList(
     fun render() {
         val now = System.currentTimeMillis()
         val vis = HashMap<String, LockPolicy.Vis>()
-        val all = NotifStore.visible().filter { e ->
+        val all = source.visible().filter { e ->
             if (!onLock) return@filter true
             val v = LockPolicy.visibility(ctx, e)
             vis[e.key] = v
@@ -174,7 +174,7 @@ class NotifList(
                 else -> false
             }
         }
-        val lastCheck = Prefs.lastCheck
+        val lastCheck = source.lastCheck
         val s = Attention.sections(all, lastCheck)
         val running = s.running
         val rows = ArrayList<Row>()
@@ -208,7 +208,7 @@ class NotifList(
             }
         }
 
-        if (!NotifStore.connected) {
+        if (!source.connected) {
             rows += message("m:access", R.string.no_access_title, R.string.no_access_body) {
                 host.context.startActivity(Intent(ctx, SetupActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                 host.launched()
@@ -245,7 +245,7 @@ class NotifList(
                 continue
             }
             val newIds = incoming.takeLast(Attention.newMessages(incoming.map { it.time }, lastCheck)).map { it.id }.toSet()
-            val hidden = NotifStore.hiddenMessages(e.key)
+            val hidden = source.hiddenMessages(e.key)
             val shown = incoming.filter { it.id !in hidden }
             val (new, old) = shown.partition { it.id in newIds }
             if (new.isNotEmpty()) {
@@ -271,7 +271,7 @@ class NotifList(
 
         for (e in s.earlier) {
             val c = Content.of(ctx, e, redacted(e))
-            val hidden = NotifStore.hiddenMessages(e.key)
+            val hidden = source.hiddenMessages(e.key)
             val shown = c.messages.filter { it.incoming && it.id !in hidden }
             if (c.messages.any { it.incoming }) {
                 if (shown.isNotEmpty()) earlier += Piece(shown.last().time, e, c, shown) { style ->
@@ -387,7 +387,7 @@ class NotifList(
         shownUpTo = maxOf(shownUpTo, e.alertTime)
         val latest = msgs.last()
         // The conversation's newest shown message answers a focus (reply handoff), even if a newer one was hidden.
-        val hidden = NotifStore.hiddenMessages(e.key)
+        val hidden = source.hiddenMessages(e.key)
         val newest = c.messages.lastOrNull { it.incoming && it.id !in hidden }?.id
         // A reply being typed keeps its card on screen when another message turns it into a stack.
         val replyingHere = replying?.first.let { r -> r == e.key || msgs.any { r == "${e.key}#${it.id}" } }
@@ -440,7 +440,7 @@ class NotifList(
             val reply = replying?.takeIf { it.first == id || (latest && it.first == e.key) }?.second ?: -1
             // Android can't drop one message from a notification, so only Chronotif hides it.
             v.swipeAllowed = { true }
-            v.onSwiped = { NotifStore.hideMessage(e.key, m.id) }
+            v.onSwiped = { source.hideMessage(e.key, m.id) }
             v.showCount(0)
             v.bind(e, c.forMessage(m), style, open, reply, now, id = id, at = m.time)
             v.swipe.reset(v)
@@ -455,7 +455,7 @@ class NotifList(
             if (!c.redacted) onToggleExpand(e, e.key)
             return
         }
-        host.guarded { if (Act.open(host.context, e)) host.launched() }
+        host.guarded { if (source.open(host.context, e)) host.launched() }
     }
 
     override fun onToggleExpand(e: Entry, id: String) {
@@ -478,21 +478,21 @@ class NotifList(
             }
             return
         }
-        runAction(a)
+        runAction(e, a)
     }
 
     /** On the lock screen, a button that works in the background runs without unlocking. */
-    private fun runAction(a: android.app.Notification.Action) {
+    private fun runAction(e: Entry, a: android.app.Notification.Action) {
         if (onLock && !Act.needsUnlock(a)) {
-            Act.action(host.context, a)
+            source.action(host.context, e, a)
             return
         }
-        host.guarded { if (Act.action(host.context, a)) host.launched() }
+        host.guarded { if (source.action(host.context, e, a)) host.launched() }
     }
 
     override fun onSendReply(e: Entry, id: String, index: Int, text: CharSequence) {
         val a = e.n.actions?.getOrNull(index) ?: return
-        Act.reply(host.context, a, text)
+        source.reply(host.context, e, a, text)
         replying = null
         expanded -= id
         expanded -= e.key
@@ -515,12 +515,12 @@ class NotifList(
         pendingDismiss += e.key
         container.postDelayed({
             pendingDismiss -= e.key
-            if (NotifStore.get(e.key) != null) render()
+            if (source.get(e.key) != null) render()
         }, 900)
     }
 
     /** The notification as it is now: apps repost with fresh buttons, and an old one may no longer work. */
-    private fun live(e: Entry) = NotifStore.get(e.key) ?: e
+    private fun live(e: Entry) = source.get(e.key) ?: e
 
     override fun onViewImages(anchor: View, e: Entry, items: List<Viewable>, start: Int) {
         val viewer = ImageViewer.show(anchor, items, start, object : ImageViewer.Actions {
@@ -528,7 +528,7 @@ class NotifList(
 
             override fun launched() = host.launched()
 
-            override fun openInApp() = host.guarded { if (Act.open(host.context, live(e))) host.launched() }
+            override fun openInApp() = host.guarded { if (source.open(host.context, live(e))) host.launched() }
         }) ?: return
         overlays += Open(e.key, viewer)
     }
@@ -546,8 +546,9 @@ class NotifList(
             override fun open() = onTap(live(e), c)
 
             override fun action(index: Int) {
-                val a = live(e).n.actions?.getOrNull(index) ?: return
-                runAction(a)
+                val now = live(e)
+                val a = now.n.actions?.getOrNull(index) ?: return
+                runAction(now, a)
             }
 
             override fun canReplyHere(index: Int) = !onLock || live(e).n.actions?.getOrNull(index)?.let(Act::needsUnlock) == false
@@ -555,8 +556,9 @@ class NotifList(
             override fun replyElsewhere(index: Int) = host.guarded { host.replyElsewhere(live(e), index) }
 
             override fun sendReply(index: Int, text: CharSequence) {
-                val a = live(e).n.actions?.getOrNull(index) ?: return
-                Act.reply(host.context, a, text)
+                val now = live(e)
+                val a = now.n.actions?.getOrNull(index) ?: return
+                source.reply(host.context, now, a, text)
             }
 
             override fun viewImages(anchor: View, items: List<Viewable>, start: Int) = onViewImages(anchor, e, items, start)
@@ -571,7 +573,7 @@ class NotifList(
 
             override fun canSnooze() = e.kind == Kind.NOTIFICATION && e.clearable
 
-            override fun snooze(until: Long) = Act.snooze(live(e), until)
+            override fun snooze(until: Long) = source.snooze(live(e), until)
         }) ?: return
         overlays += Open(e.key, preview, stillShows)
     }
@@ -579,11 +581,11 @@ class NotifList(
     private fun dismissAll(entries: List<Entry>) {
         val keys = entries.filter { it.clearable }.map { it.key }
         pendingDismiss += keys
-        Act.dismissAll(entries)
+        source.dismissAll(entries)
         // If the system refused (or we lost the listener), bring the cards back.
         container.postDelayed({
             pendingDismiss -= keys.toSet()
-            if (keys.any { NotifStore.get(it) != null }) render()
+            if (keys.any { source.get(it) != null }) render()
         }, 900)
     }
 
