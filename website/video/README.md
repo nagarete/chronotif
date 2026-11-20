@@ -35,7 +35,8 @@ in seconds, so `trailer/render.mjs` steps through it frame by frame into `out/ch
 `node trailer/render.mjs out/x.mp4 --stills 2,8.5` writes stills next to the output to check a
 change. `trailer/vs.html` is a second trailer (`--page vs.html`) that sets the stock Android shade
 beside Chronotif; see `trailer-vs.md`. `trailer/search.html` is the Search video (`--page search.html`,
-see `search.md`). They show the same made-up apps and people as the phone takes, and must follow the same
+see `search.md`). `trailer/whatsnew.html` is the 0.2.7 video (`--page whatsnew.html`, see
+`whatsnew.md`). They show the same made-up apps and people as the phone takes, and must follow the same
 ordering rules as the app (`docs/notification-behavior.md`): newest first, Conversation stacks,
 and App stacks only in Earlier.
 

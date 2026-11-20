@@ -1,0 +1,476 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Chronotif 0.2.7</title>
+<!-- The 0.2.7 video, drawn frame by frame like search.html: render(t) sets everything from the time
+     t in seconds. The phone screen is laid out in dp (412x883), matching Panel.kt, EdgeHandle.kt
+     and SetupActivity.kt, scaled to the same 672x1440 screen as the other videos. Apps, people and
+     notifications are the same made-up ones as the phone takes. -->
+<style>
+  :root {
+    --card: rgba(44,44,46,.92); --text-2: rgba(235,235,245,.6); --accent: #a8c7fa;
+    --serif: "Newsreader", Georgia, serif; --sans: "Noto Sans", system-ui, sans-serif;
+    --side: #1a1b1d; --scard: #2a2b2f; --tile: #2e3038; --sel: #34374a; --page: #111214;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; width: 1080px; height: 1920px; overflow: hidden; background: #0b0c10; }
+  body { font-family: var(--sans); color: #f4f1ea; }
+  #bg { position: absolute; inset: 0; background: radial-gradient(1080px 1920px at 50% 0%, #1b2236 0%, #0b0c10 100%); }
+  #bezel { position: absolute; left: 192px; top: 428px; width: 696px; height: 1464px; border-radius: 60px; background: #2a2d36; }
+  #bezel::after { content: ""; position: absolute; inset: 4px; border-radius: 57px; background: #08090c; }
+  #screen { position: absolute; left: 204px; top: 440px; width: 672px; height: 1440px; border-radius: 48px; overflow: hidden; background: #000; }
+  #ui { position: absolute; left: 0; top: 0; width: 412px; height: 883px; transform: scale(1.6311); transform-origin: 0 0; }
+  .lay { position: absolute; inset: 0; overflow: hidden; }
+
+  /* captions, as captions.mjs draws them */
+  .cap { position: absolute; left: 90px; right: 90px; top: 100px; height: 340px; display: grid; place-items: center;
+         text-align: center; font: 500 56px/1.22 var(--serif); letter-spacing: -0.01em; text-wrap: balance; }
+  .cap b { font-weight: 700; color: #9db8ff; }
+  .kicker { font: 600 30px/1 var(--sans); letter-spacing: .16em; text-transform: uppercase; color: #9db8ff; margin-bottom: 26px; }
+  .full { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; gap: 28px;
+          background: radial-gradient(120% 70% at 50% 35%, #1b2236 0%, #0b0c10 60%); }
+  .big { font: 600 150px/1 var(--serif); letter-spacing: -0.03em; }
+  .small { font: 400 52px/1.3 var(--serif); color: #c9c6bf; max-width: 820px; margin: 0 auto; text-wrap: balance; }
+  .small b { color: #9db8ff; font-weight: 600; }
+  .url { margin-top: 30px; font: 600 46px/1 var(--sans); color: #9db8ff; letter-spacing: 0.02em; }
+  .url2 { font: 500 36px/1.3 "Noto Sans Mono", monospace; color: #c9c6bf; }
+
+  /* --- inside the phone, in dp --- */
+  .fill { position: absolute; inset: 0; }
+  .wall { position: absolute; inset: 0; background: linear-gradient(160deg, #3a4a78 0%, #1d2440 45%, #121522 100%); }
+  .status { position: absolute; left: 0; right: 0; top: 0; height: 32px; padding: 8px 22px 0; display: flex; justify-content: space-between;
+            font: 500 13px var(--sans); color: #fff; z-index: 5; }
+  .batt { width: 22px; height: 11px; border: 1.5px solid #fff; border-radius: 3px; position: relative; margin-top: 3px; }
+  .batt::after { content: ""; position: absolute; left: 1.5px; top: 1.5px; bottom: 1.5px; width: 13px; background: #fff; border-radius: 1px; }
+  .sec { position: absolute; left: 26px; font: 700 13px var(--sans); color: rgba(255,255,255,.75); text-shadow: 0 1px 3px rgba(0,0,0,.5); }
+  .ncard { position: absolute; left: 12px; width: 388px; padding: 12px 14px; border-radius: 22px; background: var(--card);
+           display: grid; grid-template-columns: 40px 1fr; column-gap: 12px; align-items: center; }
+  .ncard.dim { background: rgba(44,44,46,.78); }
+  .ncard .t { display: flex; justify-content: space-between; font: 600 15px/1.3 var(--sans); color: #fff; }
+  .ncard .t span:last-child { font: 400 13px var(--sans); color: var(--text-2); }
+  .ncard .b { font: 400 14px/1.35 var(--sans); color: rgba(235,235,245,.78); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ic { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; position: relative; flex: none; }
+  .ic svg { width: 22px; height: 22px; fill: #fff; }
+  .ic.round { border-radius: 50%; font: 600 15px var(--sans); color: #fff; }
+  .ic .badge { position: absolute; right: -4px; bottom: -4px; width: 18px; height: 18px; border-radius: 6px; display: grid; place-items: center; border: 2px solid #2c2c2e; }
+  .ic .badge svg { width: 10px; height: 10px; }
+  .hclock { position: absolute; left: 22px; font: 300 46px/1 var(--sans); color: #fff; }
+  .hdate { position: absolute; left: 24px; font: 400 15px var(--sans); color: rgba(255,255,255,.8); }
+  .gear { position: absolute; width: 26px; height: 26px; fill: #fff; }
+
+  .grid { position: absolute; left: 20px; right: 20px; display: grid; grid-template-columns: repeat(4, 1fr); row-gap: 22px; }
+  .cell { display: flex; flex-direction: column; align-items: center; }
+  .cell .ic { width: 56px; height: 56px; border-radius: 16px; }
+  .cell .ic svg { width: 28px; height: 28px; }
+  .cell span { margin-top: 6px; font: 400 12px var(--sans); color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.5); }
+  .wclock { position: absolute; left: 0; right: 0; text-align: center; font: 300 64px/1 var(--sans); color: #fff; }
+  .wdate { position: absolute; left: 0; right: 0; text-align: center; font: 400 15px var(--sans); color: rgba(255,255,255,.85); }
+
+  .finger { position: absolute; width: 44px; height: 44px; margin: -22px 0 0 -22px; border-radius: 50%; z-index: 20;
+            background: rgba(255,255,255,.35); border: 2px solid rgba(255,255,255,.8); box-shadow: 0 2px 10px rgba(0,0,0,.4); }
+  .ripple { position: absolute; inset: 0; background: rgba(255,255,255,.18); border-radius: inherit; }
+
+  /* settings */
+  .rail { position: absolute; left: 0; top: 0; bottom: 0; width: 64px; background: var(--side); padding-top: 40px;
+          display: flex; flex-direction: column; align-items: center; }
+  .menu { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 22px; position: relative; margin-bottom: 6px; }
+  .menu svg, .tl svg { width: 24px; height: 24px; fill: #fff; }
+  .tl { width: 42px; height: 42px; margin-top: 8px; border-radius: 12px; background: var(--tile); display: grid; place-items: center; position: relative; }
+  .tl.cur { box-shadow: inset 0 0 0 2px var(--accent); }
+  .page { position: absolute; left: 64px; top: 0; right: 0; bottom: 0; background: var(--page); overflow: hidden; }
+  .body { position: absolute; left: 0; right: 0; top: 0; padding: 44px 16px 32px; }
+  .body h1 { margin: 0 0 4px; font: 700 24px/1.3 var(--sans); color: #fff; }
+  .lbl { margin-top: 18px; font: 400 13px/1.35 var(--sans); color: var(--text-2); }
+  .desc { font: 400 13px/1.4 var(--sans); color: var(--text-2); }
+  .trow { display: flex; align-items: center; justify-content: space-between; font: 400 16px var(--sans); color: #fff; min-height: 40px; margin-top: 8px; }
+  .sw { width: 52px; height: 32px; border-radius: 16px; position: relative; flex: none; margin-left: 12px; background: var(--accent); }
+  .sw::after { content: ""; position: absolute; left: 22px; top: 4px; width: 24px; height: 24px; border-radius: 50%; background: #0b305f; }
+  .seg { margin-top: 8px; display: flex; padding: 3px; border-radius: 12px; background: var(--scard); }
+  .seg div { flex: 1; text-align: center; padding: 9px 6px; font: 400 14px/1.3 var(--sans); color: var(--text-2); border-radius: 9px; position: relative; overflow: hidden; }
+  .seg div.on { background: var(--sel); color: #fff; }
+  .tiles { margin-top: 8px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .tile { padding: 10px 6px; border-radius: 12px; background: var(--scard); text-align: center; font: 400 12.5px/1.3 var(--sans); color: #fff; position: relative; overflow: hidden; }
+  .tile.on { background: var(--sel); box-shadow: inset 0 0 0 2px var(--accent); }
+  .tile svg { display: block; width: 100%; height: 56px; margin-bottom: 6px; }
+  .dots { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px; }
+  .dot { width: 34px; height: 34px; position: relative; }
+  .dot i { position: absolute; inset: 5px; border-radius: 50%; border: 1px solid rgba(128,128,128,.33); }
+  .dot.on::before { content: ""; position: absolute; inset: 1px; border-radius: 50%; border: 2px solid var(--accent); }
+  .tip { margin-top: 10px; padding: 12px 14px; border-radius: 14px; background: var(--scard); }
+  .tip b { display: block; font: 700 15px/1.3 var(--sans); color: #fff; }
+  .tip span { display: block; margin-top: 4px; font: 400 13.5px/1.4 var(--sans); color: var(--text-2); }
+  .scrim2 { position: absolute; inset: 0; background: rgba(0,0,0,.45); }
+  .side { position: absolute; left: 0; top: 0; bottom: 0; width: 290px; background: var(--side); padding: 40px 10px 16px; box-shadow: 4px 0 16px rgba(0,0,0,.4); }
+  .side .hd { display: flex; align-items: center; margin-bottom: 8px; font: 700 22px var(--sans); color: #fff; }
+  .scd { margin-top: 7px; display: flex; align-items: center; padding: 9px 10px; border-radius: 14px; background: var(--scard); position: relative; overflow: hidden; }
+  .scd.cur { background: var(--sel); box-shadow: inset 0 0 0 2px var(--accent); }
+  .scd .tl { margin: 0; width: 40px; height: 40px; flex: none; }
+  .scd .tx { margin-left: 12px; font: 700 15px/1.3 var(--sans); color: #fff; }
+  .scd .tx small { display: block; font: 400 12px/1.35 var(--sans); color: var(--text-2); }
+</style>
+<body>
+<div id="bg"></div>
+<div id="bezel"></div>
+<div id="screen"><div id="ui"><div class="lay" id="layA"></div><div class="lay" id="layB"></div></div></div>
+<div id="capA"></div><div id="capB"></div>
+<div id="full"></div>
+
+<script>
+const W = 412, H = 883;
+// --- glyphs (24x24) and the made-up apps ---
+const P = {
+  chat: "M4,3h16a2,2 0,0 1,2 2v10a2,2 0,0 1,-2 2H9l-5,4v-4a2,2 0,0 1,-2 -2V5a2,2 0,0 1,2 -2z",
+  parcel: "M12,2l9,4.5v11L12,22l-9,-4.5v-11L12,2zM12,4.2L6.2,7.1 12,10l5.8,-2.9L12,4.2zM5,8.7v7.6l6,3v-7.6l-6,-3zM19,8.7l-6,3v7.6l6,-3V8.7z",
+  calendar: "M7,2h2v2h6V2h2v2h2a2,2 0,0 1,2 2v14a2,2 0,0 1,-2 2H5a2,2 0,0 1,-2 -2V6a2,2 0,0 1,2 -2h2V2zM5,9v11h14V9H5zM7,11h4v4H7v-4z",
+  bank: "M12,2L21,7v2H3V7l9,-5zM5,10h2v7H5v-7zM9,10h2v7H9v-7zM13,10h2v7h-2v-7zM17,10h2v7h-2v-7zM3,18h18v3H3v-3z",
+  photo: "M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z",
+  music: "M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z",
+  clock: "M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z",
+  camera: "M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4zM9 2 7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9z",
+  gear: "M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z",
+  call: "M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z",
+  message: "M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z",
+  person: "M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z",
+  // settings sections (res/drawable/ic_section_*.xml, ic_lock, ic_search, ic_menu)
+  general: "M13,3h-2v10h2V3zM17.83,5.17l-1.42,1.42C17.99,7.86 19,9.81 19,12c0,3.87 -3.13,7 -7,7s-7,-3.13 -7,-7c0,-2.19 1.01,-4.14 2.58,-5.42L6.17,5.17C4.23,6.82 3,9.26 3,12c0,4.97 4.03,9 9,9s9,-4.03 9,-9c0,-2.74 -1.23,-5.18 -3.17,-6.83z",
+  tips: "M9,21c0,0.55 0.45,1 1,1h4c0.55,0 1,-0.45 1,-1v-1H9v1zM12,2C8.14,2 5,5.14 5,9c0,2.38 1.19,4.47 3,5.74V17c0,0.55 0.45,1 1,1h6c0.55,0 1,-0.45 1,-1v-2.26c1.81,-1.27 3,-3.36 3,-5.74 0,-3.86 -3.14,-7 -7,-7z",
+  panel: "M12,22c1.1,0 2,-0.9 2,-2h-4c0,1.1 0.89,2 2,2zM18,16v-5c0,-3.07 -1.64,-5.64 -4.5,-6.32V4c0,-0.83 -0.67,-1.5 -1.5,-1.5s-1.5,0.67 -1.5,1.5v0.68C7.63,5.36 6,7.92 6,11v5l-2,2v1h16v-1l-2,-2z",
+  handle: "M20,3h1.5v18H20zM18.5,6.5a5.5,5.5 0,0 0,0 11z",
+  swipe: "M4,3h16v2H4zM11,7h2v9.17l3.59,-3.58L18,14l-6,6 -6,-6 1.41,-1.41L11,16.17z",
+  lock: "M12,2a5,5 0,0 0,-5 5v3H6c-1.1,0 -2,0.9 -2,2v8c0,1.1 0.9,2 2,2h12c1.1,0 2,-0.9 2,-2v-8c0,-1.1 -0.9,-2 -2,-2h-1V7a5,5 0,0 0,-5 -5zM9,7a3,3 0,0 1,6 0v3H9V7z",
+  search: "M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.570l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z",
+  updates: "M17.65,6.35C16.2,4.9 14.21,4 12,4c-4.42,0 -7.99,3.58 -7.99,8s3.57,8 7.99,8c3.730,0 6.84,-2.55 7.73,-6h-2.08c-0.82,2.33 -3.04,4 -5.65,4 -3.31,0 -6,-2.69 -6,-6s2.69,-6 6,-6c1.66,0 3.14,0.69 4.22,1.78L13,11h7V4l-2.35,2.35z",
+  about: "M12,2C6.48,2 2,6.48 2,12s4.48,10 10,10 10,-4.48 10,-10S17.52,2 12,2zM13,17h-2v-6h2v6zM13,9h-2V7h2v2z",
+  menu: "M3,18h18v-2H3v2zM3,13h18v-2H3v2zM3,6v2h18V6H3z",
+};
+const svg = (g) => `<svg viewBox="0 0 24 24"><path d="${P[g]}"/></svg>`;
+const APPS = [
+  ["Murmur", "chat", "#2EAD6B"], ["Daybook", "calendar", "#4C6FE0"], ["Fernbank", "bank", "#14806F"], ["Parcelly", "parcel", "#E8813A"],
+  ["Glimmer", "photo", "#C2477A"], ["Hum Music", "music", "#7E57C2"], ["Camera", "camera", "#3C4043"], ["Clock", "clock", "#1A73E8"],
+  ["Contacts", "person", "#1E88E5"], ["Phone", "call", "#34A853"], ["Messages", "message", "#4285F4"], ["Settings", "gear", "#5F6368"],
+].map(([name, g, c]) => ({ name, g, c }));
+const app = (n) => APPS.find((a) => a.name === n);
+const icon = (a) => `<div class="ic" style="background:${a.c}">${svg(a.g)}</div>`;
+
+// --- timing helpers ---
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const ease = (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+const out = (x) => 1 - Math.pow(1 - x, 3);
+const k = (t, t0, t1) => ease(clamp((t - t0) / (t1 - t0)));
+const ko = (t, t0, t1) => out(clamp((t - t0) / (t1 - t0)));
+const mix = (a, b, x) => a + (b - a) * x;
+// A tap: finger shows 0.35 s before, presses at t0, lifts 0.25 s after.
+const tapAt = (t, t0) => ({ o: k(t, t0 - 0.35, t0 - 0.15) * (1 - k(t, t0 + 0.25, t0 + 0.45)), press: k(t, t0 - 0.05, t0) * (1 - k(t, t0 + 0.12, t0 + 0.2)), rip: clamp(1 - Math.abs(t - t0 - 0.08) / 0.2) });
+const finger = (x, y, o, press = 0) => (o > 0 ? `<div class="finger" style="left:${x}px;top:${y}px;opacity:${o};transform:scale(${1 - press * 0.15})"></div>` : "");
+const ripple = (on) => (on > 0 ? `<div class="ripple" style="opacity:${on}"></div>` : "");
+
+// --- the edge handle, drawn as EdgeHandle.kt draws it ---
+const SIZES = { half: [28, 56], large: [36, 72], tab: [20, 120], circle: [44, 44], line: [14, 90] };
+const IDLE = "#9A9AA2", ACCENT = "#a8c7fa";
+// h: { shape, look ("subtle" | "bold" | "count"), right, y (centre), on (anything New), count, lit (colour while New) }
+function handleArt(h, w, ht) {
+  const solid = h.look === "bold", on = h.on && h.lit !== null;
+  const hue = on ? (h.lit ?? ACCENT) : IDLE;
+  let s = "";
+  if (h.shape === "tab") {
+    const r = 10, a = solid ? (on ? 1 : .78) : (on ? .3 : .32);
+    s += `<rect x="${h.right ? 0 : -r}" y="0" width="${w + r}" height="${ht}" rx="${r}" fill="${hue}" fill-opacity="${a}"/>`;
+    if (!solid) {
+      const ex = h.right ? 0.5 : w - 0.5;
+      s += `<line x1="${ex}" y1="${r}" x2="${ex}" y2="${ht - r}" stroke="#fff" stroke-opacity=".3" stroke-width="1"/>`;
+      if (h.look === "count" && h.count > 0) s += `<circle cx="${w / 2}" cy="${ht / 2}" r="9" fill="${hue}"/><text x="${w / 2}" y="${ht / 2}" dy=".35em" text-anchor="middle" font-size="11" font-weight="600" fill="#000">${h.count}</text>`;
+      else { const gw = on ? 6 : 5; s += `<rect x="${w / 2 - gw / 2}" y="${ht / 4}" width="${gw}" height="${ht / 2}" rx="${gw / 2}" fill="${hue}" fill-opacity="${on ? 1 : .95}"/>`; }
+    }
+  } else if (h.shape === "line") {
+    const lw = on ? 5 : 4, lh = ht * 0.62, x = h.right ? w - 3 - lw : 3;
+    s += `<rect x="${x}" y="${(ht - lh) / 2}" width="${lw}" height="${lh}" rx="${lw / 2}" fill="${hue}" fill-opacity="${on ? 1 : .6}"/>`;
+  } else {
+    const stroke = solid ? 4 : 3, half = h.shape !== "circle";
+    const cx = !half ? w / 2 : h.right ? w : 0, cy = ht / 2, r = (half ? w : w / 2) - stroke / 2 - 1;
+    s += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#000" stroke-opacity=".25" stroke-width="${stroke + 2}"/>`;
+    s += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${hue}" stroke-opacity="${on ? 1 : solid ? .95 : .85}" stroke-width="${stroke}"/>`;
+    if (h.look === "count" && h.count > 0) {
+      const tx = !half ? cx : h.right ? w * 0.6 : w * 0.4;
+      s += `<text x="${tx}" y="${cy}" dy=".36em" text-anchor="middle" font-size="11" font-weight="600" fill="${hue}">${h.count}</text>`;
+    }
+  }
+  return s;
+}
+// On screen at its edge; dx/dy move it (a drag), o fades it, out slides it off the edge (0..1).
+function edgeHandle(h, extra = {}) {
+  const [w, ht] = SIZES[h.shape];
+  const gap = h.shape === "circle" ? 2 : 0;
+  const x = (h.right ? W - w - gap : gap) + (extra.dx ?? 0) + (h.right ? 1 : -1) * (extra.out ?? 0) * (w + 4);
+  const y = h.y - ht / 2 + (extra.dy ?? 0);
+  return `<svg class="abs" style="position:absolute;left:${x}px;top:${y}px;overflow:visible;z-index:6;opacity:${extra.o ?? 1};transform:scale(${extra.scale ?? 1});transform-origin:${h.right ? "100%" : "0"} 50%" width="${w}" height="${ht}" viewBox="0 0 ${w} ${ht}">${handleArt(h, w, ht)}</svg>`;
+}
+// The Settings tile picture: a right-side handle against a line for the screen edge.
+function handlePreview(h) {
+  const [w, ht] = SIZES[h.shape];
+  const vw = 100, vh = 56, sc = Math.min(1, (vh - 4) / ht), ex = vw / 2 + 22;
+  const gap = h.shape === "circle" ? 2 : 0;
+  return `<svg viewBox="0 0 ${vw} ${vh}"><rect x="${ex}" y="2" width="2" height="${vh - 4}" rx="1" fill="#fff" fill-opacity=".35"/>
+    <g transform="translate(${ex - (w + gap) * sc} ${(vh - ht * sc) / 2}) scale(${sc})">${handleArt({ ...h, right: true }, w, ht)}</g></svg>`;
+}
+
+// --- screens ---
+const status = (o = 1) => `<div class="status" style="opacity:${o}"><span>9:41</span><span style="display:flex;gap:6px">▂▄▆ <span class="batt"></span></span></div>`;
+function home() {
+  const grid = ["Murmur", "Daybook", "Glimmer", "Hum Music", "Fernbank", "Parcelly", "Camera", "Clock"].map((n) =>
+    `<div class="cell">${icon(app(n))}<span>${n}</span></div>`).join("");
+  const dock = ["Phone", "Messages", "Contacts", "Settings"].map((n) => `<div class="cell">${icon(app(n))}</div>`).join("");
+  return `<div class="wall"></div>
+    <div class="grid" style="top:520px">${grid}</div><div class="grid" style="top:770px">${dock}</div>`;
+}
+const NCARDS = [
+  { a: "Murmur", person: ["MC", "#F06292"], title: "Maya Chen", body: "Look at this view", time: "now" },
+  { a: "Daybook", title: "Design review in 15 min", body: "11:00 · Room 4", time: "now" },
+  { a: "Fernbank", title: "You paid Corner Café", body: "€4.20 · Main account", time: "4m", dim: 1 },
+  { a: "Parcelly", title: "Out for delivery", body: "Arriving today, 2–4 PM", time: "31m", dim: 1 },
+  { a: "Murmur", person: ["H", "#64B5F6"], title: "Hiking crew", body: "Emma Wilson: I’ll drive, room for three", time: "1h", dim: 1 },
+];
+function ncard(c, y, o) {
+  const a = app(c.a);
+  const ic = c.person
+    ? `<div class="ic round" style="background:${c.person[1]}">${c.person[0]}<span class="badge" style="background:${a.c}">${svg(a.g)}</span></div>`
+    : icon(a);
+  return `<div class="ncard ${c.dim ? "dim" : ""}" style="top:${y + (1 - o) * 10}px;opacity:${o}">${ic}<div style="min-width:0"><div class="t"><span>${c.title}</span><span>${c.time}</span></div><div class="b">${c.body}</div></div></div>`;
+}
+// fill(i): how far card i has appeared (0..1). glow: the New label lit up.
+function cardList(top, fill = () => 1, glow = 0) {
+  let y = top, h = `<div class="sec" style="top:${y}px;opacity:${fill(0)};${glow ? `color:${ACCENT};text-shadow:0 0 ${8 * glow}px ${ACCENT}` : ""}">New</div>`; y += 24;
+  NCARDS.forEach((c, i) => {
+    if (i === 2) { y += 14; h += `<div class="sec" style="top:${y}px;opacity:${fill(i)}">Earlier</div>`; y += 24; }
+    h += ncard(c, y, fill(i)); y += 74;
+  });
+  return h;
+}
+// The panel over the home screen. p: how far it's pulled (content fades in and slides 96 dp, as in
+// PanelView.pull); blur: the blur behind, which fades in once a pull settles; cards: card fill-in.
+function panel(p, blur, opts = {}) {
+  const behind = `<div class="fill" style="filter:${blur > 0 ? `blur(${blur * 14}px)` : "none"};transform:scale(${1 + blur * 0.04})">${home()}</div>`;
+  const dim = `<div class="fill" style="background:rgba(0,0,0,${0.5 * p - 0.2 * blur * p})"></div>`;
+  const content = `<div class="fill" style="opacity:${p};transform:translateY(${(p - 1) * 96}px)">
+    <div class="hclock" style="top:46px">9:41</div><div class="hdate" style="top:98px">Friday, 20 November</div>
+    <svg class="gear" style="left:364px;top:56px" viewBox="0 0 24 24"><path d="${P.gear}"/></svg>
+    ${cardList(140, opts.cards, opts.glow)}</div>`;
+  return behind + dim + content;
+}
+
+// Settings (SetupActivity): the rail of section icons, and the open section's page.
+const SECTIONS = [
+  ["general", "General", "On"], ["tips", "Tips", "Gestures and shortcuts"], ["panel", "Panel", "Clock and date"],
+  ["handle", "Edge handle", "Half circle · Right"], ["swipe", "Status-bar swipe", "On"], ["lock", "Lock screen", "When something is new"],
+  ["search", "Search", "Google"], ["updates", "Updates", "Stable · automatic"], ["about", "Privacy and about", "Version 0.2.7"],
+];
+function rail(cur, menuTap = 0) {
+  return `<div class="rail"><div class="menu" id="menu">${ripple(menuTap)}${svg("menu")}</div>` +
+    SECTIONS.map(([g]) => `<div class="tl ${g === cur ? "cur" : ""}">${svg(g)}</div>`).join("") + `</div>`;
+}
+function sidebar(cur, slide, tap = {}) {
+  const cards = SECTIONS.map(([g, title, sum]) => `<div class="scd ${g === cur ? "cur" : ""}" id="card-${g}">${ripple(tap[g] ?? 0)}<div class="tl">${svg(g)}</div>
+    <div class="tx">${title}${g === "handle" && tap.summary ? `<small>${tap.summary}</small>` : `<small>${sum}</small>`}</div></div>`).join("");
+  return `<div class="scrim2" style="opacity:${slide}"></div><div class="side" style="transform:translateX(${(slide - 1) * 300}px)">
+    <div class="hd"><div class="menu">${svg("menu")}</div><span style="margin-left:6px">Chronotif</span></div>${cards}</div>`;
+}
+const SHAPES = [["half", "Half circle"], ["large", "Large half circle"], ["tab", "Tab"], ["circle", "Circle"], ["line", "Thin line"]];
+const LOOKS = [["subtle", "Subtle"], ["bold", "Bold"], ["count", "With count"]];
+const NEWCOLS = [ACCENT, "#0A84FF", "#30D158", "#FF9F0A", "#FF453A", "#BF5AF2", null];
+// st: { shape, look, lit, taps: { id: ripple } }
+function handlePage(st) {
+  const tp = st.taps ?? {};
+  const h = { shape: st.shape, look: st.look, right: true, on: true, count: 2, lit: st.lit };
+  const seg = (opts, cur, id) => `<div class="seg">${opts.map(([v, l], i) => `<div class="${v === cur ? "on" : ""}" id="${id}-${v}">${ripple(tp[`${id}-${v}`] ?? 0)}${l}</div>`).join("")}</div>`;
+  const tiles = `<div class="tiles">${SHAPES.map(([v, l]) => `<div class="tile ${v === st.shape ? "on" : ""}" id="shape-${v}">${ripple(tp[`shape-${v}`] ?? 0)}${handlePreview({ ...h, shape: v })}${l}</div>`).join("")}</div>`;
+  const dots = (cols, cur, id) => `<div class="dots">${cols.map((c, i) => `<div class="dot ${c === cur ? "on" : ""}" id="${id}-${i}"><i style="background:${c ?? "var(--scard)"}"></i>${c === null ? `<svg viewBox="0 0 34 34" style="position:absolute;inset:0"><line x1="12" y1="22" x2="22" y2="12" stroke="#808088" stroke-width="2"/></svg>` : ""}</div>`).join("")}</div>`;
+  return `<div class="body" style="transform:translateY(${-(st.scroll ?? 0)}px)"><h1>Edge handle</h1>
+    <div class="trow"><span>Edge handle</span><span class="sw"></span></div>
+    <div class="desc">A handle at the screen edge. Tap it or swipe down on it to open the panel, or hold it for Search. Hold and drag it to move it. It lights up when something is new, and steps aside in fullscreen apps.</div>
+    <div class="lbl">Side</div>${seg([["left", "Left"], ["right", "Right"]], "right", "side")}
+    <div class="lbl">Shape</div>${tiles}
+    <div class="lbl">Style</div>${seg(LOOKS, st.look, "look")}
+    <div class="desc" style="margin-top:6px">With count, the handle shows how many notifications are new, to anyone who can see your screen.</div>
+    <div class="lbl">Usual colour</div>${dots(["#9A9AA2", "#FFFFFF", "#1C1C1E"], "#9A9AA2", "idle")}
+    <div class="lbl">When something is new</div>${dots(NEWCOLS, st.lit, "lit")}</div>`;
+}
+const TIPS = [
+  ["Open the panel", "Tap the edge handle or swipe down on it. With the status-bar swipe on, pull down from the left half of the status bar and the panel follows your finger. The Chronotif Quick Settings tile opens it too."],
+  ["New and Earlier", "Notifications move from New to Earlier once the panel has been open for about a second and a half, or as soon as you touch it. Pulling it partway and letting it slide back doesn’t count."],
+  ["Search", "Pull down at the top of the panel or the lock-screen view, or hold the edge handle. The Search tile, widget and app shortcut open it too."],
+  ["Preview", "Press and hold a card to see its full text, its picture and the app’s buttons, without opening the app."],
+  ["Stacks", "Tap a stack to open it. Swipe a card or a stack sideways to clear it."],
+  ["Pictures", "Tap the picture in a Preview to see it full screen. Pinch to zoom, swipe sideways through a chat’s pictures, and save them to your gallery."],
+  ["Move the edge handle", "Hold it until it buzzes, then drag it to either side and any height."],
+  ["Close the panel", "Tap an empty space, press Back, or flick up at the end of the list."],
+];
+const tipsPage = (scroll) => `<div class="body" style="transform:translateY(${-scroll}px)"><h1>Tips</h1>${TIPS.map(([b, s]) => `<div class="tip"><b>${b}</b><span>${s}</span></div>`).join("")}</div>`;
+const settings = (cur, page, menuTap = 0) => `<div class="page">${page}</div>${rail(cur, menuTap)}${status()}`;
+
+// A made-up photo, full screen in a made-up gallery app.
+const landscape = `<svg viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice" style="width:100%;height:100%">
+  <defs><linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3B2A6B"/><stop offset=".75" stop-color="#F2995E"/></linearGradient>
+  <radialGradient id="sun"><stop offset="0" stop-color="#FFD27A"/><stop offset="1" stop-color="#FFD27A" stop-opacity="0"/></radialGradient></defs>
+  <rect width="400" height="300" fill="url(#sky)"/><circle cx="280" cy="96" r="54" fill="url(#sun)"/><circle cx="280" cy="96" r="24" fill="#FFD27A"/>
+  <path d="M0 175 Q60 130 120 160 T240 150 T400 165 V300 H0Z" fill="#5B6E8C"/><path d="M0 205 Q70 180 140 200 T280 190 T400 205 V300 H0Z" fill="#3E5470"/>
+  <path d="M0 240 Q90 220 180 238 T400 236 V300 H0Z" fill="#253A52"/></svg>`;
+function gallery(full) {
+  const ph = mix(260, H, full), top = mix(150, 0, full);
+  return `<div class="fill" style="background:#000"></div>
+    <div style="position:absolute;left:0;right:0;top:${top}px;height:${ph}px">${landscape}</div>
+    <div style="position:absolute;left:20px;top:${mix(52, 30, full)}px;font:600 22px var(--sans);color:#fff;opacity:${1 - full}">Glimmer</div>
+    <div style="position:absolute;left:20px;top:${mix(430, 470, full)}px;font:400 14px var(--sans);color:rgba(255,255,255,.7);opacity:${1 - full}">Lake Bled · 18 November</div>`;
+}
+
+// --- scenes: [start, end, kicker, caption, draw(t)] ---
+const HOME_H = { shape: "half", look: "subtle", right: true, y: 330, on: true, count: 2, lit: ACCENT };
+const pullY0 = 14;
+const SCENES = [
+  [2.25, 8.0, "Follows your finger", "Swipe down on the status bar. The panel comes down <b>with you</b>.", (t) => {
+    // The finger pulls down the left half of the status bar, slows, then carries on; the panel
+    // tracks it, and settles open once let go past a third of the screen.
+    const a = k(t, 3.0, 3.9), b = k(t, 4.15, 4.8);
+    const fy = pullY0 + 230 * a + 260 * b;
+    const lift = 4.85, settle = k(t, lift, lift + 0.25);
+    const pPull = clamp((fy - pullY0) / 520);
+    const p = t < lift ? pPull : mix(pPull, 1, settle);
+    const blur = k(t, lift + 0.25, lift + 0.65);
+    const fo = k(t, 2.6, 2.85) * (1 - k(t, lift, lift + 0.15));
+    return panel(p, blur) + status(1) + (p < 0.05 ? edgeHandle(HOME_H) : "") + finger(110, fy, fo);
+  }],
+  [8.0, 13.8, "Changed your mind?", "Let go early and it slides back. It doesn’t count as a <b>check</b>: New stays New.", (t) => {
+    const a = k(t, 8.6, 9.4), lift1 = 9.75;
+    const fy1 = pullY0 + 150 * a;
+    const p1 = t < lift1 ? clamp((fy1 - pullY0) / 520) : mix(clamp(150 / 520), 0, ko(t, lift1, lift1 + 0.3));
+    const b = k(t, 10.7, 11.5), lift2 = 11.6;
+    const fy2 = pullY0 + 520 * b;
+    const p2 = t < 10.7 ? 0 : t < lift2 ? clamp((fy2 - pullY0) / 520) : mix(clamp(520 / 520), 1, k(t, lift2, lift2 + 0.2));
+    const p = t < 10.7 ? p1 : p2;
+    const blur = k(t, lift2 + 0.2, lift2 + 0.6);
+    const glow = t > 12.1 ? Math.sin(clamp((t - 12.1) / 1.2) * Math.PI) : 0;
+    const f1 = k(t, 8.3, 8.5) * (1 - k(t, lift1, lift1 + 0.15)), f2 = k(t, 10.4, 10.6) * (1 - k(t, lift2, lift2 + 0.15));
+    return panel(p, t < 10.7 ? 0 : blur, { glow }) + status(1) + (p < 0.05 ? edgeHandle(HOME_H) : "") +
+      finger(110, fy1, f1) + finger(110, fy2, f2);
+  }],
+  [13.8, 19.4, "Opens at once", "The header is there at once, your notifications right after. <b>Reopening</b> is quicker still.", (t) => {
+    const tp1 = tapAt(t, 14.5), tp2 = tapAt(t, 16.4), tp3 = tapAt(t, 17.6);
+    let h;
+    if (t < 14.5) h = home() + status() + edgeHandle(HOME_H);
+    else if (t < 16.5) {
+      // First open: window and header at once, cards built just after.
+      const p = k(t, 14.5, 14.62), cards = (i) => ko(t, 14.72 + i * 0.07, 14.95 + i * 0.07);
+      h = panel(p, k(t, 14.55, 14.8), { cards }) + status();
+    } else if (t < 17.6) {
+      const c = 1 - k(t, 16.5, 16.65);
+      h = (c > 0 ? panel(c, c) : home()) + status() + (c <= 0 ? edgeHandle(HOME_H) : "");
+    } else {
+      // Kept panel: everything is already there.
+      const p = k(t, 17.6, 17.72);
+      h = panel(p, k(t, 17.62, 17.85)) + status();
+    }
+    return h + finger(398, 330, tp1.o, tp1.press) + finger(206, 820, tp2.o, tp2.press) + finger(398, 330, tp3.o, tp3.press);
+  }],
+  [19.4, 25.0, "Easier to hit", "A half circle the size of a fingertip, and <b>all of it</b> responds.", (t) => {
+    // Zoom in on the edge: the old thin line becomes the half circle, a finger lands on it.
+    const z = k(t, 19.7, 20.5) * (1 - k(t, 23.4, 24.0));
+    const morph = k(t, 21.0, 21.5);
+    const tp = tapAt(t, 22.7);
+    const open = k(t, 22.75, 22.87);
+    const sc = 1 + 1.0 * z;
+    const line = { ...HOME_H, shape: "line" };
+    const inner = (open > 0 ? panel(open, k(t, 22.8, 23.1)) : home() + edgeHandle(line, { o: 1 - morph }) + edgeHandle(HOME_H, { o: morph, scale: 0.6 + 0.4 * morph })) + status();
+    return `<div class="fill" style="transform:scale(${sc});transform-origin:${W}px 330px">${inner}${finger(398, 330, tp.o, tp.press)}</div>`;
+  }],
+  [25.0, 31.0, "Move it", "Hold it until it buzzes, then drag it to <b>either side</b>, any height.", (t) => {
+    // Hold, buzz, drag across to the left edge lower down, let go: it settles on the left.
+    const down = 25.5, buzz = 26.0, drag0 = 26.3, drag1 = 27.8, drop = 27.9;
+    const d = k(t, drag0, drag1);
+    const fx = mix(398, 18, d), fy = mix(330, 610, d) - Math.sin(d * Math.PI) * 60;
+    const wob = t > buzz && t < buzz + 0.3 ? Math.sin((t - buzz) * 90) * 2 * (1 - (t - buzz) / 0.3) : 0;
+    const right = t < drop;
+    let h = home() + status();
+    if (t < drag0) h += edgeHandle(HOME_H, { dx: wob, scale: t > buzz ? 1.12 : 1 });
+    else if (right) h += edgeHandle(HOME_H, { dx: fx - 398, dy: fy - 330, scale: 1.12 });
+    else h += edgeHandle({ ...HOME_H, right: false, y: 610 }, { scale: mix(1.12, 1, k(t, drop, drop + 0.2)) });
+    const fo = k(t, down - 0.3, down - 0.1) * (1 - k(t, drop + 0.1, drop + 0.3));
+    const ring = t > buzz && t < buzz + 0.5 ? `<div style="position:absolute;left:${398 - 30 - 40 * (t - buzz)}px;top:${330 - 30 - 40 * (t - buzz)}px;width:${60 + 80 * (t - buzz)}px;height:${60 + 80 * (t - buzz)}px;border-radius:50%;border:2px solid ${ACCENT};opacity:${1 - (t - buzz) / 0.5}"></div>` : "";
+    return h + ring + finger(fx, fy, fo, t > down ? 0.15 : 0);
+  }],
+  [31.0, 38.2, "Make it yours", "A shape, a style and colours, under <b>Settings → Edge handle</b>.", (t) => {
+    const steps = [[31.7, "shape-tab"], [32.6, "shape-circle"], [33.5, "shape-large"], [34.6, "look-count"], [35.7, "lit-2"], [36.8, "shape-half"]];
+    const st = { shape: "half", look: "subtle", lit: ACCENT, taps: {} };
+    let tap = null;
+    for (const [t0, id] of steps) {
+      const tp = tapAt(t, t0);
+      if (t >= t0 + 0.05) {
+        if (id.startsWith("shape-")) st.shape = id.slice(6);
+        if (id.startsWith("look-")) st.look = id.slice(5);
+        if (id.startsWith("lit-")) st.lit = NEWCOLS[+id.slice(4)];
+      }
+      st.taps[id] = tp.rip;
+      if (tp.o > 0) tap = { id, o: tp.o, press: tp.press };
+    }
+    const live = { shape: st.shape, look: st.look, right: true, y: 752, on: true, count: 2, lit: st.lit };
+    return { html: settings("handle", handlePage(st)) + edgeHandle(live), tap };
+  }],
+  [38.2, 42.4, "Steps aside", "In fullscreen apps the handle <b>steps aside</b>, and comes back after.", (t) => {
+    const tp = tapAt(t, 38.9), full = k(t, 39.0, 39.4) * (1 - k(t, 41.0, 41.4));
+    return gallery(full) + status(1 - full) + edgeHandle({ ...HOME_H, y: 330 }, { out: k(t, 39.0, 39.3) * (1 - k(t, 41.1, 41.4)) }) + finger(206, 300, tp.o, tp.press);
+  }],
+  [42.4, 48.4, "Settings, in sections", "Each section with a <b>summary</b>, and choices side by side.", (t) => {
+    const m = tapAt(t, 43.0), slide = k(t, 43.05, 43.4), tipTap = tapAt(t, 45.6);
+    const closing = k(t, 45.7, 46.0), toTips = t >= 45.7;
+    const page = toTips ? tipsPage(0) : handlePage({ shape: "half", look: "subtle", lit: ACCENT });
+    let html = settings(toTips ? "tips" : "handle", page, m.rip);
+    const s = slide * (1 - closing);
+    if (s > 0) html += sidebar(toTips ? "tips" : "handle", s, { tips: tipTap.rip });
+    const tap = m.o > 0 ? { id: "menu", o: m.o, press: m.press } : tipTap.o > 0 ? { id: "card-tips", o: tipTap.o, press: tipTap.press } : null;
+    return { html, tap };
+  }],
+  [48.4, 53.6, "Tips", "A Tips page lists the <b>gestures</b> you can’t see.", (t) => {
+    return settings("tips", tipsPage(k(t, 49.2, 52.6) * 330));
+  }],
+];
+const FULL = [
+  [0, 2.6, `<div class="big">Chronotif</div><div class="small">What’s new in <b>0.2.7</b>: a panel that follows your finger, and an edge handle that’s yours.</div>`],
+  [53.25, 58.6, `<div class="big">Help shape it</div><div class="small">Ideas or bugs? Tell us. Chronotif gets better from what you report.</div>
+    <div class="url">github.com/nagarete/chronotif/issues</div><div class="url2">chronotif.com</div>`],
+];
+const XF = 0.35;
+const $ = (id) => document.getElementById(id);
+const capHTML = (kick, text) => `<div class="cap"><div><div class="kicker">${kick}</div>${text}</div></div>`;
+const S = 1.6311;
+
+// Puts a scene into a layer; a scene may return { html, tap: { id, o, press } } to put the finger on
+// an element by id, measured after layout.
+function paint(el, r) {
+  const { html, tap } = typeof r === "string" ? { html: r, tap: null } : r;
+  el.innerHTML = html;
+  if (tap) {
+    const target = el.querySelector(`#${tap.id}`);
+    if (target) {
+      const b = target.getBoundingClientRect(), s = $("screen").getBoundingClientRect();
+      el.insertAdjacentHTML("beforeend", finger((b.left + b.width / 2 - s.left) / S, (b.top + b.height / 2 - s.top) / S, tap.o, tap.press));
+    }
+  }
+}
+
+function render(t) {
+  let i = SCENES.findIndex(([t0, t1]) => t >= t0 && t < t1);
+  if (i < 0) i = t < SCENES[0][0] ? 0 : SCENES.length - 1;
+  const [t0, , kick, text, draw] = SCENES[i];
+  const prev = SCENES[i - 1];
+  const fade = prev ? k(t, t0, t0 + XF) : 1;
+  paint($("layA"), prev && fade < 1 ? prev[4](prev[1]) : "");
+  paint($("layB"), draw(t));
+  $("layB").style.opacity = fade;
+  $("capA").innerHTML = prev && fade < 1 ? capHTML(prev[2], prev[3]) : "";
+  $("capA").style.opacity = 1 - fade;
+  $("capB").innerHTML = capHTML(kick, text);
+  $("capB").style.opacity = clamp((t - t0 - 0.15) / 0.3);
+  $("full").innerHTML = FULL.filter(([f0, f1]) => t >= f0 && t < f1).map(([f0, f1, html]) =>
+    `<div class="full" style="opacity:${f0 === 0 ? 1 - k(t, f1 - XF, f1) : k(t, f0, f0 + XF)}">${html}</div>`).join("");
+}
+window.render = render;
+window.DURATION = 58.6;
+render(Number(new URLSearchParams(location.search).get("t") ?? 0));
+</script>
