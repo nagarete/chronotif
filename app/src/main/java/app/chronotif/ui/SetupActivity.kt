@@ -42,6 +42,7 @@ import app.chronotif.Prefs
 import app.chronotif.R
 import app.chronotif.StatusBarSwipe
 import app.chronotif.Updater
+import app.chronotif.core.SettingMatch
 import kotlin.math.abs
 
 /**
@@ -90,6 +91,9 @@ class SetupActivity : Activity() {
         /** A listener the system is still binding looks disconnected for a moment after launch. */
         const val SETTLE_MS = 2000L
         const val REQUEST_SEARCH_PERMISSION = 10
+        const val REQUEST_SPEECH = 1
+        /** Results shown at most; more means the query is too short to be useful. */
+        const val RESULTS = 30
     }
 
     private var settled = false
@@ -130,15 +134,15 @@ class SetupActivity : Activity() {
             addView(body)
             isVerticalScrollBarEnabled = false
         }
-        val main = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            if (!wide) addView(LinearLayout(context).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-                setPadding(dp(8), dp(4), dp(16), 0)
-                addView(menuButton(), LinearLayout.LayoutParams(dp(48), dp(48)))
-            }, Ui.lp())
-            addView(page, LinearLayout.LayoutParams(-1, 0, 1f))
+        val main = FrameLayout(this).apply {
+            addView(LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                addView(searchBar(), Ui.lp(h = dp(56)).apply {
+                    setMargins(dp(12), dp(8), dp(12), dp(4))
+                })
+                addView(page, LinearLayout.LayoutParams(-1, 0, 1f))
+            }, FrameLayout.LayoutParams(-1, -1))
+            addView(searchLayer(), FrameLayout.LayoutParams(-1, -1))
         }
         rows = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -173,6 +177,9 @@ class SetupActivity : Activity() {
             val bars = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())
             row.setPadding(bars.left, bars.top, bars.right, bars.bottom)
             if (!wide) drawer.setPadding(bars.left, bars.top, 0, bars.bottom)
+            // Results end above the keyboard.
+            val ime = insets.getInsets(WindowInsets.Type.ime()).bottom
+            searchLayer.setPadding(0, 0, 0, maxOf(0, ime - bars.bottom))
             insets
         }
         setContentView(root)
@@ -186,6 +193,8 @@ class SetupActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        // Back from Android's settings, a permission may have changed.
+        index = null
         refreshAll()
         // Back from granting a permission (e.g. display over other apps): let the strip re-check.
         StatusBarSwipe.instance?.refresh()
@@ -202,13 +211,19 @@ class SetupActivity : Activity() {
         Panel.drop()
     }
 
-    /** Back closes the drawer over the page, before it leaves settings. */
-    private val collapseOnBack = if (Build.VERSION.SDK_INT >= 33) android.window.OnBackInvokedCallback { expand(false) } else null
+    /** Back closes search, then the drawer over the page, before it leaves settings. */
+    private val collapseOnBack = if (Build.VERSION.SDK_INT >= 33) android.window.OnBackInvokedCallback { back() } else null
     private var backRegistered = false
+
+    private fun backCloses() = searching || (!wide && expanded)
+
+    private fun back() {
+        if (searching) closeSearch() else expand(false)
+    }
 
     private fun updateBack() {
         if (Build.VERSION.SDK_INT < 33) return
-        val want = !wide && expanded
+        val want = backCloses()
         if (want == backRegistered) return
         backRegistered = want
         if (want) {
@@ -220,8 +235,8 @@ class SetupActivity : Activity() {
 
     override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
         // Before Android 13, Back arrives as a key.
-        if (Build.VERSION.SDK_INT < 33 && event.keyCode == android.view.KeyEvent.KEYCODE_BACK && !wide && expanded) {
-            if (event.action == android.view.KeyEvent.ACTION_UP) expand(false)
+        if (Build.VERSION.SDK_INT < 33 && event.keyCode == android.view.KeyEvent.KEYCODE_BACK && backCloses()) {
+            if (event.action == android.view.KeyEvent.ACTION_UP) back()
             return true
         }
         return super.dispatchKeyEvent(event)
@@ -401,8 +416,16 @@ class SetupActivity : Activity() {
         pendingPermission.clear()
         target = body
         body.addView(text(getString(s.title), 30f, weight = 500).apply {
-            setPadding(dp(4), dp(if (wide) 28 else 12), dp(4), 0)
+            setPadding(dp(4), dp(12), dp(4), 0)
         }, Ui.lp())
+        build(s)
+        refreshers.forEach { it() }
+        reshapeGroups()
+        page.scrollTo(0, 0)
+    }
+
+    /** Adds [s]'s settings to [body]. */
+    private fun build(s: Section) {
         when (s) {
             Section.GENERAL -> general()
             Section.TIPS -> tips()
@@ -414,9 +437,6 @@ class SetupActivity : Activity() {
             Section.UPDATES -> updates()
             Section.ABOUT -> about()
         }
-        refreshers.forEach { it() }
-        reshapeGroups()
-        page.scrollTo(0, 0)
     }
 
     private fun reshapeGroups() {
@@ -762,7 +782,11 @@ class SetupActivity : Activity() {
      * screen stays resumed, so the kept panel goes now, not only in [onPause]: the next open
      * builds one that shows the change.
      */
-    private fun changed() = Panel.drop()
+    private fun changed() {
+        Panel.drop()
+        // Search shows values; it reads them afresh next time.
+        index = null
+    }
 
     private fun applyHandle() {
         ListenerService.instance?.refreshHandle()
@@ -799,6 +823,422 @@ class SetupActivity : Activity() {
         false
     }
 
+    // --- Search ---
+
+    /** One searchable setting: a row on a section's page, or the page itself (no [title] row). */
+    private class Entry(
+        val section: Section,
+        val title: Int?,
+        val label: String,
+        val path: String,
+        val row: View?,
+        val doc: SettingMatch.Doc,
+    ) {
+        /** What it's set to, read from its row once the page is built. */
+        var value: String? = null
+    }
+
+    /** Every setting, built from the pages themselves when search opens, so it can't drift from them. */
+    private var index: List<Entry>? = null
+    /** While [buildIndex] runs: where [indexed] collects rows, and the section being built. */
+    private var indexing: MutableList<Entry>? = null
+    private var indexSection = Section.GENERAL
+    private var groupHeading: Int? = null
+
+    private var searching = false
+    private lateinit var searchLayer: LinearLayout
+    private lateinit var query: android.widget.EditText
+    private lateinit var results: LinearLayout
+    private lateinit var resultsScroll: ScrollView
+    private lateinit var clearQuery: View
+
+    /** Words people type for a setting that its name and description don't contain. */
+    private val keywords = mapOf(
+        R.string.enabled to "on off disable pause",
+        R.string.perm_listener to "permission notification listener",
+        R.string.perm_overlay to "permission overlay draw",
+        R.string.handle_enabled to "handle tab button",
+        R.string.handle_colour to "color",
+        R.string.handle_new_colour to "color light glow",
+        R.string.handle_fill to "count number frosted solid",
+        R.string.handle_position to "height move",
+        R.string.header_clock_size to "font text big small",
+        R.string.swipe_to_clear to "dismiss delete remove",
+        R.string.lock_mode to "lockscreen keyguard",
+        R.string.lock_privacy to "private hide privacy",
+        R.string.search_engine to "google duckduckgo bing brave web browser",
+        R.string.update_auto to "upgrade install",
+        R.string.update_channel_label to "beta nightly stable",
+    )
+
+    private val speech by lazy {
+        Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+            .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            .putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, getString(R.string.settings_search_hint))
+    }
+
+    /** Voice input is Android's: its speech service listens and hands back the words. */
+    private val canSpeak by lazy { packageManager.resolveActivity(speech, 0) != null }
+
+    private fun listen() {
+        try {
+            @Suppress("DEPRECATION")
+            startActivityForResult(speech, REQUEST_SPEECH)
+        } catch (_: ActivityNotFoundException) {
+        } catch (_: SecurityException) {
+        }
+    }
+
+    @Deprecated("Activity API")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        @Suppress("DEPRECATION")
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != REQUEST_SPEECH || resultCode != RESULT_OK) return
+        val said = data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)?.firstOrNull() ?: return
+        openSearch(said)
+    }
+
+    private fun micButton() = ImageView(this).apply {
+        setImageResource(R.drawable.ic_mic)
+        imageTintList = ColorStateList.valueOf(c.textSecondary)
+        scaleType = ImageView.ScaleType.CENTER
+        background = c.pressable(0, dp(24).toFloat())
+        contentDescription = getString(R.string.settings_search_voice)
+        setOnClickListener { listen() }
+    }
+
+    /** The bar over every page: the drawer's menu button, then a field that opens search. */
+    private fun searchBar() = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        setPadding(dp(4), 0, dp(4), 0)
+        background = c.pressable(c.high, dp(28).toFloat())
+        if (!wide) addView(menuButton(), LinearLayout.LayoutParams(dp(48), dp(48)))
+        else addView(ImageView(context).apply {
+            setImageResource(R.drawable.ic_search)
+            imageTintList = ColorStateList.valueOf(c.textSecondary)
+            scaleType = ImageView.ScaleType.CENTER
+        }, LinearLayout.LayoutParams(dp(48), dp(48)))
+        addView(text(getString(R.string.settings_search_hint), 16f, secondary = true).apply {
+            setPadding(dp(4), 0, 0, 0)
+            maxLines = 1
+        }, LinearLayout.LayoutParams(0, -2, 1f))
+        if (canSpeak) addView(micButton(), LinearLayout.LayoutParams(dp(48), dp(48)))
+        contentDescription = getString(R.string.settings_search_hint)
+        setOnClickListener { openSearch() }
+    }
+
+    /** Search over the page: a field, and results that change as you type. */
+    private fun searchLayer(): View {
+        query = android.widget.EditText(this).apply {
+            background = null
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
+            setTextColor(c.text)
+            setHintTextColor(c.textSecondary)
+            hint = getString(R.string.settings_search_hint)
+            isSingleLine = true
+            imeOptions = android.view.inputmethod.EditorInfo.IME_ACTION_GO
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+            setPadding(dp(4), 0, dp(4), 0)
+            addTextChangedListener(object : android.text.TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, d: Int) {}
+                override fun onTextChanged(s: CharSequence?, a: Int, b: Int, d: Int) {}
+                override fun afterTextChanged(s: android.text.Editable?) {
+                    if (searching) showResults()
+                }
+            })
+            setOnEditorActionListener { _, _, _ ->
+                resultRows.firstOrNull()?.view?.takeIf { it.visibility == View.VISIBLE }
+                    ?.let { (it.getTag(R.id.search_entry) as? Entry)?.let(::pick) }
+                true
+            }
+        }
+        clearQuery = ImageView(this).apply {
+            setImageResource(R.drawable.ic_close)
+            imageTintList = ColorStateList.valueOf(c.textSecondary)
+            scaleType = ImageView.ScaleType.CENTER
+            background = c.pressable(0, dp(24).toFloat())
+            contentDescription = getString(R.string.clear)
+            setOnClickListener { query.setText("") }
+        }
+        results = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(0, dp(8), 0, dp(24))
+        }
+        resultsScroll = ScrollView(this).apply {
+            addView(results)
+            isVerticalScrollBarEnabled = false
+            // Scrolling the results puts the keyboard away, so more of them show.
+            setOnScrollChangeListener { _, _, y, _, oldY -> if (abs(y - oldY) > 0 && y > dp(8)) hideKeyboard() }
+        }
+        searchLayer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(c.high)
+            visibility = View.GONE
+            isClickable = true
+            addView(LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(8), dp(8), dp(8), dp(8))
+                addView(ImageView(context).apply {
+                    setImageResource(R.drawable.ic_arrow_back)
+                    imageTintList = ColorStateList.valueOf(c.text)
+                    scaleType = ImageView.ScaleType.CENTER
+                    background = c.pressable(0, dp(24).toFloat())
+                    contentDescription = getString(R.string.close)
+                    setOnClickListener { closeSearch() }
+                }, LinearLayout.LayoutParams(dp(48), dp(48)))
+                addView(query, LinearLayout.LayoutParams(0, dp(48), 1f))
+                addView(clearQuery, LinearLayout.LayoutParams(dp(48), dp(48)))
+                if (canSpeak) addView(micButton(), LinearLayout.LayoutParams(dp(48), dp(48)))
+            }, Ui.lp())
+            addView(View(context).apply { setBackgroundColor(c.highest) }, Ui.lp(h = dp(1)))
+            addView(resultsScroll, LinearLayout.LayoutParams(-1, 0, 1f))
+        }
+        return searchLayer
+    }
+
+    private fun openSearch(text: String? = null) {
+        if (!wide) expand(false)
+        searching = true
+        updateBack()
+        searchLayer.visibility = View.VISIBLE
+        query.setText(text ?: "")
+        query.setSelection(query.text.length)
+        showResults()
+        // The index and the result rows are ready before the first letter: made once search has
+        // drawn, not on the keystroke.
+        searchLayer.postOnAnimation {
+            searchLayer.post {
+                if (!searching) return@post
+                if (index == null) index = buildIndex()
+                for (i in resultRows.size until RESULTS) resultRow(i).view.visibility = View.GONE
+            }
+        }
+        if (text == null) {
+            query.requestFocus()
+            query.post {
+                getSystemService(android.view.inputmethod.InputMethodManager::class.java)
+                    .showSoftInput(query, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+            }
+        }
+    }
+
+    private fun closeSearch() {
+        if (!searching) return
+        searching = false
+        updateBack()
+        hideKeyboard()
+        query.clearFocus()
+        searchLayer.visibility = View.GONE
+    }
+
+    private fun hideKeyboard() {
+        getSystemService(android.view.inputmethod.InputMethodManager::class.java)
+            .hideSoftInputFromWindow(query.windowToken, 0)
+    }
+
+    /** Records a row while [buildIndex] builds the pages; does nothing otherwise. */
+    private fun indexed(title: Int, desc: CharSequence?, row: View) {
+        val into = indexing ?: return
+        val label = getString(title)
+        val heading = groupHeading?.let { getString(it) }
+        val section = getString(indexSection.title)
+        val path = if (heading != null) "$section › $heading" else section
+        val other = listOfNotNull(section, heading, desc, keywords[title]).joinToString(" ")
+        into += Entry(indexSection, title, label, path, row, SettingMatch.Doc(label, other))
+    }
+
+    /**
+     * Builds every page off screen and keeps its rows, each page also findable by its name. Rows
+     * are found by the same words they show, and their values are read from the rows themselves.
+     */
+    private fun buildIndex(): List<Entry> {
+        val savedBody = body
+        val savedRefreshers = ArrayList(refreshers)
+        val savedPending = HashMap(pendingPermission)
+        val out = ArrayList<Entry>()
+        indexing = out
+        try {
+            for (s in Section.entries) {
+                val start = out.size
+                body = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+                target = body
+                indexSection = s
+                build(s)
+                refreshers.forEach { it() }
+                refreshers.clear()
+                for (i in start until out.size) out[i].value = out[i].row?.let(::valueOf)
+                // The page itself, unless a row already has its name (Edge handle's switch).
+                val name = getString(s.title)
+                if (out.subList(start, out.size).none { it.label == name }) {
+                    out.add(start, Entry(s, null, name, getString(R.string.settings_search_page), null,
+                        SettingMatch.Doc(name, keywords[s.title] ?: "")))
+                }
+            }
+        } finally {
+            indexing = null
+            body = savedBody
+            target = body
+            groupHeading = null
+            refreshers.clear()
+            refreshers += savedRefreshers
+            pendingPermission.clear()
+            pendingPermission.putAll(savedPending)
+        }
+        return out
+    }
+
+    /** Result rows, made once and reused, so typing only rebinds them. */
+    private class ResultRow(val view: LinearLayout, val icon: ImageView, val label: TextView, val path: TextView, val value: TextView)
+    private val resultRows = ArrayList<ResultRow>()
+    private var noResults: TextView? = null
+
+    private fun resultRow(i: Int): ResultRow {
+        resultRows.getOrNull(i)?.let { return it }
+        val icon = ImageView(this).apply {
+            imageTintList = ColorStateList.valueOf(c.textSecondary)
+            scaleType = ImageView.ScaleType.CENTER
+        }
+        val label = text("", 16f).apply { maxLines = 2 }
+        val path = text("", 13f, secondary = true).apply { maxLines = 1 }
+        val value = text("", 13f, secondary = true).apply {
+            maxLines = 1
+            maxWidth = dp(120)
+            ellipsize = android.text.TextUtils.TruncateAt.END
+        }
+        val view = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            minimumHeight = dp(56)
+            setPadding(dp(20), dp(10), dp(20), dp(10))
+            background = c.pressable(0, 0f)
+            addView(icon, LinearLayout.LayoutParams(dp(24), dp(24)))
+            addView(LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                addView(label)
+                addView(path, gap(2))
+            }, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(20) })
+            addView(value, Ui.lp(-2).apply { marginStart = dp(12) })
+        }
+        results.addView(view, i, Ui.lp())
+        return ResultRow(view, icon, label, path, value).also { resultRows += it }
+    }
+
+    private fun bind(i: Int, s: Section, label: String, path: String?, value: String?, typed: String, entry: Entry?, onClick: () -> Unit) {
+        val r = resultRow(i)
+        r.icon.setImageResource(s.icon)
+        r.label.text = highlight(label, typed)
+        r.path.text = path
+        r.path.visibility = if (path == null) View.GONE else View.VISIBLE
+        r.value.text = value
+        r.value.visibility = if (value == null) View.GONE else View.VISIBLE
+        r.view.setTag(R.id.search_entry, entry)
+        r.view.setOnClickListener { onClick() }
+        r.view.visibility = View.VISIBLE
+    }
+
+    private fun showResults() {
+        val typed = query.text.toString()
+        clearQuery.visibility = if (typed.isEmpty()) View.GONE else View.VISIBLE
+        resultsScroll.scrollTo(0, 0)
+        var shown = 0
+        if (typed.isBlank()) {
+            // Before typing: the pages, as in the drawer.
+            for (s in Section.entries) bind(shown++, s, getString(s.title), null, null, typed, null) { closeSearch(); select(s) }
+        } else {
+            val all = index ?: buildIndex().also { index = it }
+            for (e in SettingMatch.search(all, typed, RESULTS) { it.doc }) {
+                bind(shown++, e.section, e.label, e.path, e.value, typed, e) { pick(e) }
+            }
+        }
+        for (i in shown until resultRows.size) resultRows[i].view.visibility = View.GONE
+        val none = noResults ?: text("", 15f, secondary = true).apply {
+            setPadding(dp(24), dp(20), dp(24), dp(20))
+            results.addView(this, Ui.lp())
+            noResults = this
+        }
+        none.text = if (shown == 0) getString(R.string.settings_search_none, typed.trim()) else ""
+        none.visibility = if (shown == 0) View.VISIBLE else View.GONE
+    }
+
+    /** The typed text, where the name has it, in bold and the accent colour. */
+    private fun highlight(label: String, typed: String): CharSequence {
+        val q = typed.trim()
+        val at = if (q.isEmpty()) -1 else label.indexOf(q, ignoreCase = true)
+        if (at < 0) return label
+        return android.text.SpannableString(label).apply {
+            setSpan(android.text.style.StyleSpan(Typeface.BOLD), at, at + q.length, 0)
+            setSpan(android.text.style.ForegroundColorSpan(c.primary), at, at + q.length, 0)
+        }
+    }
+
+    /** What a row is set to: a switch's On or Off, or the picked option's name. */
+    private fun valueOf(row: View): String? {
+        fun find(v: View, test: (View) -> Boolean): View? {
+            if (test(v)) return v
+            if (v is android.view.ViewGroup) for (i in 0 until v.childCount) find(v.getChildAt(i), test)?.let { return it }
+            return null
+        }
+        (find(row) { it is M3Switch } as? M3Switch)?.let { return getString(if (it.isChecked) R.string.value_on else R.string.value_off) }
+        val picked = find(row) { it !== row && it.isSelected } ?: return null
+        return when (picked) {
+            is TextView -> picked.text.toString()
+            is LinearLayout -> (picked.getChildAt(picked.childCount - 1) as? TextView)?.text?.toString()
+            else -> picked.contentDescription?.toString()
+        }
+    }
+
+    /** Opens a result's page, scrolled to its row, which flashes so the eye finds it. */
+    private fun pick(e: Entry) {
+        closeSearch()
+        if (e.section != current) {
+            current = e.section
+            Prefs.settingsSection = e.section.name
+            show(e.section)
+            renderDrawer()
+        }
+        val title = e.title ?: return
+        page.post {
+            val row = body.findViewWithTag<View>(title) ?: return@post
+            var y = 0
+            var v: View = row
+            while (v !== body) {
+                y += v.top
+                v = v.parent as? View ?: break
+            }
+            page.smoothScrollTo(0, maxOf(0, y - dp(24)))
+            flash(row)
+        }
+    }
+
+    private fun flash(row: View) {
+        val radii = when (val bg = row.background) {
+            is GradientDrawable -> bg.cornerRadii
+            is android.graphics.drawable.RippleDrawable -> (bg.getDrawable(0) as? GradientDrawable)?.cornerRadii
+            else -> null
+        }
+        val glow = GradientDrawable().apply {
+            setColor(c.primary)
+            if (radii != null) cornerRadii = radii
+            alpha = 0
+        }
+        row.foreground = glow
+        android.animation.ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = 1400
+            startDelay = 250
+            addUpdateListener {
+                val t = it.animatedFraction
+                // Up quickly, then a slow fade.
+                glow.alpha = (60 * if (t < 0.2f) t / 0.2f else (1 - t) / 0.8f).toInt()
+            }
+            addListener(object : android.animation.AnimatorListenerAdapter() {
+                override fun onAnimationEnd(a: android.animation.Animator) { row.foreground = null }
+            })
+            start()
+        }
+    }
+
     // --- Setting helpers ---
 
     private fun text(s: CharSequence, sp: Float, weight: Int = 400, secondary: Boolean = false) =
@@ -817,6 +1257,7 @@ class SetupActivity : Activity() {
      * add their rows to it.
      */
     private fun group(heading: Int? = null, block: () -> Unit): SettingGroup {
+        groupHeading = heading
         if (heading != null) body.addView(text(getString(heading), 14f, weight = 600).apply {
             setTextColor(c.primary)
             setPadding(dp(16), 0, dp(16), 0)
@@ -826,6 +1267,7 @@ class SetupActivity : Activity() {
         target = g
         block()
         target = body
+        groupHeading = null
         return g
     }
 
@@ -862,6 +1304,7 @@ class SetupActivity : Activity() {
             if (onClick != null) setOnClickListener { onClick() }
         }
         target.addView(row, Ui.lp())
+        if (title != null) indexed(title, desc, row)
         return row
     }
 
@@ -990,6 +1433,7 @@ class SetupActivity : Activity() {
             setOnClickListener { onClick() }
         }
         target.addView(row, Ui.lp())
+        indexed(title, getString(desc), row)
         refreshers += {
             val ok = done() && !broken()
             mark.background = GradientDrawable().apply {
