@@ -14,7 +14,7 @@ Revised in the October 2026 interview comparing Chronotif with iOS (ADR 0002). E
 
 Its messages are split at the last check. Those sent since then stack in New, and the ones already checked stack in Earlier, so one conversation can appear in both. At least the latest message is New when the conversation is, because message times come from the sender's clock. There is no limit on how many messages a stack holds, beyond what Android currently supplies.
 
-A stack with one message is a plain card. A stack with more is collapsed: the latest message, a message count on the Avatar, and slivers underneath. Tapping it opens one card per message, newest first, under a header with the conversation's title, Show less and ×.
+A stack with one message is a plain card. A stack with more is collapsed: the latest message, a message count on the Avatar, and slivers underneath. Tapping it opens one card per message, newest first, under a header with the conversation's title, Show less and ×. Tapping the title collapses it again, the same as Show less.
 
 - Tapping a message card opens the chat.
 - Its chevron shows the app's buttons; Reply and Mark as read act on the whole conversation.
@@ -31,7 +31,7 @@ Agreed in the November 2026 review of Earlier on the phone (ADR 0004, which supe
 
 Earlier is newest first. Cards from one app that sit next to each other in that order fold into an App stack, as long as each arrived within 30 minutes of the stack's newest card. Three T3 Code cards from the last two minutes form one stack. A T3 Code card from 4 hours earlier forms a separate stack with the cards near it, never with the recent ones. A card from another app between two of an app's cards splits them. Grouping all of an app's cards together would pull its older cards above newer ones from other apps.
 
-A collapsed App stack shows its newest card with slivers underneath. Tapping it opens its cards in the same place, under the app's name with Show less and ×. Swiping the collapsed stack, or tapping ×, clears every notification in it. A conversation showing one message is a single card and can join an App stack, for example TikTok's one-message chats. A Conversation stack with several messages stays on its own. New doesn't use App stacks: every New card shows in full. The "N earlier" pill counts cards, not stacks.
+A collapsed App stack shows its newest card with slivers underneath. Tapping it opens its cards in the same place, under the app's name with Show less and ×. Tapping the name collapses it again. Swiping the collapsed stack, or tapping ×, clears every notification in it. A conversation showing one message is a single card and can join an App stack, for example TikTok's one-message chats. A Conversation stack with several messages stays on its own. New doesn't use App stacks: every New card shows in full. The "N earlier" pill counts cards, not stacks.
 
 ## New incoming messages
 
@@ -48,6 +48,10 @@ A conversation card leads with its Avatar, badged with the app's icon. A group s
 An Attachment shows as a thumbnail on the right of its message's card, as on iOS, on New, Earlier and open stacks alike. A video's thumbnail carries a play mark. A collapsed Conversation stack shows its latest message's thumbnail, with "+n" for the other photos inside. Tapping the thumbnail opens the app, like the rest of the card.
 
 Pressing and holding any card opens its Preview over a dimmed screen, without unlocking. It shows the card's full text, its Attachment (or a picture notification's picture) large, and the app's buttons. Reply types inside the Preview, except on the lock-screen view, where it asks to unlock and continues in the panel. Tapping outside, or Back, closes it. Nothing in the app is opened or marked read.
+
+Under the app's buttons the Preview has Snooze and Clear. Clear does what swiping the card would: a message card hides only that message, a collapsed stack clears everything in it, and any other card clears its notification. Snooze appears for clearable notifications, not for calls, Media players or Running. It opens into 15 minutes, 1 hour, 3 hours, Tomorrow morning (8:00 the next day, or the same day before 4:00) and Pick a time…. Pick a time shows a time picker, starting an hour from now, and a button that says when the notification comes back. A time already past today means tomorrow. Snoozing a message snoozes its whole conversation, because Android snoozes notifications, not messages. Android hides the notification, from the system shade too, and posts it again when the time is up. It comes back as New, at the time it came back, even if nothing in it changed (ADR 0010). Neither needs unlocking, as swiping doesn't.
+
+*Settings → Panel → Swipe to clear* turns off clearing by swiping, in the Panel and on the lock-screen view. Cards then give a little and spring back when swiped sideways, without opening anything, and clear from their Preview or a section's Clear. Paused Media players can still be swiped away, since they have no Preview.
 
 Tapping the Preview's image opens a full-screen viewer, still without unlocking. In the viewer you pinch or double-tap to zoom, swipe sideways through the conversation's images, and swipe down or press Back to close. Save puts the image in the gallery's Pictures/Chronotif album. Share asks to unlock first on the lock screen, because it opens another app. A video shows only its still frame, so it offers Open in app instead of Save and Share. A notification's expanded picture opens in the same viewer. Viewing doesn't count as a check. When content is hidden, there are no Avatars or Attachments.
 
@@ -98,6 +102,9 @@ Results show while locked, except contacts and calendar events: with either swit
 - Let one app post three notifications within a few minutes, and another notification from it hours earlier, then check. Earlier shows the three as one collapsed App stack and the old one apart from them; tapping the stack opens the three in place.
 - Receive several messages in one conversation. New shows a collapsed stack with the count on the Avatar; tapping it shows one card per message. Messages from before the last check sit in the conversation's own Earlier stack.
 - Swipe one message card away. Only that message disappears; the chat stays in the system shade. Swipe the collapsed stack and the conversation is cleared everywhere.
+- Open a Conversation stack and tap its title. It collapses, as Show less does.
+- Turn off *Swipe to clear* and swipe a card. It springs back and nothing opens. Press and hold it and tap Clear: it's cleared.
+- Press and hold a checked Earlier card, tap Snooze, then 15 minutes. It leaves Chronotif and the system shade, and returns 15 minutes later in New.
 - Check a conversation, then receive another incoming message through a silent update of its notification. The conversation returns to New.
 - Refresh a checked notification without a new incoming message. It remains in Earlier.
 - Open the panel with only always-running services active. Only the "N running" pill shows; tapping it reveals them.

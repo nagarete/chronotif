@@ -22,6 +22,7 @@ import app.chronotif.Apps
 import app.chronotif.Content
 import app.chronotif.Entry
 import app.chronotif.Images
+import app.chronotif.Prefs
 import app.chronotif.R
 import app.chronotif.Viewable
 import app.chronotif.core.Kind
@@ -76,7 +77,7 @@ class CardView(context: Context, private val cb: CardCallbacks) : LinearLayout(c
     var tapOverride: (() -> Unit)? = null
     var swipeAllowed: () -> Boolean = { entry?.clearable == true }
     var onSwiped: () -> Unit = { entry?.let(cb::onDismiss) }
-    val swipe = SwipeDismiss({ swipeAllowed() }, { onSwiped() })
+    val swipe = SwipeDismiss({ swipeAllowed() }, { onSwiped() }, resist = { !Prefs.swipeToClear })
 
     init {
         orientation = VERTICAL

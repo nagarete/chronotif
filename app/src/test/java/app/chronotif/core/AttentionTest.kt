@@ -162,4 +162,41 @@ class AttentionTest {
         assertEquals(RelTime.Label.Yesterday, RelTime.of(now, today - 8 * 3_600_000, today))
         assertEquals(RelTime.Label.Older, RelTime.of(now, today - 3 * day, today))
     }
+
+    @Test
+    fun aNotificationBackFromASnoozeArrivesWhenItIsPostedAgain() {
+        // Android reposts it as it was; Chronotif passes the time it came back.
+        assertEquals(90_000, AlertClock().onPosted("chat", 90_000, signature = 1, quiet = true, conversation = true,
+            message = MessageStamp(1_000, 1), returned = true))
+        assertEquals(90_000, AlertClock().onPosted("mail", 90_000, signature = 1, quiet = true, returned = true))
+    }
+
+    @Test
+    fun snoozeTimesAndTomorrowMorningAfterMidnight() {
+        val zone = java.time.ZoneId.of("Asia/Jakarta")
+        fun at(day: Int, hour: Int, minute: Int = 0) =
+            java.time.LocalDateTime.of(2026, 11, day, hour, minute).atZone(zone).toInstant().toEpochMilli()
+        val now = at(20, 14, 30)
+        assertEquals(now + 15 * 60_000, Snooze.until(SnoozeFor.MINUTES_15, now, zone))
+        assertEquals(now + 3 * 3_600_000, Snooze.until(SnoozeFor.HOURS_3, now, zone))
+        assertEquals(at(21, 8), Snooze.until(SnoozeFor.TOMORROW_MORNING, now, zone))
+        assertEquals(at(21, 8), Snooze.until(SnoozeFor.TOMORROW_MORNING, at(20, 23, 50), zone))
+        // At 1 a.m. "tomorrow morning" is the one about to come, not the day after.
+        assertEquals(at(21, 8), Snooze.until(SnoozeFor.TOMORROW_MORNING, at(21, 1), zone))
+        assertEquals(at(22, 8), Snooze.until(SnoozeFor.TOMORROW_MORNING, at(21, 4), zone))
+    }
+
+    @Test
+    fun aPickedSnoozeTimeIsTheNextTimeItComesRound() {
+        val zone = java.time.ZoneId.of("Asia/Jakarta")
+        fun at(day: Int, hour: Int, minute: Int = 0) =
+            java.time.LocalDateTime.of(2026, 11, day, hour, minute).atZone(zone).toInstant().toEpochMilli()
+        val now = at(20, 14, 30)
+        assertEquals(at(20, 18), Snooze.at(java.time.LocalTime.of(18, 0), now, zone))
+        assertEquals("Already past today: tomorrow", at(21, 9), Snooze.at(java.time.LocalTime.of(9, 0), now, zone))
+        assertEquals("Right now is tomorrow's", at(21, 14, 30), Snooze.at(java.time.LocalTime.of(14, 30), now, zone))
+        assertEquals(java.time.LocalTime.of(15, 30), Snooze.suggested(now, zone))
+        assertEquals(java.time.LocalTime.of(15, 35), Snooze.suggested(at(20, 14, 31), zone))
+        assertEquals(java.time.LocalTime.of(0, 0), Snooze.suggested(at(20, 22, 58), zone))
+    }
 }

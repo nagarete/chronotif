@@ -31,6 +31,14 @@ object Act {
         if (keys.isNotEmpty()) ListenerService.instance?.cancelNotifications(keys.toTypedArray())
     }
 
+    /** Hides [e] until [until], when Android posts it again and it counts as New (ADR 0010). */
+    fun snooze(e: Entry, until: Long) {
+        val service = ListenerService.instance ?: return
+        if (!e.clearable) return
+        Prefs.snoozed(e.key, until)
+        service.snoozeNotification(e.key, (until - System.currentTimeMillis()).coerceAtLeast(60_000L))
+    }
+
     /** Returns true if the action is expected to bring up an activity (the panel should close). */
     fun action(context: Context, a: Notification.Action): Boolean {
         val pi = a.actionIntent ?: return false

@@ -180,6 +180,97 @@ class NotificationBehaviorTest {
     }
 
     @Test
+    fun tappingAnOpenStacksNameClosesIt() {
+        post(notification(listOf("Jiah" to 1100L, "Gawd damn" to 1200L)), 1200)
+        withPanelList { list, container ->
+            list.render()
+            views(container).filterIsInstance<app.chronotif.ui.StackView>().single().card.performClick()
+            val showLess = views(container).filterIsInstance<TextView>().single { it.text == "Show less" }
+            val header = showLess.parent as ViewGroup
+            assertFalse("Touches on the name fall through to the header", header.getChildAt(0).isClickable)
+            header.performClick()
+            val shown = shownTexts(container)
+            assertFalse(shown.contains("Show less"))
+            assertFalse("Collapsed again", shown.contains("Jiah"))
+            assertTrue(shown.contains("Gawd damn"))
+        }
+    }
+
+    @Test
+    fun withSwipeToClearOffASwipeLeavesTheCardInPlace() {
+        val n = Notification.Builder(context, "updates")
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentText("Your order shipped")
+            .build()
+        post(n, pkg = "example.shop")
+        fun swipe(card: app.chronotif.ui.CardView): Boolean {
+            measure(card, 1000)
+            fun ev(action: Int, x: Float) = android.view.MotionEvent.obtain(0, 0, action, x, 50f, 0)
+            card.swipe.onTouch(card, ev(android.view.MotionEvent.ACTION_DOWN, 100f))
+            card.swipe.onTouch(card, ev(android.view.MotionEvent.ACTION_MOVE, 400f))
+            card.swipe.onTouch(card, ev(android.view.MotionEvent.ACTION_MOVE, 800f))
+            assertTrue("A sideways drag is taken, so it never ends as a tap",
+                card.swipe.onTouch(card, ev(android.view.MotionEvent.ACTION_UP, 800f)))
+            return card.swipe.dismissing
+        }
+        withPanelList { list, container ->
+            Prefs.swipeToClear = false
+            list.render()
+            val card = views(container).filterIsInstance<app.chronotif.ui.CardView>().single()
+            assertFalse(swipe(card))
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(500))
+            assertEquals("It springs back", 0f, card.translationX)
+            Prefs.swipeToClear = true
+            assertTrue("Turning it back on needs no rebuild", swipe(card))
+        }
+    }
+
+    @Test
+    fun aSnoozedNotificationComesBackAsNew() {
+        val e = post(notification(listOf("see you at 8" to 900L)), 1000)
+        Prefs.markChecked(5000)
+        assertEquals(0, NotifStore.newCount())
+        Prefs.snoozed(e.key, until = 6000)
+        NotifStore.remove(e.key, ranking)
+        // Android posts it again unchanged, with its old post time.
+        val back = post(notification(listOf("see you at 8" to 900L)), 1000)
+        assertTrue(back.alertTime > 5000)
+        assertEquals(1, NotifStore.newCount())
+        // Only once: a later quiet update is an update, not another return.
+        NotifStore.remove(e.key, ranking)
+        assertTrue(post(notification(listOf("see you at 8" to 900L)), 1000).alertTime < 5000)
+    }
+
+    @Test
+    fun thePreviewOffersSnoozeAndClearAndClearHidesThatMessage() {
+        val e = post(notification(listOf("one" to 1100L, "two" to 1200L)), 1200)
+        withPanelList { list, container ->
+            (container.context as Activity).setContentView(container)
+            list.render()
+            views(container).filterIsInstance<app.chronotif.ui.StackView>().single().card.performClick()
+            val card = views(container).filterIsInstance<app.chronotif.ui.CardView>()
+                .first { "one" in texts(it) && "two" !in texts(it) }
+            card.performLongClick()
+            val root = container.rootView as ViewGroup
+            fun button(label: String) = views(root).filterIsInstance<TextView>().single { it.text == label && it.isShownInTree() }
+            button("Snooze").performClick()
+            assertTrue(shownTexts(root).containsAll(listOf("15 minutes", "1 hour", "3 hours", "Tomorrow morning", "Pick a time…")))
+            button("Pick a time…").performClick()
+            assertTrue("A time picker, and a button saying when",
+                views(root).any { it is android.widget.TimePicker && it.isShownInTree() } &&
+                    shownTexts(root).any { it.startsWith("Snooze until") })
+            assertFalse("The choices replace the buttons", shownTexts(root).contains("Clear"))
+            app.chronotif.ui.Overlay.dismissTop(root)
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(500))
+            card.performLongClick()
+            button("Clear").performClick()
+            val one = Content.of(context, e, false).messages.first { it.line.endsWith("one") }.id
+            assertEquals(setOf(one), NotifStore.hiddenMessages(e.key))
+            assertNotNull("The rest of the conversation stays", NotifStore.get(e.key))
+        }
+    }
+
+    @Test
     fun swipingAMessageCardHidesOnlyThatMessage() {
         val e = post(notification(listOf("one" to 1100L, "two" to 1200L)), 1200)
         val c = Content.of(context, e, false)

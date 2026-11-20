@@ -104,6 +104,7 @@ data class MessageStamp(val time: Long, val signature: Int)
  * Tracks when each notification last arrived. Apps re-post the same key constantly
  * (progress, timestamps, silent refreshes). Incoming conversation messages count even when
  * silent; other content changes count only when the app didn't mark the update as quiet.
+ * A notification coming back from a snooze ([returned]) arrives when it's posted (ADR 0010).
  */
 class AlertClock {
     private class State(val alertTime: Long, val signature: Int, val message: MessageStamp?)
@@ -112,7 +113,7 @@ class AlertClock {
 
     fun onPosted(
         key: String, postTime: Long, signature: Int, quiet: Boolean,
-        conversation: Boolean = false, message: MessageStamp? = null,
+        conversation: Boolean = false, message: MessageStamp? = null, returned: Boolean = false,
     ): Long {
         val prev = states[key]
         val incoming = message != null && (prev?.message == null ||
@@ -120,6 +121,7 @@ class AlertClock {
             (message.time == 0L && message != prev.message))
         val arrived = if (conversation) incoming else !quiet && signature != prev?.signature
         val alertTime = when {
+            returned -> postTime
             // First sight of a chat (after a restart, or an app re-alerting old chats): it arrived with
             // its latest message, not now. The sender's clock may run a little ahead, hence min.
             prev == null && conversation && message != null && message.time > 0 -> minOf(postTime, message.time)
