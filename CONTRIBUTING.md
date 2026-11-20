@@ -9,10 +9,11 @@ translations and accessibility improvements are always welcome.
 
 - **Local-first and private.** No accounts, analytics or crash reporters, and nothing about
   the user or their notifications ever leaves the device. There are two pieces of network code,
-  both opt-in and download-only: the updater (`Updater.kt`), which reads public GitHub Releases,
-  and Search's currency rates (`ExchangeRates.kt`), which download the European Central Bank's
-  public daily rates (ADR 0008). Neither sends anything the user typed or received. A PR that
-  adds other network use won't be merged.
+  both download-only: the opt-in updater (`Updater.kt`), which reads public GitHub Releases, and
+  Search's currency rates (`ExchangeRates.kt`), on by default for new installs, which download the
+  European Central Bank's public daily rates when a currency is typed (ADR 0008, ADR 0015).
+  Neither sends anything the user typed or received. A PR that adds other network use won't be
+  merged.
 - **Lightweight.** No polling, wakelocks, alarms or foreground services. Work happens in
   response to system events. The one exception is the opt-in daily update job. Avoid
   dependencies; the app currently has none.
