@@ -203,6 +203,7 @@ To open Chronotif in fullscreen, use the Quick Settings tile, or turn off the ed
   display to sleep, without a timed handoff to the stock lock screen. This follows the stock lock
   screen's short timeout, not the device's longer display timeout. Double-tap empty space to turn
   the screen off: it goes black at once and the display sleeps a few seconds later (ADR 0014).
+  Tap the clock for your alarms or the date for your calendar; both ask you to unlock first.
   *Settings → Lock screen* chooses Off / *When something is new* (default) /
   *Whenever there are notifications*, and *Double-tap to sleep* (on by default) turns the
   double tap off.
