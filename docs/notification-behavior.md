@@ -117,6 +117,21 @@ Settings pages come from a fixed list of the pages Android lets apps open, match
 
 Results show while locked, contacts and calendar events included (ADR 0013). Only when the lock screen hides sensitive content (*Settings → Lock screen → Hide sensitive content*, or the system's setting with a secure lock) are contacts and events held back: with either switch on, a row saying *Unlock to see all results* takes their place, whether or not anything matched, so the lock screen doesn't reveal who or what is in them. Tapping it asks to unlock, then shows everything for the same query. Tapping an app, a Settings page or the web row on the lock screen asks to unlock, then opens it. Search shows no notifications, so opening it is never a check. Back, a tap on empty space, or a swipe up closes Search. On the lock-screen view, closing goes back to the notifications rather than unlocking. *Settings → Search → Pull down for Search* turns the pull-down off; the other ways in stay.
 
+## Tutorial
+
+*Settings → Tutorial*, above Tips, runs Chronotif hands-on with made-up notifications. Each part is a few steps; a step says what to try, shows *✓ That's it* once the user did, and Back and Continue move between steps whether or not they tried. The first part, Notifications, has six:
+
+1. Open the Panel with the edge handle (or the status-bar swipe when it's on). The tutorial screen also offers to add the Chronotif tile to Quick Settings on Android 13 and newer, and says how to add it by hand on older versions.
+2. New and Earlier. The Panel opens with three samples in New (Daybook, Parcelly, and Maya Chen's two Murmur messages as a Conversation stack) and two in Earlier (Fernbank, Stride). Maya writes again a moment later. Closing the Panel after it was seen, then opening it again, moves what was seen to Earlier.
+3. Open the stack and close it by its name.
+4. Hold a card for its Preview, and reply or snooze from there.
+5. Swipe a card to clear it.
+6. Close the Panel.
+
+While a part runs, the Panel, however it's opened, shows only the samples, with the step's card at its bottom; cards scroll up clear of it, and it steps aside for the keyboard. The samples have a last check of their own, so New and Earlier work as usual without touching the real one. Opening, replying, clearing, hiding a message and snoozing change only the samples: nothing reaches Android or an app, and a sample has nothing to open, so tapping it opens it in place. What's new waits for the real Panel. The edge handle's tint, the header and Search stay real.
+
+A run lives only in memory. Leaving the tutorial screen with the Panel closed ends it, as does Android stopping Chronotif, and the next Panel shows the real notifications. The step reached is saved, so Settings shows *Left at step n* and Continue picks up there. A finished part shows Done and can be started again.
+
 ## Verification cases
 
 - Leave a notification wake untouched. Chronotif remains visible and the display sleeps after the stock lock-screen timeout (about ten seconds), not the normal screen timeout, without an extra stock lock-screen interval.
@@ -159,6 +174,7 @@ Results show while locked, contacts and calendar events included (ADR 0013). Onl
 - Turn on *Find contacts* and allow the permission. Type the start of a contact's surname: the contact shows with its number. Tap the message button: WhatsApp opens the chat if the contact uses it, otherwise the SMS app opens to that number. The call button opens the dialer. Turn on *Call from Search*: the call button starts a WhatsApp call, and a video call button appears. Lock the phone, open Search from the tile and type the same: the contact shows, and its buttons ask to unlock. Turn on *Hide sensitive content* and try again: no contacts, only *Unlock to see all results*. Tap it and unlock: the contact shows.
 - Turn on *Find calendar events*, add a weekly event, and type its first word. It shows once, at its next date.
 - Open *Settings → Search* on a new install: the card says 4 steps left and Next: Find contacts. Tap Not now on Find contacts: 3 left, the next is Call from Search, and the row says it's put off. Tap Allow on Find calendar events and allow it: the row shows On and the switch below is on. Tap Add on the widget step: the home screen offers to place the Search bar, and back in settings the row shows Added.
+- Open *Settings → Tutorial* and start Notifications. Swipe down on the edge handle: the Panel shows only the samples, with the step's card at the bottom and ✓ That's it. Continue, watch Maya's new message arrive, close the Panel and open it again: New is empty and everything is in Earlier, while the real notifications are still New afterwards. Leave with Home: the next Panel is the real one, and Settings shows the step it was left at.
 - Type `100 usd` with currency rates off: the card offers to turn them on. Tap it: after a moment the card shows the amount in rupiah (on an Indonesian network) with the rate's date. Type `rp 50.000 to sgd`: fifty thousand rupiah in Singapore dollars, two decimals.
 - Type `wifi`: Wi-Fi is under Settings. Type `klikbca.com`: the last row opens it. Type `nasi goreng`: the last row searches it in the default browser.
 

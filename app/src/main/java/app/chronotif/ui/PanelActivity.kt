@@ -9,6 +9,8 @@ import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
 import android.window.OnBackInvokedDispatcher
+import app.chronotif.CardSource
+import app.chronotif.Tutorial
 
 /**
  * The panel as an activity: the fallback when it can't be an overlay window (no overlay
@@ -34,7 +36,7 @@ class PanelActivity : Activity(), NotifList.Host {
             window.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
             window.attributes = window.attributes.apply { blurBehindRadius = dp(48) }
         }
-        panel = PanelView(this, this, blur) {
+        panel = PanelView(this, this, blur, source = Tutorial.source ?: CardSource.Real) {
             finish()
             noTransition()
         }

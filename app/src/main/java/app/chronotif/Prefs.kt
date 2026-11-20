@@ -280,6 +280,16 @@ object Prefs {
         get() = sp.getBoolean("search_calendar", false)
         set(v) = sp.edit().putBoolean("search_calendar", v).apply()
 
+    /** The Tutorial part and step the user left at, as "PART:step", or null. */
+    var tutorialPlace: String?
+        get() = sp.getString("tutorial_place", null)
+        set(v) = sp.edit().putString("tutorial_place", v).apply()
+
+    /** Tutorial parts the user has finished, by [Tutorial.Part] name. */
+    var tutorialDone: Set<String>
+        get() = sp.getStringSet("tutorial_done", null).orEmpty().toSet()
+        set(v) = sp.edit().putStringSet("tutorial_done", v).apply()
+
     /** Search checklist steps the user said Not now to, by [SearchSetup.Step] name. */
     var searchSetupSkipped: Set<String>
         get() = sp.getStringSet("search_setup_skipped", null).orEmpty().toSet()

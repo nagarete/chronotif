@@ -7,12 +7,12 @@ import android.content.Context
 import android.graphics.Rect
 import android.os.Handler
 import android.os.Looper
+import android.view.Choreographer
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.VelocityTracker
 import android.view.View
 import android.view.ViewConfiguration
-import android.view.Choreographer
 import android.view.WindowInsets
 import android.view.animation.DecelerateInterpolator
 import android.widget.EditText
@@ -20,6 +20,7 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import app.chronotif.CardSource
+import app.chronotif.TutorialSource
 import kotlin.math.abs
 
 /**
@@ -176,10 +177,24 @@ class PanelView(
             false
         }
         addView(scroll, LayoutParams(-1, -1, Gravity.TOP))
+        // The Tutorial's card sits at the bottom, over the cards; they scroll up clear of it.
+        val guide = if (source is TutorialSource) TutorialGuide(context, inPanel = true) { close() } else null
+        guide?.let { g ->
+            addView(g, LayoutParams(-1, -2, Gravity.BOTTOM).apply { leftMargin = dp(12); rightMargin = dp(12) })
+            g.addOnLayoutChangeListener { _, _, top, _, bottom, _, oldTop, _, oldBottom ->
+                if (bottom - top != oldBottom - oldTop) requestApplyInsets()
+            }
+        }
         setOnApplyWindowInsetsListener { _, insets ->
             val bars = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())
             val ime = insets.getInsets(WindowInsets.Type.ime())
-            scroll.setPadding(bars.left, bars.top + dp(8), bars.right, maxOf(bars.bottom, ime.bottom))
+            // While typing a reply, the keyboard takes the guide's place.
+            val guideRoom = guide?.let { g ->
+                g.visibility = if (ime.bottom > 0) View.GONE else View.VISIBLE
+                (g.layoutParams as LayoutParams).bottomMargin = bars.bottom + dp(12)
+                if (ime.bottom > 0) 0 else g.height + dp(24)
+            } ?: 0
+            scroll.setPadding(bars.left, bars.top + dp(8), bars.right, maxOf(bars.bottom, ime.bottom) + guideRoom)
             // The window doesn't resize for the keyboard, so keep what's being typed above it.
             if (ime.bottom > 0) scroll.post(::revealFocusedEditor)
             insets
@@ -219,6 +234,7 @@ class PanelView(
             list.render()
             revealCards()
             startSeen()
+            list.source.noticed(CardSource.Noticed.PANEL_OPENED)
         }
         main.removeCallbacks(ticker)
         main.postDelayed(ticker, 60_000)
@@ -258,6 +274,8 @@ class PanelView(
      * panel had only just opened.
      */
     private fun whatsNew() {
+        // The Tutorial's panel is practice: What's new waits for the real one.
+        if (list.source !== CardSource.Real) return
         if (whatsNewLooked || !settled || cardsAt == 0L) return
         whatsNewLooked = true
         val releases = WhatsNewSheet.pending(context) ?: return
@@ -309,10 +327,10 @@ class PanelView(
         cardsAt = 0L
         val since = seenSince
         seenSince = 0L
-        if (since == 0L) return
-        if (interacted || android.os.SystemClock.uptimeMillis() - since >= CHECK_DWELL_MS) {
+        if (since != 0L && (interacted || android.os.SystemClock.uptimeMillis() - since >= CHECK_DWELL_MS)) {
             list.source.markChecked(list.shownUpTo)
         }
+        list.source.noticed(CardSource.Noticed.PANEL_CLOSED)
     }
 
     // --- Gestures: upward fling at the bottom of the list closes, like pushing a shade up.

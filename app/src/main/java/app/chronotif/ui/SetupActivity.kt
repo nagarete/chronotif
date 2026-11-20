@@ -41,6 +41,7 @@ import app.chronotif.PanelTile
 import app.chronotif.Prefs
 import app.chronotif.R
 import app.chronotif.SearchSetup
+import app.chronotif.Tutorial
 import app.chronotif.StatusBarSwipe
 import app.chronotif.Updater
 import app.chronotif.core.SettingMatch
@@ -60,6 +61,7 @@ class SetupActivity : Activity() {
 
     private enum class Section(val title: Int, val icon: Int) {
         GENERAL(R.string.setup_general, R.drawable.ic_section_general),
+        TUTORIAL(R.string.setup_tutorial, R.drawable.ic_section_tutorial),
         TIPS(R.string.setup_tips, R.drawable.ic_section_tips),
         PANEL(R.string.setup_panel, R.drawable.ic_section_panel),
         HANDLE(R.string.handle_enabled, R.drawable.ic_section_handle),
@@ -344,7 +346,7 @@ class SetupActivity : Activity() {
             setOnClickListener { select(Section.GENERAL) }
         }, Ui.lp().apply { bottomMargin = dp(6) })
         val groups = listOf(
-            null to listOf(Section.GENERAL, Section.TIPS),
+            null to listOf(Section.GENERAL, Section.TUTORIAL, Section.TIPS),
             R.string.settings_group_features to listOf(Section.PANEL, Section.HANDLE, Section.SWIPE, Section.LOCK, Section.SEARCH),
             R.string.settings_group_app to listOf(Section.UPDATES, Section.ABOUT),
         )
@@ -433,6 +435,7 @@ class SetupActivity : Activity() {
     private fun build(s: Section) {
         when (s) {
             Section.GENERAL -> general()
+            Section.TUTORIAL -> tutorial()
             Section.TIPS -> tips()
             Section.PANEL -> panel()
             Section.HANDLE -> handle()
@@ -547,6 +550,59 @@ class SetupActivity : Activity() {
     }
 
     /** The gestures nobody can see: a row each, always a tap away in the drawer. */
+    /** The Tutorial's parts, each with how far it got and a button to start, continue or redo it. */
+    private fun tutorial() {
+        footnote(getString(R.string.tutorial_intro), top = 6)
+        group {
+            Tutorial.Part.entries.forEach(::tutorialPart)
+        }
+    }
+
+    private fun tutorialPart(part: Tutorial.Part) {
+        val steps = Tutorial.steps(part).size
+        val mark = ImageView(this).apply { scaleType = ImageView.ScaleType.CENTER }
+        val status = text("", 13.5f, secondary = true)
+        val start = button("", filled = true) {
+            open(TutorialActivity.intent(this, part, fromStart = Tutorial.placeOf(part) == null && Tutorial.finished(part)))
+        }
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(16), dp(14), dp(18), dp(14))
+            tag = part.title
+            addView(mark, LinearLayout.LayoutParams(dp(28), dp(28)).apply { topMargin = dp(1) })
+            addView(LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                addView(text(getString(part.title), 16f, weight = 500))
+                addView(text(getString(part.desc), 13.5f, secondary = true), gap(3))
+                addView(status, gap(6))
+                addView(start, gap(12).apply { width = -2 })
+            }, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(14) })
+        }
+        target.addView(row, Ui.lp())
+        indexed(part.title, getString(part.desc), row)
+        refreshers += {
+            val place = Tutorial.placeOf(part)
+            val done = Tutorial.finished(part)
+            mark.background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                if (done) setColor(c.goodContainer) else setStroke(dp(2), c.outline)
+            }
+            mark.setImageResource(if (done) R.drawable.ic_check else 0)
+            mark.imageTintList = ColorStateList.valueOf(c.good)
+            status.text = when {
+                place != null -> getString(R.string.tutorial_part_at, place + 1, steps)
+                done -> getString(R.string.tutorial_part_done)
+                else -> resources.getQuantityString(R.plurals.tutorial_part_steps, steps, steps)
+            }
+            status.setTextColor(if (done && place == null) c.good else c.textSecondary)
+            start.setText(when {
+                place != null -> R.string.tutorial_continue_part
+                done -> R.string.tutorial_again
+                else -> R.string.tutorial_start
+            })
+        }
+    }
+
     private fun tips() {
         group {
             listOf(
@@ -883,6 +939,7 @@ class SetupActivity : Activity() {
         R.string.lock_double_tap to "screen off turn off gesture wake",
         R.string.search_setup_widget to "home screen bar launcher",
         R.string.search_setup_tile to "quick settings",
+        R.string.setup_tutorial to "learn guide how practice try",
         R.string.search_engine to "google duckduckgo bing brave web browser",
         R.string.update_auto to "upgrade install",
         R.string.update_channel_label to "beta nightly stable",
