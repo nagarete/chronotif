@@ -162,6 +162,11 @@ object Prefs {
         get() = sp.getBoolean("lock_hide_content", false)
         set(v) = sp.edit().putBoolean("lock_hide_content", v).apply()
 
+    /** Double-tapping empty space on the lock-screen view puts the display to sleep (ADR 0014). */
+    var lockDoubleTapSleep: Boolean
+        get() = sp.getBoolean("lock_double_tap_sleep", true)
+        set(v) = sp.edit().putBoolean("lock_double_tap_sleep", v).apply()
+
     // --- Panel header. Android decides what the time and date say; these choose what shows,
     // where and how big (ADR 0005).
 

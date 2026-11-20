@@ -10,17 +10,21 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.res.ColorStateList
+import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.VelocityTracker
 import android.view.View
+import android.view.ViewConfiguration
 import android.view.WindowInsets
+import android.view.WindowInsetsController
 import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.ImageView
@@ -32,6 +36,7 @@ import app.chronotif.BuildConfig
 import app.chronotif.Entry
 import app.chronotif.LockSession
 import app.chronotif.NotifStore
+import app.chronotif.Prefs
 import app.chronotif.R
 import kotlin.math.abs
 
@@ -42,7 +47,8 @@ import kotlin.math.abs
  * rules, and anything beyond dismissing goes through the system unlock first. Tap outside a card,
  * swipe up from Tap to unlock (or unlock with fingerprint/face) to continue to the phone; back
  * folds the list back into the Pile, then reveals the system lock screen. Pulling down opens Search. Left alone, the display sleeps after the keyguard's short timeout, with
- * Chronotif still showing (see [useKeyguardTimeout]).
+ * Chronotif still showing (see [useKeyguardTimeout]). Double-tapping empty space turns the screen
+ * black and lets Android put the display to sleep (ADR 0014, see [sleep]).
  */
 class LockActivity : Activity(), NotifList.Host {
 
@@ -101,17 +107,19 @@ class LockActivity : Activity(), NotifList.Host {
             addView(date, Ui.lp(-2).apply { topMargin = dp(28) })
             addView(clock, Ui.lp(-2))
         }
+        this.clockBox = clockBox
+        clockFace = listOf(date, clock)
         val clockRoom = View(this)
         val content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             // Taps that no card, chip or pill takes (empty space, headers) unlock.
-            setOnClickListener { unlock(null) }
+            setOnClickListener { tapped() }
             addView(clockRoom, LinearLayout.LayoutParams(-1, 0))
         }
         listBox = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(12), 0, dp(12), dp(16))
-            setOnClickListener { unlock(null) }
+            setOnClickListener { tapped() }
         }
         content.addView(listBox, LinearLayout.LayoutParams(-1, -2))
         scroll = ScrollView(this).apply {
@@ -142,7 +150,7 @@ class LockActivity : Activity(), NotifList.Host {
         }
         column.addView(hint, Ui.lp(-1))
         this.hint = hint
-        column.setOnClickListener { unlock(null) }
+        column.setOnClickListener { tapped() }
         // Blurred artwork in place of the wallpaper while a Media player shows (see LockPile).
         val backdrop = ImageView(this).apply {
             scaleType = ImageView.ScaleType.CENTER_CROP
@@ -156,6 +164,7 @@ class LockActivity : Activity(), NotifList.Host {
             insets
         }
         setContentView(root)
+        this.root = root
 
         list = NotifList(this, listBox, onLock = true)
         pile = LockPile(stage, scroll, clockRoom, clockBox, listBox, list, backdrop) { openPile() }
@@ -174,8 +183,9 @@ class LockActivity : Activity(), NotifList.Host {
     /** Unfolds the Pile and scrolls New to the top of the screen. */
     private fun openPile() = scroll.smoothScrollTo(0, pile.openAt)
 
-    /** Back folds the open list back into the Pile, then shows the stock lock screen. */
+    /** Back folds the open list back into the Pile, then shows the stock lock screen. Not while dark. */
     internal fun back() {
+        if (dark != null) return
         if (pile.resting) finish() else scroll.smoothScrollTo(0, 0)
     }
 
@@ -214,6 +224,7 @@ class LockActivity : Activity(), NotifList.Host {
     }
 
     override fun onDestroy() {
+        main.removeCallbacks(tapUnlocks)
         unregisterReceiver(receiver)
         super.onDestroy()
     }
@@ -238,12 +249,17 @@ class LockActivity : Activity(), NotifList.Host {
         val res = android.content.res.Resources.getSystem()
         val id = res.getIdentifier("config_lockScreenDisplayTimeout", "integer", "android")
         val ms = (if (id != 0) res.getInteger(id).toLong() else 0L).takeIf { it > 0 } ?: KEYGUARD_TIMEOUT_MS
+        userActivityTimeout(ms)
+    }
+
+    /** How long after the last touch the display sleeps while this window shows. Android won't go below its own minimum. */
+    private fun userActivityTimeout(ms: Long) {
         try {
             val attrs = window.attributes
             WindowManager.LayoutParams::class.java.getField("userActivityTimeout").setLong(attrs, ms)
             window.attributes = attrs
         } catch (e: ReflectiveOperationException) {
-            if (BuildConfig.DEBUG) android.util.Log.w("Chronotif", "keyguard timeout unavailable", e)
+            if (BuildConfig.DEBUG) android.util.Log.w("Chronotif", "screen timeout unavailable", e)
         }
     }
 
@@ -299,7 +315,115 @@ class LockActivity : Activity(), NotifList.Host {
         }
     }
 
+    // --- Double-tap to sleep (ADR 0014).
+
+    private lateinit var root: FrameLayout
+    private lateinit var clockBox: View
+    /** The date and the clock: never empty space, even though a tap on them unlocks. */
+    private lateinit var clockFace: List<View>
+    /** The black cover while Android counts down to sleep, or null while the view shows. */
+    private var dark: View? = null
+    private var downX = 0f
+    /** Whether the touch under way started on empty space. */
+    private var downEmpty = false
+    /** Whether the touch under way is the second tap of a double tap on empty space. */
+    private var secondTap = false
+    /** A first tap on empty space still waiting for a second: when it ended (uptime) and where, or 0. */
+    private var firstTapAt = 0L
+    private var firstX = 0f
+    private var firstY = 0f
+    private val tapUnlocks = Runnable {
+        firstTapAt = 0L
+        unlock(null)
+    }
+    /** On the black cover: when the last tap ended, or 0, and whether the touch under way is a second tap. */
+    private var darkTapAt = 0L
+    private var darkSecond = false
+    private val doubleTapTimeout = ViewConfiguration.getDoubleTapTimeout().toLong()
+    private val doubleTapSlop by lazy { ViewConfiguration.get(this).scaledDoubleTapSlop }
+
+    /**
+     * Empty space: where a tap means nothing but "unlock". Not a row of the list (cards, players,
+     * the artwork's room, headers), the Pile, the clock and date, or Tap to unlock. The blank gap
+     * the Pile unfolds from is empty space.
+     */
+    private fun emptyAt(ev: MotionEvent): Boolean {
+        if (onHint || onPile) return false
+        val x = ev.rawX.toInt()
+        val y = ev.rawY.toInt()
+        val r = android.graphics.Rect()
+        fun on(v: View) = v.isShown && v.getGlobalVisibleRect(r) && r.contains(x, y)
+        if (clockBox.alpha > 0f && clockFace.any(::on)) return false
+        val gap = list.spacer
+        return (0 until listBox.childCount).none { listBox.getChildAt(it).let { row -> row !== gap && on(row) } }
+    }
+
+    /**
+     * A tap that no card, chip or pill took. On empty space, with double-tap to sleep on, it waits
+     * for a second tap before asking to unlock; anywhere else it asks at once.
+     */
+    private fun tapped() {
+        if (!Prefs.lockDoubleTapSleep || !downEmpty) {
+            unlock(null)
+            return
+        }
+        if (secondTap) {
+            secondTap = false
+            sleep()
+            return
+        }
+        firstTapAt = SystemClock.uptimeMillis()
+        firstX = downX
+        firstY = downY
+        main.postDelayed(tapUnlocks, doubleTapTimeout)
+    }
+
+    /**
+     * Turns the screen black, as dim as it goes and without the system bars, and asks for the
+     * shortest screen timeout. Android has no call for an app to put the display to sleep, so it
+     * sleeps on its own once its minimum timeout runs out (6 seconds on HyperOS). The screen-off
+     * broadcast then closes the view, as after any wake.
+     */
+    private fun sleep() {
+        if (dark != null) return
+        dark = View(this).apply { setBackgroundColor(Color.BLACK) }
+            .also { root.addView(it, FrameLayout.LayoutParams(-1, -1)) }
+        window.insetsController?.apply {
+            systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            hide(WindowInsets.Type.systemBars())
+        }
+        window.attributes = window.attributes.apply { screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_OFF }
+        userActivityTimeout(1L)
+    }
+
+    /** Brings the view back from [sleep], as double tap to wake would. */
+    private fun wake() {
+        val cover = dark ?: return
+        root.removeView(cover)
+        dark = null
+        window.insetsController?.show(WindowInsets.Type.systemBars())
+        window.attributes = window.attributes.apply { screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE }
+        useKeyguardTimeout()
+    }
+
+    /** The black cover acts as a sleeping screen: a double tap brings the view back, and nothing else does anything. */
+    private fun darkTouch(ev: MotionEvent) {
+        when (ev.actionMasked) {
+            MotionEvent.ACTION_DOWN -> darkSecond = darkTapAt != 0L && ev.eventTime - darkTapAt <= doubleTapTimeout
+            MotionEvent.ACTION_UP -> if (darkSecond) {
+                darkTapAt = 0L
+                wake()
+            } else {
+                darkTapAt = ev.eventTime
+            }
+        }
+    }
+
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        if (dark != null) {
+            darkTouch(ev)
+            return true
+        }
         // A Preview or the image viewer scrolls and swipes on its own; swiping up there isn't "unlock".
         val decor = window.decorView as android.view.ViewGroup
         if ((0 until decor.childCount).any { decor.getChildAt(it) is Overlay }) {
@@ -317,6 +441,13 @@ class LockActivity : Activity(), NotifList.Host {
                 onPile = pile.hits(ev)
                 val r = android.graphics.Rect()
                 onHint = hint.getGlobalVisibleRect(r) && r.contains(ev.rawX.toInt(), ev.rawY.toInt())
+                downX = ev.rawX
+                downEmpty = emptyAt(ev)
+                // A new touch settles a tap still waiting: a second tap close by sleeps, anything else drops it.
+                secondTap = firstTapAt != 0L && downEmpty && ev.eventTime - firstTapAt <= doubleTapTimeout &&
+                    kotlin.math.hypot(ev.rawX - firstX, ev.rawY - firstY) < doubleTapSlop
+                main.removeCallbacks(tapUnlocks)
+                firstTapAt = 0L
                 tracker?.recycle()
                 tracker = VelocityTracker.obtain().also { it.addMovement(ev) }
             }

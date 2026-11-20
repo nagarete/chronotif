@@ -21,7 +21,8 @@
       "Settings → Search lists what Search can do, with examples to try, below its settings, and the Search tip on the Tips page sums it up.",
       "The lock screen leaves room for the time: the clock stays big, and new notifications wait at the bottom as a pile. Tap it or drag it up to see everything, and press Back to put it away.",
       "While music plays, the lock screen shows the album art large with the player under it, over a blur of the art. Drag up and the art shrinks into the player. Playing music now brings up Chronotif's lock screen on its own.",
-      "More works on the lock screen without unlocking: reply right there, use a notification's buttons that don't open the app, see Running, and find contacts and events in Search. Turn on Hide sensitive content to keep contacts and events behind the unlock. Opening an app still asks to unlock."
+      "More works on the lock screen without unlocking: reply right there, use a notification's buttons that don't open the app, see Running, and find contacts and events in Search. Turn on Hide sensitive content to keep contacts and events behind the unlock. Opening an app still asks to unlock.",
+      "Double-tap an empty part of the lock screen to turn the screen off, as on your phone's own lock screen. It goes black at once and the phone sleeps a few seconds later. Settings → Lock screen → Double-tap to sleep switches the double tap off."
     ],
     "video": {
       "src": "/video/release-0.2.7.mp4",

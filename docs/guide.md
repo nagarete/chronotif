@@ -200,10 +200,12 @@ To open Chronotif in fullscreen, use the Quick Settings tile, or turn off the ed
 - **Reply**: expand, tap the reply action, type, send.
 - **Lock screen**: tap outside a card or swipe up (or use fingerprint/face) to unlock; back
   reveals the system lock screen. Left untouched, Chronotif stays visible until Android puts the
-  display to sleep, without a timed handoff to the stock lock screen. This follows the device's
-  display timeout, which can be longer than the stock lock-screen timeout.
+  display to sleep, without a timed handoff to the stock lock screen. This follows the stock lock
+  screen's short timeout, not the device's longer display timeout. Double-tap empty space to turn
+  the screen off: it goes black at once and the display sleeps a few seconds later (ADR 0014).
   *Settings → Lock screen* chooses Off / *When something is new* (default) /
-  *Whenever there are notifications*.
+  *Whenever there are notifications*, and *Double-tap to sleep* (on by default) turns the
+  double tap off.
 - **Search**: find and open apps, do quick math, convert units, check the time in another city,
   convert currencies, find a contact or calendar event, jump to a Settings page, or hand anything else to your browser, all without the accessibility
   service. Pull down at the top of the panel or the lock-screen view, hold the edge handle, tap the
