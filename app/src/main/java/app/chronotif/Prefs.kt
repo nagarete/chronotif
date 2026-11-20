@@ -106,6 +106,16 @@ object Prefs {
         get() = sp.getFloat("handle_y", 0.22f)
         set(v) = sp.edit().putFloat("handle_y", v).apply()
 
+    /** What's new: the release notes already shown, as [app.chronotif.core.WhatsNew.key]s; null before any. */
+    var whatsNewSeen: Set<String>?
+        get() = sp.getStringSet("whats_new_seen", null)
+        set(v) = sp.edit().putStringSet("whats_new_seen", v).apply()
+
+    /** What's new: the version code last looked at, so the notes are read once per update. */
+    var whatsNewCode: Long
+        get() = sp.getLong("whats_new_code", 0L)
+        set(v) = sp.edit().putLong("whats_new_code", v).apply()
+
     /** The name of the settings section last open, reopened next time unless a permission is missing. */
     var settingsSection: String?
         get() = sp.getString("settings_section_name", null)

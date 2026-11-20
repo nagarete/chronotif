@@ -328,4 +328,11 @@
     <string name="update_stable">Stable</string>
     <string name="update_nightly">Nightly</string>
     <string name="update_channel_desc">Nightly includes changes still being tested. Switching to Stable waits for a newer stable release; it does not downgrade the app.</string>
+
+    <!-- What's new, after an update -->
+    <string name="whats_new_updated">Updated to %1$s</string>
+    <string name="whats_new_title">What\'s new</string>
+    <string name="whats_new_version">Version %1$s</string>
+    <string name="whats_new_all">All release notes</string>
+    <string name="whats_new_done">Got it</string>
 </resources>

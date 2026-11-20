@@ -85,6 +85,8 @@ The header and dim show at once and the cards right after. A long list fills in 
 
 Being on screen counts as a check once the Panel's cards have shown for about 1.5 seconds and it has opened fully, or as soon as it's used. For a pull that opens, the 1.5 seconds count from when its cards first showed during the pull. A pull that slides back is never a check.
 
+After an update, the first Panel open shows What's new on a sheet over the cards: the release notes this version has that weren't shown before, so a nightly that adds a line shows just that line. It shows once, however it's closed. A new install shows nothing, and the first update from a version without What's new shows only the new version's own notes. While the sheet covers the cards the Panel isn't seen: closing it then is no check, and the 1.5 seconds count from when the sheet goes. The lock-screen view never shows it.
+
 ## Search
 
 Search opens without the accessibility service, so it works alongside banking apps that refuse to run with one (ADR 0008). It opens from five places: a pull-down in the Panel or lock-screen view, a long press on the edge handle, the Chronotif Search Quick Settings tile, a Search home-screen widget (a bar 2 to 5 cells wide, or a round 1x1 button), and the Search shortcut on a long press of the app icon. Launchers that bind gestures, such as Nova, can bind theirs to the shortcut. Opened anywhere but the pull-down, Search has its own window over whatever is on screen, the lock screen included. It never takes the digital-assistant slot, so Gemini keeps the power button.

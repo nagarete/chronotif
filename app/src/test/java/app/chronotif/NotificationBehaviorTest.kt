@@ -1260,6 +1260,59 @@ class NotificationBehaviorTest {
         assertNotEquals("On screen for a moment, and opened", before, Prefs.lastCheck)
     }
 
+    /** The installed app looks updated rather than newly installed, so What's new has something to show. */
+    private fun pretendUpdated() {
+        val info = shadowOf(context.packageManager).getInternalMutablePackageInfo(context.packageName)
+        info.firstInstallTime = 1
+        info.lastUpdateTime = 2
+    }
+
+    private fun gotIt(root: View): View? {
+        val label = context.getString(R.string.whats_new_done)
+        fun find(v: View): View? {
+            if (v is TextView && v.text.toString() == label && v.isShown) return v
+            if (v is ViewGroup) for (i in 0 until v.childCount) find(v.getChildAt(i))?.let { return it }
+            return null
+        }
+        return find(root)
+    }
+
+    @Test
+    fun whatsNewOverTheCardsIsNoCheck() {
+        post(notification("hi"), time = 1000)
+        pretendUpdated()
+        val before = Prefs.lastCheck
+        withPanelView { panel ->
+            panel.shown()
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(3))
+            assertNotNull("The first open after an update shows What's new", gotIt(panel.rootView))
+            panel.dismissed()
+        }
+        assertEquals("Closed while What's new covered the cards", before, Prefs.lastCheck)
+        assertNull("It shows once", app.chronotif.ui.WhatsNewSheet.pending(context))
+    }
+
+    @Test
+    fun theCheckCountsFromWhenWhatsNewCloses() {
+        post(notification("hi"), time = 1000)
+        pretendUpdated()
+        val before = Prefs.lastCheck
+        withPanelView { panel ->
+            panel.shown()
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(3))
+            gotIt(panel.rootView)!!.performClick()
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(500))
+            panel.dismissed()
+            assertEquals("Half a second of cards after the sheet", before, Prefs.lastCheck)
+            panel.reset()
+            panel.shown()
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(2))
+            assertNull("Not again on the next open", gotIt(panel.rootView))
+            panel.dismissed()
+        }
+        assertNotEquals("Cards on screen for a moment", before, Prefs.lastCheck)
+    }
+
     // --- Panel header ---
 
     /** Runs [block] with the header's clock-and-date block, the start of its row; the gear is at the end. */
