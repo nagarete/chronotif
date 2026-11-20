@@ -11,14 +11,17 @@ import android.content.Context
 import android.content.Intent
 import android.os.Looper
 import android.os.Process
+import android.os.SystemClock
 import android.media.session.PlaybackState
 import android.service.notification.NotificationListenerService.RankingMap
 import android.service.notification.NotificationListenerService.Ranking
 import android.service.notification.StatusBarNotification
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.LinearLayout
+import android.widget.TextClock
 import android.widget.TextView
 import app.chronotif.core.Attention
 import app.chronotif.core.Kind
@@ -36,6 +39,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowKeyguardManager
 import org.robolectric.util.ReflectionHelpers
 import java.time.Duration
 
@@ -552,6 +556,115 @@ class NotificationBehaviorTest {
             assertTrue(controller.get().isFinishing)
         } finally {
             controller.pause().stop().destroy()
+        }
+    }
+
+    // --- Double-tap to sleep (ADR 0014)
+
+    private fun LockActivity.tapAt(x: Float, y: Float) {
+        val looper = shadowOf(Looper.getMainLooper())
+        val down = SystemClock.uptimeMillis()
+        dispatchTouchEvent(MotionEvent.obtain(down, down, MotionEvent.ACTION_DOWN, x, y, 0))
+        looper.idleFor(Duration.ofMillis(40))
+        dispatchTouchEvent(MotionEvent.obtain(down, SystemClock.uptimeMillis(), MotionEvent.ACTION_UP, x, y, 0))
+        looper.idle()
+    }
+
+    private fun LockActivity.doubleTapAt(x: Float, y: Float) {
+        tapAt(x, y)
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(100))
+        tapAt(x, y)
+    }
+
+    /** Above the date, beside nothing: empty space on the lock-screen view. */
+    private fun LockActivity.emptySpot() = dp(4).toFloat()
+
+    private fun LockActivity.clockSpot(): Pair<Float, Float> {
+        val clock = views(window.decorView).filterIsInstance<TextClock>().maxBy { it.textSize }
+        val at = IntArray(2).also { clock.getLocationInWindow(it) }
+        return at[0] + clock.width / 2f to at[1] + clock.height / 2f
+    }
+
+    private val unlockAsked: Boolean
+        get() = ReflectionHelpers.getStaticField<KeyguardManager.KeyguardDismissCallback?>(
+            ShadowKeyguardManager::class.java, "callback") != null
+
+    private fun LockActivity.isDark() =
+        window.attributes.screenBrightness == WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_OFF
+
+    private fun LockActivity.screenTimeout() =
+        WindowManager.LayoutParams::class.java.getField("userActivityTimeout").getLong(window.attributes)
+
+    @Test
+    fun doubleTappingEmptySpaceTurnsTheScreenBlackAndLetsAndroidSleep() {
+        plain("Lunch?", 4000, 1, "example.chat")
+        withLockView { activity ->
+            val spot = activity.emptySpot()
+            activity.doubleTapAt(spot, spot)
+            assertTrue("The screen goes black at once", activity.isDark())
+            assertEquals("and asks for the shortest timeout, which Android raises to its minimum", 1L, activity.screenTimeout())
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(1))
+            assertFalse("A double tap never asks to unlock", unlockAsked)
+            activity.back()
+            assertFalse("Back doesn't reveal the stock lock screen while dark", activity.isFinishing)
+            assertEquals("It isn't a check", 1, NotifStore.newCount())
+            context.sendBroadcast(Intent(Intent.ACTION_SCREEN_OFF))
+            shadowOf(Looper.getMainLooper()).idle()
+            assertTrue(activity.isFinishing)
+        }
+    }
+
+    @Test
+    fun onTheBlackScreenOnlyADoubleTapBringsTheViewBack() {
+        plain("Lunch?", 4000, 1, "example.chat")
+        withLockView { activity ->
+            val spot = activity.emptySpot()
+            activity.doubleTapAt(spot, spot)
+            activity.tapAt(spot, spot)
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(1))
+            assertTrue("A single tap does nothing", activity.isDark())
+            activity.doubleTapAt(spot, spot)
+            assertFalse(activity.isDark())
+            assertEquals("Back on the keyguard's own timeout", 10_000L, activity.screenTimeout())
+            assertFalse(unlockAsked)
+        }
+    }
+
+    @Test
+    fun oneTapOnEmptySpaceWaitsForASecondBeforeAskingToUnlock() {
+        plain("Lunch?", 4000, 1, "example.chat")
+        withLockView { activity ->
+            val spot = activity.emptySpot()
+            activity.tapAt(spot, spot)
+            assertFalse(unlockAsked)
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(400))
+            assertTrue(unlockAsked)
+            assertFalse(activity.isDark())
+        }
+    }
+
+    @Test
+    fun theClockIsntEmptySpace() {
+        plain("Lunch?", 4000, 1, "example.chat")
+        withLockView { activity ->
+            val (x, y) = activity.clockSpot()
+            activity.tapAt(x, y)
+            assertTrue("A tap on the clock asks to unlock without waiting", unlockAsked)
+            activity.tapAt(x, y)
+            assertFalse(activity.isDark())
+        }
+    }
+
+    @Test
+    fun withDoubleTapToSleepOffATapOnEmptySpaceAsksToUnlockAtOnce() {
+        Prefs.lockDoubleTapSleep = false
+        plain("Lunch?", 4000, 1, "example.chat")
+        withLockView { activity ->
+            val spot = activity.emptySpot()
+            activity.tapAt(spot, spot)
+            assertTrue(unlockAsked)
+            activity.tapAt(spot, spot)
+            assertFalse(activity.isDark())
         }
     }
 

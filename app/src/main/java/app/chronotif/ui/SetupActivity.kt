@@ -660,6 +660,9 @@ class SetupActivity : Activity() {
             toggle(R.string.lock_privacy, R.string.lock_privacy_desc, { Prefs.lockHideContent }) {
                 Prefs.lockHideContent = it
             }
+            toggle(R.string.lock_double_tap, R.string.lock_double_tap_desc, { Prefs.lockDoubleTapSleep }) {
+                Prefs.lockDoubleTapSleep = it
+            }
         }
     }
 
@@ -866,6 +869,7 @@ class SetupActivity : Activity() {
         R.string.swipe_to_clear to "dismiss delete remove",
         R.string.lock_mode to "lockscreen keyguard",
         R.string.lock_privacy to "private hide privacy",
+        R.string.lock_double_tap to "screen off turn off gesture wake",
         R.string.search_engine to "google duckduckgo bing brave web browser",
         R.string.update_auto to "upgrade install",
         R.string.update_channel_label to "beta nightly stable",

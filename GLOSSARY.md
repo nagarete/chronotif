@@ -43,6 +43,10 @@ _Avoid_: Remind me, later
 **Wake session**:
 One continuous period from the display waking until it sleeps. Chronotif and the stock lock screen share this period.
 
+**Double-tap to sleep**:
+Double-tapping empty space on the lock-screen view puts the display to sleep, ending the Wake session, as double-tapping the stock lock screen does on phones that offer it. Like the display timing out, it is not a check.
+_Avoid_: Double-tap to lock (the phone is already locked), screen off
+
 **Off**:
 Chronotif's standing surfaces (the edge handle, the status-bar swipe and the lock-screen view) are withheld. Notifications are still tracked and the panel can still be opened on purpose, e.g. from the Quick Settings tile. The user's surface settings are kept for when Chronotif is turned back on.
 _Avoid_: Disabled, Paused
