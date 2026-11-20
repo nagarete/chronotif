@@ -882,6 +882,25 @@ class NotificationBehaviorTest {
         else -> emptyList()
     }
 
+    @Test
+    fun anAppsNameLoadsInTheBackgroundSoTheListNeverWaitsForIt() {
+        val n = Notification.Builder(context, "updates")
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentText("Your parcel is on its way")
+            .build()
+        post(n, pkg = "example.parcels")
+        withPanelList { list, container ->
+            list.render()
+            assertTrue(texts(container).toString(), texts(container).any { "parcel is on its way" in it })
+            assertFalse("The name isn't read while drawing", texts(container).any { "example.parcels" in it })
+            Apps.loopers.forEach { shadowOf(it).idle() }
+            shadowOf(Looper.getMainLooper()).idle()
+            list.render()
+            // An app the package manager doesn't know is named by its package.
+            assertTrue(texts(container).toString(), texts(container).any { "example.parcels" in it })
+        }
+    }
+
     // --- Panel header ---
 
     /** Runs [block] with the header's clock-and-date block, the start of its row; the gear is at the end. */

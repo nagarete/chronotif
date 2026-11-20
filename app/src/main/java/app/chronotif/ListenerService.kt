@@ -52,6 +52,8 @@ class ListenerService : NotificationListenerService() {
             null
         }
         NotifStore.connect(active, currentRanking)
+        // The first panel after an update or restart would otherwise read every app's icon and name.
+        Apps.warm(this, NotifStore.visible())
         if (!receiverRegistered) {
             val filter = IntentFilter().apply {
                 addAction(Intent.ACTION_SCREEN_ON)
@@ -100,6 +102,7 @@ class ListenerService : NotificationListenerService() {
 
     override fun onNotificationPosted(sbn: StatusBarNotification, rankingMap: RankingMap) {
         NotifStore.post(sbn, rankingMap)
+        Apps.warm(this, NotifStore.visible())
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification, rankingMap: RankingMap) {

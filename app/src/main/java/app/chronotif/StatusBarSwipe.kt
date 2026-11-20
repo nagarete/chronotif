@@ -258,24 +258,23 @@ class StatusBarSwipe : AccessibilityService() {
         }
     }
 
-    /** Returns whether the panel was launched. */
-    private fun open(): Boolean {
+    /** The haptic comes first, so the swipe is felt before the panel has drawn anything. */
+    private fun open(v: View) {
         if (!eligible()) {
             hide()
-            return false
+            return
         }
-        return try {
+        v.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+        try {
             Panel.open(this)
-            true
         } catch (e: RuntimeException) {
             Log.w(TAG, "Couldn't open the panel", e)
-            false
         }
     }
 
     /** A tap, or a mostly downward single-finger swipe, opens the panel. Anything else does nothing. */
     @SuppressLint("ViewConstructor")
-    private class SwipeView(context: Context, private val onOpen: () -> Boolean) : View(context) {
+    private class SwipeView(context: Context, private val onOpen: (View) -> Unit) : View(context) {
         private val slop = ViewConfiguration.get(context).scaledTouchSlop.toFloat()
         private var downX = 0f
         private var downY = 0f
@@ -307,7 +306,7 @@ class StatusBarSwipe : AccessibilityService() {
         }
 
         private fun fire() {
-            if (onOpen()) performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+            onOpen(this)
         }
     }
 }

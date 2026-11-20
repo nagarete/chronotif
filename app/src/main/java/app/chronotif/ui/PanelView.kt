@@ -12,6 +12,7 @@ import android.view.MotionEvent
 import android.view.VelocityTracker
 import android.view.View
 import android.view.ViewConfiguration
+import android.view.ViewTreeObserver
 import android.view.WindowInsets
 import android.view.animation.DecelerateInterpolator
 import android.widget.EditText
@@ -28,6 +29,10 @@ import kotlin.math.abs
  * search. Hosted by [Panel] as an overlay
  * window, or by [PanelActivity] when overlays aren't allowed. Being on screen for a moment (or
  * interacting) counts as a meaningful check: on [dismissed], what was shown moves to EARLIER.
+ *
+ * The window, dim and header draw first; the cards are built right after that frame, so building
+ * them never holds the panel back. Until they're on screen, nothing has been seen, so closing
+ * before then is no check.
  */
 @SuppressLint("ViewConstructor")
 class PanelView(
@@ -40,7 +45,7 @@ class PanelView(
 
     companion object {
         private const val CHECK_DWELL_MS = 1500L
-        /** [animateIn]'s length: a pull only counts from a touch that starts after it. */
+        /** How long the cards take to come in: a pull only counts from a touch that starts after it. */
         private const val OPEN_ANIMATION_MS = 260L
 
         /**
@@ -67,6 +72,9 @@ class PanelView(
     private val header: LinearLayout
     private val list: NotifList
     private val main = Handler(Looper.getMainLooper())
+    private var showing = false
+    private var revealed = false
+    /** When the cards came on screen; 0 until then. */
     private var shownAt = 0L
     private var interacted = false
     private var closing = false
@@ -74,10 +82,10 @@ class PanelView(
     private var blankDownY = 0f
     private var blankTapCandidate = false
 
-    private val render: () -> Unit = { list.render() }
+    private val render: () -> Unit = { if (shownAt != 0L) list.render() }
     private val ticker = object : Runnable {
         override fun run() {
-            list.render()
+            render()
             main.postDelayed(this, 60_000)
         }
     }
@@ -171,22 +179,41 @@ class PanelView(
     fun focus(key: String, replyIndex: Int) {
         list.focus(key, replyIndex)
         interacted = true
-        list.render()
+        // Before the cards are first built, building them picks this up.
+        if (shownAt != 0L) list.render()
     }
 
-    /** The panel is on screen: start following notifications. */
+    /** The panel is on screen: show the header now, the cards once it has drawn, then follow notifications. */
     fun shown() {
-        shownAt = System.currentTimeMillis()
+        showing = true
         // Picks up header settings changed since the panel was built.
         PanelHeader.fill(header, host)
         NotifStore.addListener(render)
-        list.render()
+        afterNextFrame {
+            if (!showing || shownAt != 0L) return@afterNextFrame
+            shownAt = System.currentTimeMillis()
+            list.render()
+            revealCards()
+        }
         main.removeCallbacks(ticker)
         main.postDelayed(ticker, 60_000)
     }
 
+    /** Runs [action] once the next frame has been drawn: posted from its pre-draw, it runs after the draw. */
+    private fun afterNextFrame(action: () -> Unit) {
+        viewTreeObserver.addOnPreDrawListener(object : ViewTreeObserver.OnPreDrawListener {
+            override fun onPreDraw(): Boolean {
+                viewTreeObserver.removeOnPreDrawListener(this)
+                main.post(action)
+                return true
+            }
+        })
+        invalidate()
+    }
+
     /** The panel left the screen, by any route: stop following, and record the check. */
     fun dismissed() {
+        showing = false
         NotifStore.removeListener(render)
         main.removeCallbacks(ticker)
         if (shownAt == 0L) return
@@ -210,7 +237,7 @@ class PanelView(
     private val pull = PullToSearch(
         list = scroll,
         atTop = { !scroll.canScrollVertically(-1) },
-        ready = { !closing && android.os.SystemClock.uptimeMillis() - openedAt >= OPEN_ANIMATION_MS },
+        ready = { !closing && shownAt != 0L && android.os.SystemClock.uptimeMillis() - openedAt >= OPEN_ANIMATION_MS },
         open = { SearchOverlay.show(this, host) },
     )
 
@@ -277,13 +304,21 @@ class PanelView(
 
     // --- Animation ---
 
+    /** The backdrop fades in; the header is there from the first frame, and the cards follow in [revealCards]. */
     fun animateIn() {
         openedAt = android.os.SystemClock.uptimeMillis()
         scrim.alpha = 0f
-        scroll.alpha = 0f
-        scroll.translationY = -dp(48).toFloat()
         scrim.animate().alpha(1f).setDuration(180).start()
-        scroll.animate().alpha(1f).translationY(0f).setDuration(260)
+    }
+
+    /** The cards' first arrival slides in; coming back to the panel (the activity resuming) doesn't. */
+    private fun revealCards() {
+        openedAt = android.os.SystemClock.uptimeMillis()
+        if (revealed) return
+        revealed = true
+        content.alpha = 0f
+        content.translationY = -dp(24).toFloat()
+        content.animate().alpha(1f).translationY(0f).setDuration(OPEN_ANIMATION_MS)
             .setInterpolator(DecelerateInterpolator(2f)).start()
     }
 

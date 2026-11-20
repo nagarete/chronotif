@@ -6,6 +6,7 @@ import android.animation.LayoutTransition
 import android.content.Context
 import android.content.Intent
 import android.content.res.ColorStateList
+import android.os.SystemClock
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -70,11 +71,13 @@ class NotifList(
     var shownUpTo = 0L
         private set
 
+    private val transition = LayoutTransition().apply {
+        enableTransitionType(LayoutTransition.CHANGING)
+        setDuration(200)
+    }
+
     init {
-        container.layoutTransition = LayoutTransition().apply {
-            enableTransitionType(LayoutTransition.CHANGING)
-            setDuration(200)
-        }
+        container.layoutTransition = transition
     }
 
     /** A conversation focuses its latest message card: see [messageCard]. */
@@ -570,8 +573,13 @@ class NotifList(
 
     private fun dp(v: Int) = ctx.dp(v)
 
+    /** Rows still to be placed by [place], on a later frame. */
+    private var resume: Runnable? = null
+
     /** Keyed diff: reuse views by id, insert/move/remove only what changed. */
     private fun reconcile(rows: List<Row>) {
+        resume?.let(container::removeCallbacks)
+        resume = null
         val wanted = rows.mapTo(HashSet()) { it.id }
         for (i in container.childCount - 1 downTo 0) {
             val v = container.getChildAt(i)
@@ -581,8 +589,29 @@ class NotifList(
                 views.remove(id)
             }
         }
-        rows.forEachIndexed { i, r ->
-            val v = views.getOrPut(r.id) { r.make().also { it.tag = r.id } }
+        // A whole list arriving at once doesn't animate in card by card.
+        if (views.isEmpty()) container.layoutTransition = null
+        place(rows, 0)
+    }
+
+    /**
+     * Places [rows] from [from] on. Reusing a view is cheap but making one isn't, and a phone with
+     * a hundred cards in Earlier would hold the list back for most of a second. So once a
+     * screenful is up, the rest are made a few per frame.
+     */
+    private fun place(rows: List<Row>, from: Int) {
+        val start = SystemClock.uptimeMillis()
+        for (i in from until rows.size) {
+            val r = rows[i]
+            var v = views[r.id]
+            if (v == null && i >= FIRST_SCREEN_ROWS && i > from && SystemClock.uptimeMillis() - start >= FRAME_BUDGET_MS) {
+                resume = Runnable {
+                    resume = null
+                    place(rows, i)
+                }.also(container::postOnAnimation)
+                return
+            }
+            if (v == null) v = r.make().also { it.tag = r.id; views[r.id] = it }
             r.bind(v)
             if (container.getChildAt(i) !== v) {
                 if (v.parent === container) {
@@ -592,5 +621,13 @@ class NotifList(
                 container.addView(v, i)
             }
         }
+        container.layoutTransition = transition
+    }
+
+    private companion object {
+        /** Rows made at once, whatever they cost: enough to fill the screen. */
+        const val FIRST_SCREEN_ROWS = 12
+        /** Time spent making rows per frame after that. */
+        const val FRAME_BUDGET_MS = 8L
     }
 }

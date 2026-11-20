@@ -8,7 +8,8 @@
       "Turn on contacts and calendar events under Settings → Search to find people and plans too. While the phone is locked, they stay hidden until you unlock.",
       "Convert currencies with the European Central Bank's daily rates. It's off until you turn it on, and the download carries nothing you type.",
       "Open Search without accessibility: hold the edge handle, or use the Search tile, home-screen widget or app shortcut.",
-      "A gear in the panel header opens Android's Settings."
+      "A gear in the panel header opens Android's Settings.",
+      "The panel opens faster, most of all the first time after an update: the header is there at once and your notifications follow right after."
     ],
     "video": {
       "src": "/video/release-0.2.6.mp4",
