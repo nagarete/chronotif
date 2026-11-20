@@ -67,7 +67,7 @@ class EdgeHandle(service: Context) {
             Prefs.SHAPE_HALF_LARGE to (36 to 72),
             Prefs.SHAPE_CIRCLE to (44 to 44),
         )
-        const val CIRCLE_GAP_DP = 6
+        const val CIRCLE_GAP_DP = 2
     }
 
     fun show() {
