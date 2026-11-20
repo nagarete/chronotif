@@ -66,8 +66,31 @@ class NotifList(
     private val openStacks = HashSet<String>()
     private val pendingDismiss = HashSet<String>()
     private var replying: Pair<String, Int>? = null
-    private var earlierRevealed = !onLock
     private var runningRevealed = false
+
+    /**
+     * Lock screen only: room between the clock and New. The lock-screen view sizes it so that,
+     * scrolled to the top, New's first card rests at the bottom as the Pile (ADR 0011).
+     */
+    var gap = 0
+        set(v) {
+            if (field == v) return
+            field = v
+            views["sp"]?.let { it.layoutParams = LinearLayout.LayoutParams(-1, v) }
+        }
+
+    /** The row [gap] sizes; the rows after it are the list the Pile unfolds into. */
+    val spacer: View? get() = views["sp"]?.takeIf { it.parent === container }
+
+    /** The Pile's card: New's newest card or Conversation stack, or null when nothing is New. */
+    val pileTop: View? get() = pileTopId?.let { views[it] }?.takeIf { it.parent === container }
+    private var pileTopId: String? = null
+
+    /** Cards or Conversation stacks in New, and cards or stacks in Earlier, as last rendered. */
+    var newPieces = 0
+        private set
+    var earlierPieces = 0
+        private set
     /** An open Preview or image viewer: whose notification it shows, and whether an update still matches it. */
     private class Open(val key: String, val overlay: Overlay, val stillShows: (Entry) -> Boolean = { true })
 
@@ -82,19 +105,23 @@ class NotifList(
         setDuration(200)
     }
 
+    /**
+     * The panel animates cards into place. The lock-screen view doesn't: its Pile measures where
+     * cards are to fold them, and a card caught mid-animation would throw it off.
+     */
+    private val animates = !onLock
+
     init {
-        container.layoutTransition = transition
+        if (animates) container.layoutTransition = transition
     }
 
     /**
-     * Back to how a newly built list starts: cards collapsed, no reply box, Earlier shown and
-     * Running folded. A panel kept between opens calls this so each open starts the same.
+     * Back to how a newly built list starts: cards collapsed, no reply box and Running folded. A panel kept between opens calls this so each open starts the same.
      */
     fun resetUi() {
         expanded.clear()
         openStacks.clear()
         replying = null
-        earlierRevealed = !onLock
         runningRevealed = false
     }
 
@@ -175,6 +202,8 @@ class NotifList(
         // Live state first, like the system shade: calls, then media players.
         s.calls.forEach { card(it, CardView.Style.FULL) }
         s.media.forEach { player(it) }
+        // On the lock screen, the clock's room: the rest of the list unfolds from the Pile below it.
+        if (onLock) rows += Row("sp", { View(ctx) }) { v -> v.layoutParams = LinearLayout.LayoutParams(-1, gap) }
 
         // A conversation that lists its messages is split by message: those since the check
         // stack in New, the rest in Earlier (ADR 0002). Each part sorts by its newest message, the
@@ -208,9 +237,13 @@ class NotifList(
                 conversation(earlierStackId(e.key), e, c, old, style, rows, now)
             }
         }
+        newPieces = newCount
+        pileTopId = null
         if (fresh.isNotEmpty()) {
             rows += header("h:new", ctx.getString(R.string.section_new) + "  $newCount", null)
-            fresh.sortedByDescending { it.first }.forEach { rows += it.second }
+            val sorted = fresh.sortedByDescending { it.first }
+            pileTopId = sorted[0].second.firstOrNull()?.id
+            sorted.forEach { rows += it.second }
         }
 
         for (e in s.earlier) {
@@ -224,24 +257,18 @@ class NotifList(
             } else earlier += Piece(e.alertTime, e, c, null) { style -> card(e, style) }
         }
 
+        earlierPieces = earlier.size
         if (earlier.isNotEmpty()) {
             val earlierAll = s.earlier
-            if (!earlierRevealed) {
-                rows += pill("p:earlier", ctx.getString(R.string.earlier_count, earlier.size)) {
-                    earlierRevealed = true
-                    render()
-                }
-            } else {
-                rows += header("h:earlier", ctx.getString(R.string.section_earlier),
-                    clear = earlierAll.takeIf { l -> l.any { it.clearable } })
-                // One app's neighbouring cards that arrived close together fold into a stack (ADR 0004).
-                // A conversation with several messages is already its own stack, so it stands alone.
-                val stacks = Attention.appStacks(earlier.sortedByDescending { it.time }, time = { it.time },
-                    app = { p -> p.e.appId.takeIf { p.msgs == null || p.msgs.size == 1 } })
-                for (stack in stacks) {
-                    if (stack.size == 1) stack[0].draw(CardView.Style.RECEDED)
-                    else appStack(stack, rows, now)
-                }
+            rows += header("h:earlier", ctx.getString(R.string.section_earlier),
+                clear = earlierAll.takeIf { l -> l.any { it.clearable } })
+            // One app's neighbouring cards that arrived close together fold into a stack (ADR 0004).
+            // A conversation with several messages is already its own stack, so it stands alone.
+            val stacks = Attention.appStacks(earlier.sortedByDescending { it.time }, time = { it.time },
+                app = { p -> p.e.appId.takeIf { p.msgs == null || p.msgs.size == 1 } })
+            for (stack in stacks) {
+                if (stack.size == 1) stack[0].draw(CardView.Style.RECEDED)
+                else appStack(stack, rows, now)
             }
         }
 
@@ -674,7 +701,7 @@ class NotifList(
                 container.addView(v, i)
             }
         }
-        container.layoutTransition = transition
+        if (animates) container.layoutTransition = transition
     }
 
     private companion object {

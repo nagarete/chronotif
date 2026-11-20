@@ -149,8 +149,89 @@ class NotificationBehaviorTest {
             list.render()
             val shown = shownTexts(container)
             assertTrue(shown.contains("second"))
-            assertFalse("The checked message moved to Earlier", shown.contains("first"))
-            assertTrue(shown.contains("1 earlier"))
+            assertTrue("The checked message moved to Earlier",
+                shown.indexOf("second") < shown.indexOf("EARLIER") && shown.indexOf("EARLIER") < shown.indexOf("first"))
+        }
+    }
+
+    private fun plain(title: String, time: Long, id: Int, pkg: String) = post(
+        Notification.Builder(context, "updates").setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle(title).setContentText("$title text").build(), time, id, pkg)
+
+    private fun <T> withLockView(block: (LockActivity) -> T): T {
+        shadowOf(context.getSystemService(KeyguardManager::class.java)).setKeyguardLocked(true)
+        val controller = Robolectric.buildActivity(LockActivity::class.java).setup()
+        try {
+            shadowOf(Looper.getMainLooper()).idle()
+            return block(controller.get())
+        } finally {
+            controller.pause().stop().destroy()
+        }
+    }
+
+    /** Text the lock-screen view shows: visible, not faded out, and with every parent the same. */
+    private fun seen(view: View): List<String> = when {
+        view.visibility != View.VISIBLE || view.alpha == 0f -> emptyList()
+        view is TextView -> listOf(view.text.toString())
+        view is ViewGroup -> (0 until view.childCount).flatMap { seen(view.getChildAt(it)) }
+        else -> emptyList()
+    }
+
+    private fun LockActivity.scroll() = views(window.decorView).filterIsInstance<android.widget.ScrollView>().single()
+
+    @Test
+    fun theLockScreenViewRestsWithNewAsAPileThatUnfoldsAsItScrolls() {
+        plain("Old news", 500, 1, "example.news")
+        Prefs.markChecked(1000)
+        plain("Parcel", 2000, 2, "example.shop")
+        plain("Meeting", 3000, 3, "example.calendar")
+        plain("Lunch?", 4000, 4, "example.chat")
+        withLockView { activity ->
+            var shown = seen(activity.window.decorView)
+            assertTrue("The newest New card shows whole", shown.contains("Lunch?"))
+            assertFalse("The rest of New is folded under it", shown.contains("Meeting") || shown.contains("Parcel"))
+            assertTrue("with a count of what's folded", shown.contains("2 more"))
+            assertFalse("Earlier stays folded too", shown.contains("Old news"))
+
+            val scroll = activity.scroll()
+            scroll.scrollTo(0, 10_000)
+            shadowOf(Looper.getMainLooper()).idle()
+            shown = seen(activity.window.decorView)
+            assertEquals("Unfolded in the same order, then Earlier",
+                listOf("Lunch?", "Meeting", "Parcel", "Old news"),
+                shown.filter { it in setOf("Lunch?", "Meeting", "Parcel", "Old news") })
+            assertFalse(shown.contains("2 more"))
+        }
+    }
+
+    @Test
+    fun withNothingNewTheLockScreenViewRestsAsTheClockAndAnEarlierLine() {
+        plain("Old news", 500, 1, "example.news")
+        plain("Older news", 400, 2, "example.mail")
+        Prefs.markChecked(1000)
+        withLockView { activity ->
+            val shown = seen(activity.window.decorView)
+            assertTrue(shown.contains("2 earlier"))
+            assertFalse(shown.contains("Old news"))
+        }
+    }
+
+    @Test
+    fun backFoldsTheOpenListIntoThePileThenLeavesTheLockScreenView() {
+        plain("Lunch?", 4000, 1, "example.chat")
+        plain("Meeting", 3000, 2, "example.calendar")
+        withLockView { activity ->
+            val scroll = activity.scroll()
+            scroll.scrollTo(0, 10_000)
+            shadowOf(Looper.getMainLooper()).idle()
+            assertTrue(seen(activity.window.decorView).contains("Meeting"))
+            activity.back()
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(1))
+            assertFalse(activity.isFinishing)
+            assertEquals(0, scroll.scrollY)
+            assertFalse(seen(activity.window.decorView).contains("Meeting"))
+            activity.back()
+            assertTrue(activity.isFinishing)
         }
     }
 

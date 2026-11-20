@@ -420,6 +420,7 @@ class SetupActivity : Activity() {
             R.string.tip_pictures_title to R.string.tip_pictures_body,
             R.string.tip_move_title to R.string.tip_move_body,
             R.string.tip_close_title to R.string.tip_close_body,
+            R.string.tip_lock_title to R.string.tip_lock_body,
         ).forEach { (title, tip) ->
             body.addView(LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
