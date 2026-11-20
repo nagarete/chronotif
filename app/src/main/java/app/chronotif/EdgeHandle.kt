@@ -114,11 +114,6 @@ class EdgeHandle(service: Context) {
         } else {
             params.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
         }
-        params.flags = if (Prefs.handleSecureTest) {
-            params.flags or WindowManager.LayoutParams.FLAG_SECURE
-        } else {
-            params.flags and WindowManager.LayoutParams.FLAG_SECURE.inv()
-        }
         v.right = Prefs.handleRight
         v.shape = Prefs.handleShape
         v.look = Prefs.handleLook

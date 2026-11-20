@@ -190,18 +190,6 @@ class SetupActivity : Activity() {
             applyHandle()
         }
         body.addView(text(getString(R.string.fill_count_desc), 13f, secondary = true), gap(4))
-        // Debug build only, until screenshots on real phones show whether it helps.
-        if (BuildConfig.APPLICATION_ID.endsWith(".debug")) {
-            body.addView(android.widget.CheckBox(this).apply {
-                text = "Secure (screenshot test)"
-                setTextColor(palette.text)
-                isChecked = Prefs.handleSecureTest
-                setOnCheckedChangeListener { _, on ->
-                    Prefs.handleSecureTest = on
-                    applyHandle()
-                }
-            }, gap(8))
-        }
         body.addView(text(getString(R.string.handle_position), 15f), gap(12))
         body.addView(SeekBar(this).apply {
             max = 100

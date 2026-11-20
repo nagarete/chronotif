@@ -59,11 +59,6 @@ object Prefs {
         get() = sp.getFloat("handle_y", 0.22f)
         set(v) = sp.edit().putFloat("handle_y", v).apply()
 
-    /** Debug build only: marks the edge handle secure, to see what screenshots then do with it. */
-    var handleSecureTest: Boolean
-        get() = sp.getBoolean("handle_secure_test", false)
-        set(v) = sp.edit().putBoolean("handle_secure_test", v).apply()
-
     /** The edge handle's shape: one of the SHAPE_ constants. */
     var handleShape: Int
         get() = sp.getInt("handle_shape", SHAPE_HALF_SMALL)
