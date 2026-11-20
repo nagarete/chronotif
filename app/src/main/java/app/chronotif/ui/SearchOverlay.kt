@@ -46,7 +46,7 @@ import app.chronotif.core.WebQuery
  * the apps that notified most recently. Typing: an answer (math, units, time in a place), apps,
  * contacts, Settings pages, calendar events and, last, the web. It never searches notifications.
  * Opening anything goes through [NotifList.Host.guarded], so on the lock screen it unlocks first;
- * copying an answer doesn't. Contacts and events stay hidden while the phone is locked.
+ * copying an answer doesn't. Contacts and events show while locked, unless the lock screen hides content.
  */
 @SuppressLint("ViewConstructor")
 class SearchOverlay private constructor(
@@ -228,8 +228,8 @@ class SearchOverlay private constructor(
         }
         val found = AppMatch.search(apps, query) { it.label }
         if (found.isNotEmpty()) results.addView(card(R.string.search_apps, found.map(::row)), cardLp())
-        // Who you know and where you'll be stay private until the phone is unlocked.
-        val hidePersonal = locked() && (PersonalData.contactsOn(context) || PersonalData.calendarOn(context))
+        // While locked, contacts and events show unless the lock screen hides content.
+        val hidePersonal = locked() && app.chronotif.LockPolicy.hidesContent(context) && (PersonalData.contactsOn(context) || PersonalData.calendarOn(context))
         val people = if (hidePersonal) emptyList() else PersonalMatch.contacts(contacts, query, { it.name }, { it.numbers })
         if (people.isNotEmpty()) {
             val shown = if (allContacts) people.take(PersonalMatch.CONTACTS_MAX) else people.take(PersonalMatch.CONTACTS_SHOWN)
@@ -473,7 +473,7 @@ class SearchOverlay private constructor(
     }
 
     /**
-     * Shown instead of contacts and events while locked. After unlocking, Search shows everything:
+     * Shown instead of contacts and events while the lock screen hides content. After unlocking, Search shows everything:
      * in its own window right away, or reopened when the lock-screen view closes on unlock.
      */
     private fun unlockRow(): View = iconRow(R.drawable.ic_lock, context.getString(R.string.search_unlock_for_more)) {

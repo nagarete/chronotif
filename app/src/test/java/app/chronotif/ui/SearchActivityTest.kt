@@ -72,8 +72,9 @@ class SearchActivityTest {
         shadowOf(Looper.getMainLooper()).idle()
     }
 
-    private fun shownWith(locked: Boolean): List<String> {
+    private fun shownWith(locked: Boolean, hideContent: Boolean = false): List<String> {
         Prefs.searchContacts = true
+        Prefs.lockHideContent = hideContent
         shadowOf(RuntimeEnvironment.getApplication()).grantPermissions(android.Manifest.permission.READ_CONTACTS)
         shadowOf(context.getSystemService(android.app.KeyguardManager::class.java)).setKeyguardLocked(locked)
         val controller = Robolectric.buildActivity(SearchActivity::class.java, SearchActivity.intent(context)).setup()
@@ -85,9 +86,15 @@ class SearchActivityTest {
         return shown
     }
 
-    @Test fun contactsAndEventsWaitForUnlock() {
+    @Test fun contactsAndEventsShowWhileLocked() {
         val shown = shownWith(locked = true)
-        assertTrue("Locked: asks to unlock, before the web row: $shown",
+        assertTrue("Locked, content not hidden: nothing waits for unlock: $shown",
+            shown.none { it == "Unlock to see all results" })
+    }
+
+    @Test fun contactsAndEventsWaitForUnlockWhenTheLockScreenHidesContent() {
+        val shown = shownWith(locked = true, hideContent = true)
+        assertTrue("Locked, content hidden: asks to unlock, before the web row: $shown",
             shown.indexOf("Unlock to see all results") == shown.lastIndex - 1)
     }
 

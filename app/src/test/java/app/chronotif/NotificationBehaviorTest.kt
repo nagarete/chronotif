@@ -1004,6 +1004,70 @@ class NotificationBehaviorTest {
         return true
     }
 
+    /** A lock-screen list that records what had to wait for an unlock. */
+    private fun <T> withRecordingLockList(block: (NotifList, LinearLayout, MutableList<String>) -> T): T {
+        val controller = Robolectric.buildActivity(Activity::class.java).setup()
+        try {
+            val activity = controller.get()
+            val container = LinearLayout(activity)
+            val unlocks = ArrayList<String>()
+            val list = NotifList(object : NotifList.Host {
+                override val context: Context = activity
+                override fun launched() {}
+                override fun guarded(action: () -> Unit) { unlocks += "unlock" }
+            }, container, onLock = true)
+            return block(list, container, unlocks)
+        } finally {
+            controller.pause().stop().destroy()
+        }
+    }
+
+    @Test
+    fun aReplyTypesRightOnTheLockScreen() {
+        val e = post(replyable(listOf("one" to 1100L)), 1100)
+        withRecordingLockList { list, container, unlocks ->
+            list.render()
+            val id = "${e.key}#${Content.of(context, e, false).messages.single().id}"
+            list.onAction(e, id, 0)
+            assertTrue("The reply box opens on the lock screen", replyBoxShown(container))
+            assertTrue("Replying doesn't ask to unlock: $unlocks", unlocks.isEmpty())
+        }
+    }
+
+    @Test
+    fun aReplyTheAppWantsUnlockedWaitsForAnUnlock() {
+        val input = android.app.RemoteInput.Builder("reply").setLabel("Reply").build()
+        val pi = android.app.PendingIntent.getBroadcast(context, 0, Intent("reply"), android.app.PendingIntent.FLAG_MUTABLE)
+        val n = Notification.Builder(context, "messages")
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setCategory(Notification.CATEGORY_MESSAGE)
+            .setStyle(Notification.MessagingStyle(me).also { it.addMessage("one", 1100L, sender) })
+            .addAction(Notification.Action.Builder(null, "Reply", pi).addRemoteInput(input)
+                .setAuthenticationRequired(true).build())
+            .build()
+        val e = post(n, 1100)
+        withRecordingLockList { list, container, unlocks ->
+            list.render()
+            val id = "${e.key}#${Content.of(context, e, false).messages.single().id}"
+            list.onAction(e, id, 0)
+            assertFalse(replyBoxShown(container))
+            assertEquals(listOf("unlock"), unlocks)
+        }
+    }
+
+    @Test
+    fun runningShowsOnTheLockScreenBehindItsPill() {
+        post(notification(listOf("hi" to 1100L)), 1100, id = 1)
+        post(Notification.Builder(context, "service").setContentTitle("Sync is running")
+            .setOngoing(true).build(), id = 2, pkg = "example.sync")
+        withLockList { list, container ->
+            list.render()
+            assertTrue(texts(container).contains("1 running"))
+            views(container).first { it is TextView && it.text.toString() == "1 running" }.performClick()
+            assertTrue(texts(container).contains("Sync is running"))
+        }
+    }
+
     @Test
     fun aDraftReplySurvivesAnotherMessageArriving() {
         val e = post(replyable(listOf("one" to 1100L)), 1100)
