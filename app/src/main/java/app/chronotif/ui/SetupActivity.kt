@@ -52,6 +52,7 @@ class SetupActivity : Activity() {
 
     private enum class Section(val title: Int, val icon: Int) {
         GENERAL(R.string.setup_general, R.drawable.ic_section_general),
+        TIPS(R.string.setup_tips, R.drawable.ic_section_tips),
         PANEL(R.string.setup_panel, R.drawable.ic_section_panel),
         HANDLE(R.string.handle_enabled, R.drawable.ic_section_handle),
         SWIPE(R.string.status_swipe_title, R.drawable.ic_section_swipe),
@@ -141,7 +142,7 @@ class SetupActivity : Activity() {
         }
         setContentView(root)
         current = if (missingPermission()) Section.GENERAL
-        else Section.entries.getOrElse(Prefs.settingsSection) { Section.GENERAL }
+        else Section.entries.firstOrNull { it.name == Prefs.settingsSection } ?: Section.GENERAL
         expanded = wide
         show(current)
         applyExpanded()
@@ -228,7 +229,7 @@ class SetupActivity : Activity() {
         if (!wide) expand(false)
         if (s == current) return
         current = s
-        Prefs.settingsSection = s.ordinal
+        Prefs.settingsSection = s.name
         show(s)
         renderSidebar()
     }
@@ -302,6 +303,7 @@ class SetupActivity : Activity() {
     private fun summary(s: Section): Pair<String, Boolean> = when (s) {
         Section.GENERAL -> if (missingPermission()) getString(R.string.summary_permission_needed) to true
             else getString(if (Prefs.enabled) R.string.summary_on else R.string.summary_off) to false
+        Section.TIPS -> getString(R.string.summary_tips) to false
         Section.PANEL -> getString(if (Prefs.headerClock) R.string.summary_clock_date else R.string.summary_date_only) to false
         Section.HANDLE -> (if (!Prefs.handleEnabled) getString(R.string.summary_off) else getString(R.string.summary_handle,
             getString(shapes.first { it.second == Prefs.handleShape }.first),
@@ -339,6 +341,7 @@ class SetupActivity : Activity() {
         body.addView(text(getString(s.title), 24f, bold = true), Ui.lp().apply { bottomMargin = dp(4) })
         when (s) {
             Section.GENERAL -> general()
+            Section.TIPS -> tips()
             Section.PANEL -> panel()
             Section.HANDLE -> handle()
             Section.SWIPE -> swipe()
@@ -403,6 +406,28 @@ class SetupActivity : Activity() {
                     ),
                 )
             }
+        }
+    }
+
+    /** The gestures nobody can see: a line each, always a tap away in the sidebar. */
+    private fun tips() {
+        listOf(
+            R.string.tip_open_title to R.string.tip_open_body,
+            R.string.tip_check_title to R.string.tip_check_body,
+            R.string.tip_search_title to R.string.tip_search_body,
+            R.string.tip_preview_title to R.string.tip_preview_body,
+            R.string.tip_stacks_title to R.string.tip_stacks_body,
+            R.string.tip_pictures_title to R.string.tip_pictures_body,
+            R.string.tip_move_title to R.string.tip_move_body,
+            R.string.tip_close_title to R.string.tip_close_body,
+        ).forEach { (title, tip) ->
+            body.addView(LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                background = Ui.rounded(cardBg, dp(14).toFloat())
+                setPadding(dp(14), dp(12), dp(14), dp(12))
+                addView(text(getString(title), 15f, bold = true))
+                addView(text(getString(tip), 13.5f, secondary = true), gap(4))
+            }, gap(10))
         }
     }
 
