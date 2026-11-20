@@ -24,6 +24,7 @@ import app.chronotif.core.Attention
 import app.chronotif.core.Kind
 import app.chronotif.ui.LockActivity
 import app.chronotif.ui.MediaPlayerView
+import app.chronotif.ui.dp
 import app.chronotif.ui.NotifList
 import org.junit.After
 import org.junit.Assert.*
@@ -233,6 +234,76 @@ class NotificationBehaviorTest {
             activity.back()
             assertTrue(activity.isFinishing)
         }
+    }
+
+    private fun song(title: String, playing: Boolean, id: Int = 9): Entry {
+        val art = android.graphics.Bitmap.createBitmap(300, 300, android.graphics.Bitmap.Config.ARGB_8888)
+            .apply { eraseColor(0xFF2E7D32.toInt()) }
+        val n = Notification.Builder(context, "media").setSmallIcon(android.R.drawable.ic_media_play)
+            .setContentTitle(title).setContentText("Artist").setLargeIcon(art)
+            .setStyle(Notification.MediaStyle()).setOngoing(playing).build()
+        return post(n, 2500, id, "example.music")
+    }
+
+    /** The large artwork the lock-screen view draws over the list, if it shows. */
+    private fun LockActivity.bigArtwork(): android.widget.ImageView? {
+        val player = views(window.decorView).filterIsInstance<MediaPlayerView>().first()
+        val art = player.artwork ?: return null
+        return views(window.decorView).filterIsInstance<android.widget.ImageView>()
+            .firstOrNull { it !== player.thumb && it.drawable === art && it.isShownInTree() }
+    }
+
+    @Test
+    @Config(sdk = [35], application = Application::class, qualifiers = "w411dp-h891dp")
+    fun aMediaPlayersArtworkRestsLargeAboveThePileAndShrinksIntoThePlayerAsItScrolls() {
+        plain("Old news", 500, 1, "example.news")
+        Prefs.markChecked(1000)
+        plain("Lunch?", 4000, 2, "example.chat")
+        song("Garden", playing = false)
+        withLockView { activity ->
+            val big = activity.bigArtwork()
+            assertNotNull("The artwork rests large", big)
+            assertTrue("bigger than the thumbnail", big!!.width > activity.dp(64) * 2)
+            val shown = seen(activity.window.decorView)
+            assertTrue("The player shows under it", shown.contains("Garden"))
+            assertTrue("and New's Pile under the player", shown.contains("Lunch?"))
+            assertFalse("Earlier stays folded", shown.contains("Old news"))
+            val backdrop = views(activity.window.decorView).filterIsInstance<android.widget.ImageView>()
+                .first { it.layoutParams.width == -1 && it.layoutParams.height == -1 }
+            assertEquals("A blurred copy stands in for the wallpaper", View.VISIBLE, backdrop.visibility)
+
+            activity.scroll().scrollTo(0, 10_000)
+            shadowOf(Looper.getMainLooper()).idle()
+            assertNull("Scrolled open, the artwork is back in the player", activity.bigArtwork())
+            assertEquals("The backdrop stays", View.VISIBLE, backdrop.visibility)
+            assertTrue(seen(activity.window.decorView).contains("Old news"))
+
+            activity.back()
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(1))
+            assertNotNull("Back brings it back", activity.bigArtwork())
+        }
+    }
+
+    @Test
+    @Config(sdk = [35], application = Application::class, qualifiers = "w411dp-h891dp")
+    fun aPrivateLockScreenShowsNoLargeArtwork() {
+        Prefs.lockHideContent = true
+        plain("Lunch?", 4000, 2, "example.chat")
+        song("Garden", playing = true)
+        withLockView { activity ->
+            assertNull(activity.bigArtwork())
+            assertFalse(seen(activity.window.decorView).contains("Garden"))
+        }
+    }
+
+    @Test
+    fun playingMediaBringsUpTheLockScreenViewButPausedMediaDoesNot() {
+        shadowOf(context.getSystemService(KeyguardManager::class.java)).setKeyguardLocked(true)
+        Prefs.lockMode = Prefs.LOCK_WHEN_NEW
+        song("Garden", playing = false)
+        assertFalse(LockPolicy.shouldShow(context))
+        song("Garden", playing = true)
+        assertTrue(LockPolicy.shouldShow(context))
     }
 
     @Test

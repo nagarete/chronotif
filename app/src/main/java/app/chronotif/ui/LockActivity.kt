@@ -37,7 +37,7 @@ import kotlin.math.abs
 
 /**
  * Shown over the (still locked) keyguard when the screen turns on. It rests with the clock big
- * and New as a Pile at the bottom (ADR 0011); scrolling up unfolds the list, New then Earlier,
+ * and New as a Pile at the bottom (ADR 0011), and a Media player's artwork large between them (ADR 0012); scrolling up unfolds the list, New then Earlier,
  * and a tap on the Pile does the same ([LockPile]). Content follows the lock-screen privacy
  * rules, and anything beyond dismissing goes through the system unlock first. Tap outside a card,
  * swipe up from Tap to unlock (or unlock with fingerprint/face) to continue to the phone; back
@@ -143,6 +143,12 @@ class LockActivity : Activity(), NotifList.Host {
         column.addView(hint, Ui.lp(-1))
         this.hint = hint
         column.setOnClickListener { unlock(null) }
+        // Blurred artwork in place of the wallpaper while a Media player shows (see LockPile).
+        val backdrop = ImageView(this).apply {
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            visibility = View.GONE
+        }
+        root.addView(backdrop, FrameLayout.LayoutParams(-1, -1))
         root.addView(column, FrameLayout.LayoutParams(-1, -1))
         root.setOnApplyWindowInsetsListener { _, insets ->
             val bars = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())
@@ -152,7 +158,7 @@ class LockActivity : Activity(), NotifList.Host {
         setContentView(root)
 
         list = NotifList(this, listBox, onLock = true)
-        pile = LockPile(stage, scroll, clockRoom, clockBox, listBox, list) { openPile() }
+        pile = LockPile(stage, scroll, clockRoom, clockBox, listBox, list, backdrop) { openPile() }
 
         val filter = IntentFilter().apply {
             addAction(Intent.ACTION_SCREEN_OFF)

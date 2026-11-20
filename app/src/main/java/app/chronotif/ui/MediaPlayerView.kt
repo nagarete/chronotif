@@ -40,6 +40,8 @@ class MediaPlayerView(context: Context, private val cb: CardCallbacks) : LinearL
 
     private val pal = Palette(context)
     private val art = ImageView(context)
+    private val artBox = FrameLayout(context)
+    private val texts = LinearLayout(context)
     private val badge = ImageView(context)
     private val title = Ui.text(context, 17f, pal.text, bold = true, lines = 1)
     private val artist = Ui.text(context, 14f, pal.textSecondary, lines = 1)
@@ -51,6 +53,17 @@ class MediaPlayerView(context: Context, private val cb: CardCallbacks) : LinearL
     private val elapsed = Ui.text(context, 12f, pal.textSecondary, lines = 1)
     private val total = Ui.text(context, 12f, pal.textSecondary, lines = 1)
     private val seek = SeekBar(context)
+
+    /**
+     * The track's artwork, for the lock-screen view to show large: null when content is hidden or
+     * the app gives none. The same object until the picture itself changes.
+     */
+    var artwork: Drawable? = null
+        private set
+    private var artSource: Any? = null
+
+    /** The thumbnail the large artwork shrinks into. */
+    val thumb: android.view.View get() = art
 
     private var entry: Entry? = null
     private var content: Content? = null
@@ -82,14 +95,14 @@ class MediaPlayerView(context: Context, private val cb: CardCallbacks) : LinearL
         art.scaleType = ImageView.ScaleType.CENTER_CROP
         Ui.clipRounded(art, dp(14).toFloat())
         Ui.clipRounded(badge, dp(6).toFloat())
-        val artBox = FrameLayout(context).apply {
+        artBox.apply {
             addView(art, FrameLayout.LayoutParams(dp(64), dp(64)))
             addView(badge, FrameLayout.LayoutParams(dp(20), dp(20), Gravity.BOTTOM or Gravity.END).apply {
                 setMargins(0, 0, -dp(4), -dp(4))
             })
             clipChildren = false
         }
-        val texts = LinearLayout(context).apply {
+        texts.apply {
             orientation = VERTICAL
             addView(title)
             addView(artist, Ui.lp().apply { topMargin = dp(4) })
@@ -208,7 +221,9 @@ class MediaPlayerView(context: Context, private val cb: CardCallbacks) : LinearL
         val redacted = c.redacted
 
         badge.setImageDrawable(Apps.icon(context, e))
-        val artwork = if (redacted) null else artwork(meta) ?: Apps.largeIcon(context, e)
+        val bitmap = if (redacted) null else meta?.let(::artBitmap)
+        val artwork = if (redacted) null else bitmap?.let { keep(it) } ?: Apps.largeIcon(context, e)?.let { keep(it) }
+        if (artwork == null) { this.artwork = null; artSource = null }
         art.setImageDrawable(artwork ?: Apps.icon(context, e))
         badge.visibility = if (artwork != null) VISIBLE else GONE
 
@@ -286,12 +301,33 @@ class MediaPlayerView(context: Context, private val cb: CardCallbacks) : LinearL
         else -> false
     }
 
-    private fun artwork(meta: MediaMetadata?): Drawable? {
-        meta ?: return null
-        val bitmap: Bitmap? = meta.getBitmap(MediaMetadata.METADATA_KEY_ART)
+    private fun artBitmap(meta: MediaMetadata): Bitmap? =
+        meta.getBitmap(MediaMetadata.METADATA_KEY_ART)
             ?: meta.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART)
             ?: meta.getBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON)
-        return bitmap?.let { BitmapDrawable(resources, it) }
+
+    /**
+     * Keeps [artwork] the same object while the picture is the same: sessions hand out a fresh
+     * copy of the bitmap with every update, and the lock-screen view redraws its backdrop on change.
+     */
+    private fun keep(source: Any): Drawable {
+        val old = artSource
+        val same = old === source || (old is Bitmap && source is Bitmap && !old.isRecycled &&
+            old.width == source.width && old.height == source.height && old.sameAs(source))
+        if (!same || artwork == null) {
+            artSource = source
+            artwork = if (source is Bitmap) BitmapDrawable(resources, source) else source as Drawable
+        }
+        return artwork!!
+    }
+
+    /**
+     * How much of the player the lock-screen view's large artwork stands in for: at 1 the
+     * thumbnail is hidden and the titles move into its place, at 0 the player looks as usual.
+     */
+    fun feature(f: Float) {
+        artBox.alpha = if (f > 0f) 0f else 1f
+        texts.translationX = -f * (artBox.width + dp(14)) * (if (layoutDirection == LAYOUT_DIRECTION_RTL) -1 else 1)
     }
 
     private fun control(icon: Int, label: Int, size: Int) = ImageView(context).apply {
