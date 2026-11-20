@@ -10,7 +10,8 @@
       "Open Search without accessibility: hold the edge handle, or use the Search tile, home-screen widget or app shortcut.",
       "A gear in the panel header opens Android's Settings.",
       "The edge handle is easier to hit: a half circle the size of a fingertip, and all of it responds. Pick another shape or fill under Settings → Edge handle.",
-      "The edge handle steps aside in fullscreen apps and while you type."
+      "Hold the edge handle and drag it to move it, to either side and any height. Holding it without moving still opens Search, when you let go.",
+      "The edge handle steps aside in fullscreen apps."
     ],
     "video": {
       "src": "/video/release-0.2.6.mp4",

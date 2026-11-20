@@ -30,11 +30,12 @@ import kotlin.math.abs
 /**
  * An always-available handle on the screen edge, in the shape and fill the user picks (a half
  * circle by default). Tap it, or swipe down or inward on it, to open the panel; hold it to open
- * Search. What's drawn fills the area that takes touches, so it's easy to hit and never catches a
- * touch where nothing shows. It takes the accent colour while anything is NEW.
+ * Search. Hold it and drag to move it: it snaps to the nearer side at the height it's let go.
+ * What's drawn fills the area that takes touches, so it's easy to hit and never catches a touch
+ * where nothing shows. It takes the accent colour while anything is NEW.
  *
- * It steps aside while a fullscreen app hides the status bar or the keyboard is up, and asks
- * Android to keep the Back gesture off it. MIUI/HyperOS keep their own Back strip on the lower
+ * It steps aside while a fullscreen app hides the status bar (the keyboard can't be followed: Android
+ * tells only the app being typed in), and asks Android to keep the Back gesture off it. MIUI/HyperOS keep their own Back strip on the lower
  * part of the edges regardless, which takes inward swipes there; taps and downward swipes still
  * reach the tab. Idle cost is one small window with no timers.
  */
@@ -55,7 +56,6 @@ class EdgeHandle(service: Context) {
 
     /** Reported by the window's insets: a fullscreen app has hidden the status bar. */
     private var barHidden = false
-    private var keyboardUp = false
 
     private val onChange: () -> Unit = { view?.newCount = NotifStore.newCount() }
 
@@ -72,13 +72,11 @@ class EdgeHandle(service: Context) {
 
     fun show() {
         if (view == null) {
-            val v = HandleView(ctx)
+            val v = HandleView(ctx, ::drag, ::drop)
             v.setOnApplyWindowInsetsListener { _, insets ->
                 val hidden = !insets.isVisible(WindowInsets.Type.statusBars())
-                val keyboard = insets.isVisible(WindowInsets.Type.ime())
-                if (hidden != barHidden || keyboard != keyboardUp) {
+                if (hidden != barHidden) {
                     barHidden = hidden
-                    keyboardUp = keyboard
                     update()
                 }
                 insets
@@ -105,9 +103,9 @@ class EdgeHandle(service: Context) {
     fun update() {
         val v = view ?: return
         val landscape = ctx.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-        val away = (landscape && Prefs.handleHideLandscape) || barHidden || keyboardUp
-        // Stepped aside, the window stays (so it keeps hearing about the status bar and keyboard)
-        // but draws nothing and takes no touches; at no opacity it doesn't block touches below it.
+        val away = (landscape && Prefs.handleHideLandscape) || barHidden
+        // Stepped aside, the window stays (so it keeps hearing about the status bar) but draws
+        // nothing and takes no touches; at no opacity it doesn't block touches below it.
         params.alpha = if (away) 0f else 1f
         params.flags = if (away) {
             params.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
@@ -122,18 +120,44 @@ class EdgeHandle(service: Context) {
         runCatching { wm.updateViewLayout(v, params) }
     }
 
+    // Physical sides: the setting says left or right, whatever the language's direction.
+    @SuppressLint("RtlHardcoded")
     private fun layout() {
         val screenH = wm.currentWindowMetrics.bounds.height()
         val (w, h) = SIZES[Prefs.handleShape] ?: SIZES.getValue(Prefs.SHAPE_HALF_SMALL)
         params.width = ctx.dp(w)
         params.height = ctx.dp(h)
-        params.gravity = Gravity.TOP or if (Prefs.handleRight) Gravity.END else Gravity.START
+        params.gravity = Gravity.TOP or if (Prefs.handleRight) Gravity.RIGHT else Gravity.LEFT
         params.x = if (Prefs.handleShape == Prefs.SHAPE_CIRCLE) ctx.dp(CIRCLE_GAP_DP) else 0
         params.y = ((screenH - params.height) * Prefs.handleY.coerceIn(0f, 1f)).toInt()
     }
 
+    /** Follows a held handle's drag, centred on the finger; it faces the nearer side as it goes. */
+    @SuppressLint("RtlHardcoded")
+    private fun drag(x: Float, y: Float) {
+        val v = view ?: return
+        val bounds = wm.currentWindowMetrics.bounds
+        params.gravity = Gravity.TOP or Gravity.LEFT
+        params.x = (x - params.width / 2f).toInt().coerceIn(0, bounds.width() - params.width)
+        params.y = (y - params.height / 2f).toInt().coerceIn(0, bounds.height() - params.height)
+        v.right = x > bounds.width() / 2f
+        runCatching { wm.updateViewLayout(v, params) }
+    }
+
+    /** Let go: the handle snaps to the nearer side at this height, which settings show too. */
+    private fun drop(x: Float, y: Float) {
+        val bounds = wm.currentWindowMetrics.bounds
+        Prefs.handleRight = x > bounds.width() / 2f
+        Prefs.handleY = ((y - params.height / 2f) / (bounds.height() - params.height)).coerceIn(0f, 1f)
+        update()
+    }
+
     @SuppressLint("ViewConstructor")
-    private class HandleView(context: Context) : View(context) {
+    private class HandleView(
+        context: Context,
+        private val onDrag: (Float, Float) -> Unit,
+        private val onDrop: (Float, Float) -> Unit,
+    ) : View(context) {
         var newCount = 0
             set(v) {
                 if (field != v) {
@@ -176,6 +200,10 @@ class EdgeHandle(service: Context) {
         private val accent = Ui.accent(context)
         private val trigger = context.dp(22).toFloat()
         private val tab = RectF()
+        private val slop = ViewConfiguration.get(context).scaledTouchSlop.toFloat()
+        /** Held past the long-press time: lifting opens Search, dragging moves the handle. */
+        private var held = false
+        private var dragging = false
         private var downX = 0f
         private var downY = 0f
         private var fired = false
@@ -250,29 +278,47 @@ class EdgeHandle(service: Context) {
                     downX = e.rawX
                     downY = e.rawY
                     fired = false
+                    held = false
+                    dragging = false
                     postDelayed(longPress, ViewConfiguration.getLongPressTimeout().toLong())
                 }
-                MotionEvent.ACTION_MOVE -> if (!fired) {
-                    val dx = e.rawX - downX
-                    val inward = if (right) -dx else dx
-                    if (e.rawY - downY > trigger || inward > trigger) open()
-                    else if (abs(dx) > trigger || abs(e.rawY - downY) > trigger) removeCallbacks(longPress)
+                MotionEvent.ACTION_MOVE -> when {
+                    held -> {
+                        if (!dragging && (abs(e.rawX - downX) > slop || abs(e.rawY - downY) > slop)) dragging = true
+                        if (dragging) onDrag(e.rawX, e.rawY)
+                    }
+                    !fired -> {
+                        val dx = e.rawX - downX
+                        val inward = if (right) -dx else dx
+                        if (e.rawY - downY > trigger || inward > trigger) open()
+                        else if (abs(dx) > trigger || abs(e.rawY - downY) > trigger) removeCallbacks(longPress)
+                    }
                 }
                 MotionEvent.ACTION_UP -> {
                     removeCallbacks(longPress)
-                    if (!fired && abs(e.rawX - downX) < trigger && abs(e.rawY - downY) < trigger) open()
+                    when {
+                        dragging -> onDrop(e.rawX, e.rawY)
+                        held -> runCatching { SearchActivity.open(context) }
+                        !fired && abs(e.rawX - downX) < trigger && abs(e.rawY - downY) < trigger -> open()
+                    }
                 }
-                MotionEvent.ACTION_CANCEL -> removeCallbacks(longPress)
+                MotionEvent.ACTION_CANCEL -> {
+                    removeCallbacks(longPress)
+                    if (dragging) onDrop(e.rawX, e.rawY)
+                }
             }
             return true
         }
 
-        /** Holding the handle opens Search instead of the panel (ADR 0008). */
+        /**
+         * Held: the buzz says it can be moved now. Let go without moving and Search opens
+         * (ADR 0008); drag and the handle follows.
+         */
         private val longPress = Runnable {
             if (fired) return@Runnable
             fired = true
+            held = true
             performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-            runCatching { SearchActivity.open(context) }
         }
 
         private fun open() {
