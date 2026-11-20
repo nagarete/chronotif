@@ -901,6 +901,58 @@ class NotificationBehaviorTest {
         }
     }
 
+    private fun <T> withPanelView(block: (app.chronotif.ui.PanelView) -> T): T {
+        val controller = Robolectric.buildActivity(Activity::class.java).setup()
+        try {
+            val activity = controller.get()
+            val panel = app.chronotif.ui.PanelView(activity, object : NotifList.Host {
+                override val context: Context = activity
+                override fun launched() {}
+                override fun guarded(action: () -> Unit) = action()
+            }, blur = true, windowDims = true) {}
+            activity.setContentView(panel)
+            shadowOf(Looper.getMainLooper()).idle()
+            return block(panel)
+        } finally {
+            controller.pause().stop().destroy()
+        }
+    }
+
+    @Test
+    fun aStatusBarPullThatSlidesBackIsNoCheck() {
+        post(notification("hi"), time = 1000)
+        val before = Prefs.lastCheck
+        withPanelView { panel ->
+            panel.shown(pulling = true)
+            panel.pull(0.3f)
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(3))
+            panel.dismissed()
+        }
+        assertEquals("Peeking leaves New alone", before, Prefs.lastCheck)
+    }
+
+    @Test
+    fun aPullThatOpensCountsFromWhenItsCardsFirstShowed() {
+        post(notification("hi"), time = 1000)
+        val before = Prefs.lastCheck
+        withPanelView { panel ->
+            panel.shown(pulling = true)
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(100))
+            assertTrue("The cards come in during the pull", texts(panel).any { "hi" in it })
+            panel.settle()
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(500))
+            panel.dismissed()
+            assertEquals("A glance shorter than a moment", before, Prefs.lastCheck)
+            // Pulled for a second before letting go: that second counts.
+            panel.shown(pulling = true)
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(1))
+            panel.settle()
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
+            panel.dismissed()
+        }
+        assertNotEquals("On screen for a moment, and opened", before, Prefs.lastCheck)
+    }
+
     // --- Panel header ---
 
     /** Runs [block] with the header's clock-and-date block, the start of its row; the gear is at the end. */

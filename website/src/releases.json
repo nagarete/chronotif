@@ -3,7 +3,10 @@
     "version": "0.2.7",
     "headline": "The panel comes down under your finger, and the edge handle is yours to shape.",
     "notes": [
-      "The panel opens faster, most of all the first time after an update: the header is there at once and your notifications follow right after."
+      "The panel opens faster, most of all the first time after an update: the header is there at once and your notifications follow right after.",
+      "Swipe down on the status bar and the panel follows your finger, like the system shade. Let go early and it slides back, without counting as a check.",
+      "Reopening the panel is quicker: it keeps your cards ready instead of building them again.",
+      "Swiping the status bar again right after closing the panel no longer opens the system shade."
     ]
   },
   "stable": [
