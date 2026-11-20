@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- A search result row's entry in Settings. -->
+    <item name="search_entry" type="id" />
+</resources>

@@ -116,6 +116,12 @@
     <string name="theme_system">System</string>
     <string name="theme_light">Light</string>
     <string name="theme_dark">Dark</string>
+    <string name="settings_search_hint">Search settings</string>
+    <string name="settings_search_voice">Search settings by voice</string>
+    <string name="settings_search_none">No settings match “%1$s”</string>
+    <string name="settings_search_page">Page</string>
+    <string name="value_on">On</string>
+    <string name="value_off">Off</string>
     <string name="handle_look">Look</string>
     <string name="handle_colours">Colour</string>
     <string name="handle_placement">Placement</string>
