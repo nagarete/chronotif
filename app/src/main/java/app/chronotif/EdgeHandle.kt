@@ -28,10 +28,10 @@ import app.chronotif.ui.dp
 import kotlin.math.abs
 
 /**
- * An always-available handle on the screen edge, in the shape and fill the user picks (a half
- * circle by default). Tap it, or swipe down or inward on it, to open the panel; hold it to open
+ * An always-available handle on the screen edge, in the shape and style the user picks (a half
+ * circle outline by default). Tap it, or swipe down or inward on it, to open the panel; hold it to open
  * Search. Hold it and drag to move it: it snaps to the nearer side at the height it's let go.
- * What's drawn fills the area that takes touches, so it's easy to hit and never catches a touch
+ * What's drawn spans the area that takes touches, so it's easy to hit and never catches a touch
  * where nothing shows. It takes the accent colour while anything is NEW.
  *
  * It steps aside while a fullscreen app hides the status bar (the keyboard can't be followed: Android
@@ -216,6 +216,10 @@ class EdgeHandle(service: Context) {
 
         override fun onDraw(canvas: Canvas) {
             val fresh = newCount > 0
+            if (shape != Prefs.SHAPE_TAB) {
+                drawRing(canvas, fresh)
+                return
+            }
             val solid = look == Prefs.LOOK_SOLID
             fill.color = when {
                 solid && fresh -> accent
@@ -227,47 +231,57 @@ class EdgeHandle(service: Context) {
             line.strokeWidth = 1f
             val w = width.toFloat()
             val h = height.toFloat()
-            // Where the mark sits: the middle of what shows.
-            val cx: Float
-            when (shape) {
-                Prefs.SHAPE_TAB -> {
-                    // Rounded on the inner side only: the outer corners sit past the screen edge.
-                    val r = context.dp(10).toFloat()
-                    if (right) tab.set(0f, 0f, w + r, h) else tab.set(-r, 0f, w, h)
-                    canvas.drawRoundRect(tab, r, r, fill)
-                    if (!solid) canvas.drawLine(if (right) 0.5f else w - 0.5f, r, if (right) 0.5f else w - 0.5f, h - r, line)
-                    cx = w / 2
-                }
-                Prefs.SHAPE_CIRCLE -> {
-                    canvas.drawCircle(w / 2, h / 2, w / 2, fill)
-                    if (!solid) canvas.drawCircle(w / 2, h / 2, w / 2 - 0.5f, line)
-                    cx = w / 2
-                }
-                else -> {
-                    // A half circle, its flat side on the screen edge.
-                    val edge = if (right) w else 0f
-                    canvas.drawCircle(edge, h / 2, w, fill)
-                    if (!solid) canvas.drawCircle(edge, h / 2, w - 0.5f, line)
-                    cx = if (right) w * 0.58f else w * 0.42f
-                }
-            }
+            // The tab: rounded on the inner side only, its outer corners past the screen edge.
+            val r = context.dp(10).toFloat()
+            if (right) tab.set(0f, 0f, w + r, h) else tab.set(-r, 0f, w, h)
+            canvas.drawRoundRect(tab, r, r, fill)
             if (solid) return
+            val edge = if (right) 0.5f else w - 0.5f
+            canvas.drawLine(edge, r, edge, h - r, line)
+            val cx = w / 2
             val cy = h / 2
             if (look == Prefs.LOOK_COUNT && fresh) {
-                val r = context.dp(9).toFloat()
                 fill.color = accent
-                canvas.drawCircle(cx, cy, r, fill)
+                canvas.drawCircle(cx, cy, context.dp(9).toFloat(), fill)
                 val label = if (newCount > 99) "99" else newCount.toString()
                 canvas.drawText(label, cx, cy - (count.ascent() + count.descent()) / 2, count)
                 return
             }
+            // A grip line in the middle.
             fill.color = if (fresh) accent else 0xF2787880.toInt()
-            if (shape == Prefs.SHAPE_TAB) {
-                val gw = context.dp(if (fresh) 6 else 5).toFloat()
-                val gh = h * 0.5f
-                canvas.drawRoundRect(cx - gw / 2, cy - gh / 2, cx + gw / 2, cy + gh / 2, gw / 2, gw / 2, fill)
-            } else {
-                canvas.drawCircle(cx, cy, context.dp(if (fresh) 5 else 4).toFloat(), fill)
+            val gw = context.dp(if (fresh) 6 else 5).toFloat()
+            val gh = h * 0.5f
+            canvas.drawRoundRect(cx - gw / 2, cy - gh / 2, cx + gw / 2, cy + gh / 2, gw / 2, gw / 2, fill)
+        }
+
+        /**
+         * Circles and half circles are only a border, so what's behind shows through: accent while
+         * anything is New, the bold style thicker. Subtle with count puts the number inside.
+         * A half circle is a circle centred on the screen edge, its other half off screen.
+         */
+        private fun drawRing(canvas: Canvas, fresh: Boolean) {
+            val solid = look == Prefs.LOOK_SOLID
+            val stroke = context.dp(if (solid) 4 else 3).toFloat()
+            val half = shape != Prefs.SHAPE_CIRCLE
+            val cy = height / 2f
+            val c = if (!half) width / 2f else if (right) width.toFloat() else 0f
+            val r = (if (half) width.toFloat() else width / 2f) - stroke / 2 - 1f
+            line.strokeWidth = stroke + 2f
+            line.color = 0x40000000 // A faint dark edge, so a light ring still shows on white.
+            canvas.drawCircle(c, cy, r, line)
+            line.strokeWidth = stroke
+            line.color = when {
+                fresh -> accent
+                solid -> 0xF2B4B4BC.toInt()
+                else -> 0xD9A0A0A8.toInt()
+            }
+            canvas.drawCircle(c, cy, r, line)
+            if (look == Prefs.LOOK_COUNT && fresh) {
+                count.color = accent
+                val label = if (newCount > 99) "99" else newCount.toString()
+                val tx = if (!half) c else if (right) width * 0.6f else width * 0.4f
+                canvas.drawText(label, tx, cy - (count.ascent() + count.descent()) / 2, count)
+                count.color = Color.WHITE
             }
         }
 

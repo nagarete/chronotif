@@ -64,7 +64,7 @@ object Prefs {
         get() = sp.getInt("handle_shape", SHAPE_HALF_SMALL)
         set(v) = sp.edit().putInt("handle_shape", v).apply()
 
-    /** The edge handle's fill: one of the LOOK_ constants. */
+    /** The edge handle's style: one of the LOOK_ constants (subtle, bold, subtle with the New count). */
     var handleLook: Int
         get() = sp.getInt("handle_look", LOOK_FROSTED)
         set(v) = sp.edit().putInt("handle_look", v).apply()
