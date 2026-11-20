@@ -882,6 +882,77 @@ class NotificationBehaviorTest {
         else -> emptyList()
     }
 
+    @Test
+    fun anAppsNameLoadsInTheBackgroundSoTheListNeverWaitsForIt() {
+        val n = Notification.Builder(context, "updates")
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentText("Your parcel is on its way")
+            .build()
+        post(n, pkg = "example.parcels")
+        withPanelList { list, container ->
+            list.render()
+            assertTrue(texts(container).toString(), texts(container).any { "parcel is on its way" in it })
+            assertFalse("The name isn't read while drawing", texts(container).any { "example.parcels" in it })
+            Apps.loopers.forEach { shadowOf(it).idle() }
+            shadowOf(Looper.getMainLooper()).idle()
+            list.render()
+            // An app the package manager doesn't know is named by its package.
+            assertTrue(texts(container).toString(), texts(container).any { "example.parcels" in it })
+        }
+    }
+
+    private fun <T> withPanelView(block: (app.chronotif.ui.PanelView) -> T): T {
+        val controller = Robolectric.buildActivity(Activity::class.java).setup()
+        try {
+            val activity = controller.get()
+            val panel = app.chronotif.ui.PanelView(activity, object : NotifList.Host {
+                override val context: Context = activity
+                override fun launched() {}
+                override fun guarded(action: () -> Unit) = action()
+            }, blur = true, windowDims = true) {}
+            activity.setContentView(panel)
+            shadowOf(Looper.getMainLooper()).idle()
+            return block(panel)
+        } finally {
+            controller.pause().stop().destroy()
+        }
+    }
+
+    @Test
+    fun aStatusBarPullThatSlidesBackIsNoCheck() {
+        post(notification("hi"), time = 1000)
+        val before = Prefs.lastCheck
+        withPanelView { panel ->
+            panel.shown(pulling = true)
+            panel.pull(0.3f)
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(3))
+            panel.dismissed()
+        }
+        assertEquals("Peeking leaves New alone", before, Prefs.lastCheck)
+    }
+
+    @Test
+    fun aPullThatOpensCountsFromWhenItsCardsFirstShowed() {
+        post(notification("hi"), time = 1000)
+        val before = Prefs.lastCheck
+        withPanelView { panel ->
+            panel.shown(pulling = true)
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(100))
+            assertTrue("The cards come in during the pull", texts(panel).any { "hi" in it })
+            panel.settle()
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(500))
+            panel.dismissed()
+            assertEquals("A glance shorter than a moment", before, Prefs.lastCheck)
+            // Pulled for a second before letting go: that second counts.
+            panel.shown(pulling = true)
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(1))
+            panel.settle()
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
+            panel.dismissed()
+        }
+        assertNotEquals("On screen for a moment, and opened", before, Prefs.lastCheck)
+    }
+
     // --- Panel header ---
 
     /** Runs [block] with the header's clock-and-date block, the start of its row; the gear is at the end. */

@@ -1,33 +1,44 @@
 {
   "next": {
-    "version": "0.2.6",
-    "headline": "Search, from the panel or the lock screen.",
+    "version": "0.2.7",
+    "headline": "The panel comes down under your finger, and the edge handle is yours to shape.",
     "notes": [
-      "Pull down in the panel or the lock-screen view to search. Before you type, it suggests the apps that notified most recently.",
-      "Search answers quick math, unit conversions and the time in other cities, opens Android's settings pages, and hands anything else to the web search engine you pick.",
-      "Turn on contacts and calendar events under Settings → Search to find people and plans too. While the phone is locked, they stay hidden until you unlock.",
-      "Convert currencies with the European Central Bank's daily rates. It's off until you turn it on, and the download carries nothing you type.",
-      "Open Search without accessibility: hold the edge handle, or use the Search tile, home-screen widget or app shortcut.",
-      "A gear in the panel header opens Android's Settings.",
+      "The panel opens faster, most of all the first time after an update: the header is there at once and your notifications follow right after.",
+      "Swipe down on the status bar and the panel follows your finger, like the system shade. Let go early and it slides back, without counting as a check.",
+      "Reopening the panel is quicker: it keeps your cards ready instead of building them again.",
+      "Swiping the status bar again right after closing the panel no longer opens the system shade.",
       "The edge handle is easier to hit: a half-circle outline the size of a fingertip, and all of it responds. Pick another shape, style or colour under Settings → Edge handle, including one that doesn't light up for new notifications.",
       "Hold the edge handle and drag it to move it, to either side and any height. Holding it without moving still opens Search, when you let go.",
       "The edge handle steps aside in fullscreen apps."
-    ],
-    "video": {
-      "src": "/video/release-0.2.6.mp4",
-      "poster": "/video/release-0.2.6-poster.webp",
-      "label": "Search in Chronotif 0.2.6",
-      "music": {
-        "title": "Brazilian Phonk Bounce for Dance Reels",
-        "artist": "Alex Morgan",
-        "album": "Phonk & Drift",
-        "url": "https://freemusicarchive.org/music/alex-morgan/phonk-drift",
-        "license": "CC BY 4.0",
-        "licenseUrl": "https://creativecommons.org/licenses/by/4.0/"
-      }
-    }
+    ]
   },
   "stable": [
+    {
+      "version": "0.2.6",
+      "date": "2026-11-20",
+      "headline": "Search, from the panel or the lock screen.",
+      "notes": [
+        "Pull down in the panel or the lock-screen view to search. Before you type, it suggests the apps that notified most recently.",
+        "Search answers quick math, unit conversions and the time in other cities, opens Android's settings pages, and hands anything else to the web search engine you pick.",
+        "Turn on contacts and calendar events under Settings → Search to find people and plans too. While the phone is locked, they stay hidden until you unlock.",
+        "Convert currencies with the European Central Bank's daily rates. It's off until you turn it on, and the download carries nothing you type.",
+        "Open Search without accessibility: hold the edge handle, or use the Search tile, home-screen widget or app shortcut.",
+        "A gear in the panel header opens Android's Settings."
+      ],
+      "video": {
+        "src": "/video/release-0.2.6.mp4",
+        "poster": "/video/release-0.2.6-poster.webp",
+        "label": "Search in Chronotif 0.2.6",
+        "music": {
+          "title": "Brazilian Phonk Bounce for Dance Reels",
+          "artist": "Alex Morgan",
+          "album": "Phonk & Drift",
+          "url": "https://freemusicarchive.org/music/alex-morgan/phonk-drift",
+          "license": "CC BY 4.0",
+          "licenseUrl": "https://creativecommons.org/licenses/by/4.0/"
+        }
+      }
+    },
     {
       "version": "0.2.5",
       "date": "2026-11-18",

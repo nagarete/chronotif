@@ -43,11 +43,17 @@ class CustomPictureTest {
         return Entry(sbn, Ranking(), 1000)
     }
 
+    /** Lets the background loads finish and land on the main thread. */
+    private fun settle() {
+        Apps.loopers.forEach { shadowOf(it).idle() }
+        shadowOf(Looper.getMainLooper()).idle()
+    }
+
     @Test
     fun aCustomLayoutsPhotoStandsInForTheMissingLargeIcon() {
         val e = live(1, photoPx = 100)
-        assertNull(Apps.largeIcon(context, e)) // inflated on a later pass, never during binding
-        shadowOf(Looper.getMainLooper()).idle()
+        assertNull(Apps.largeIcon(context, e)) // inflated in the background, never during binding
+        settle()
         val photo = Apps.largeIcon(context, e) as BitmapDrawable
         assertEquals(100, photo.bitmap.width)
     }
@@ -56,7 +62,7 @@ class CustomPictureTest {
     fun anIconSizedImageIsNoPhoto() {
         val e = live(2, photoPx = 24)
         Apps.largeIcon(context, e)
-        shadowOf(Looper.getMainLooper()).idle()
+        settle()
         assertNull(Apps.largeIcon(context, e))
     }
 }

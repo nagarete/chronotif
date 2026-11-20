@@ -86,6 +86,8 @@ class SetupActivity : Activity() {
         body.removeCallbacks(settle)
         settled = false
         Updater.foreground = false
+        // Settings changed here may change how the panel looks; the next open builds it afresh.
+        Panel.drop()
     }
 
     private fun build() {
