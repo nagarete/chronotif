@@ -12,6 +12,8 @@ object Prefs {
     const val SHAPE_HALF_SMALL = 1
     const val SHAPE_HALF_LARGE = 2
     const val SHAPE_CIRCLE = 3
+    /** The original handle: a thin line in a wider, unseen touch area. */
+    const val SHAPE_LINE = 4
     const val LOOK_FROSTED = 0
     const val LOOK_SOLID = 1
     const val LOOK_COUNT = 2

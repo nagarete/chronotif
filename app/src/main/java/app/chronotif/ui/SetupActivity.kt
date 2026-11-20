@@ -174,6 +174,7 @@ class SetupActivity : Activity() {
             R.string.shape_half_large to Prefs.SHAPE_HALF_LARGE,
             R.string.shape_tab to Prefs.SHAPE_TAB,
             R.string.shape_circle to Prefs.SHAPE_CIRCLE,
+            R.string.shape_line to Prefs.SHAPE_LINE,
         )
         radios(shapes.map { it.first }, selected = shapes.indexOfFirst { it.second == Prefs.handleShape }, vertical = true) {
             Prefs.handleShape = shapes[it].second

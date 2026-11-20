@@ -32,7 +32,8 @@ import kotlin.math.abs
  * circle outline by default). Tap it, or swipe down or inward on it, to open the panel; hold it to open
  * Search. Hold it and drag to move it: it snaps to the nearer side at the height it's let go.
  * What's drawn spans the area that takes touches, so it's easy to hit and never catches a touch
- * where nothing shows. It takes the accent colour while anything is NEW.
+ * where nothing shows; the original thin line stays a choice, in its wider touch area. It takes
+ * the accent colour while anything is NEW.
  *
  * It steps aside while a fullscreen app hides the status bar (the keyboard can't be followed: Android
  * tells only the app being typed in), and asks Android to keep the Back gesture off it. MIUI/HyperOS keep their own Back strip on the lower
@@ -66,6 +67,7 @@ class EdgeHandle(service: Context) {
             Prefs.SHAPE_HALF_SMALL to (28 to 56),
             Prefs.SHAPE_HALF_LARGE to (36 to 72),
             Prefs.SHAPE_CIRCLE to (44 to 44),
+            Prefs.SHAPE_LINE to (24 to 110),
         )
         const val CIRCLE_GAP_DP = 2
     }
@@ -216,6 +218,10 @@ class EdgeHandle(service: Context) {
 
         override fun onDraw(canvas: Canvas) {
             val fresh = newCount > 0
+            if (shape == Prefs.SHAPE_LINE) {
+                drawLine(canvas, fresh)
+                return
+            }
             if (shape != Prefs.SHAPE_TAB) {
                 drawRing(canvas, fresh)
                 return
@@ -252,6 +258,21 @@ class EdgeHandle(service: Context) {
             val gw = context.dp(if (fresh) 6 else 5).toFloat()
             val gh = h * 0.5f
             canvas.drawRoundRect(cx - gw / 2, cy - gh / 2, cx + gw / 2, cy + gh / 2, gw / 2, gw / 2, fill)
+        }
+
+        /** The original look, kept for those who like it: a slim line, accent while anything is New. */
+        private fun drawLine(canvas: Canvas, fresh: Boolean) {
+            val w = context.dp(if (fresh) 5 else 4).toFloat()
+            val h = height * 0.62f
+            val inset = context.dp(3).toFloat()
+            val left = if (right) width - inset - w else inset
+            val top = (height - h) / 2
+            linePaint.color = if (fresh) accent else 0x99808086.toInt() // visible on light and dark
+            canvas.drawRoundRect(left, top, left + w, top + h, w / 2, w / 2, linePaint)
+        }
+
+        private val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            setShadowLayer(context.dp(2).toFloat(), 0f, 0f, 0x55000000)
         }
 
         /**
