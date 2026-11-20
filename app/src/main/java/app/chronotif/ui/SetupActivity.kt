@@ -451,6 +451,9 @@ class SetupActivity : Activity() {
             }
         }, gap(0).apply { marginStart = dp(8) })
         body.addView(buttons, gap(8))
+        toggle(R.string.swipe_to_clear, R.string.swipe_to_clear_desc, { Prefs.swipeToClear }) {
+            Prefs.swipeToClear = it
+        }
     }
 
     private fun handle() {
@@ -547,6 +550,27 @@ class SetupActivity : Activity() {
     }
 
     private fun search() {
+        label(R.string.search_can_do)
+        body.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = Ui.rounded(cardBg, dp(14).toFloat())
+            setPadding(dp(14), dp(4), dp(14), dp(12))
+            listOf(
+                R.string.search_can_apps to R.string.search_can_apps_desc,
+                R.string.search_can_math to R.string.search_can_math_desc,
+                R.string.search_can_units to R.string.search_can_units_desc,
+                R.string.search_can_time to R.string.search_can_time_desc,
+                R.string.search_can_currency to R.string.search_can_currency_desc,
+                R.string.search_can_contacts to R.string.search_can_contacts_desc,
+                R.string.search_can_calendar to R.string.search_can_calendar_desc,
+                R.string.search_can_settings to R.string.search_can_settings_desc,
+                R.string.search_can_web to R.string.search_can_web_desc,
+            ).forEach { (title, desc) ->
+                addView(text(getString(title), 15f, bold = true), gap(8))
+                addView(text(getString(desc), 13.5f, secondary = true), gap(2))
+            }
+        }, gap(6))
+        body.addView(text(getString(R.string.search_can_private), 13f, secondary = true), gap(8))
         toggle(R.string.search_pull_down, R.string.search_pull_down_desc, { Prefs.pullDownSearch }) {
             Prefs.pullDownSearch = it
         }

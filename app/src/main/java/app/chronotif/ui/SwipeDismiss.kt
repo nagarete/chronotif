@@ -13,14 +13,18 @@ import kotlin.math.sign
 /**
  * Horizontal swipe-to-dismiss that coexists with vertical scrolling and the view's own
  * click/long-press handling (it only takes over once a horizontal drag is recognised).
+ * While [resist] says so (Swipe to clear is off), a sideways drag still takes over, so it
+ * doesn't end as a tap, but the view only gives a little and springs back.
  */
 class SwipeDismiss(
     private val canDismiss: () -> Boolean,
     private val onDismiss: () -> Unit,
+    private val resist: () -> Boolean = { false },
 ) : View.OnTouchListener {
     private var downX = 0f
     private var downY = 0f
     private var dragging = false
+    private var resisting = false
     private var tracker: VelocityTracker? = null
     var dismissing = false
         private set
@@ -44,11 +48,14 @@ class SwipeDismiss(
                 val dy = e.rawY - downY
                 if (!dragging && abs(dx) > cfg.scaledTouchSlop && abs(dx) > abs(dy) * 1.5f) {
                     dragging = true
+                    resisting = resist()
                     v.parent?.requestDisallowInterceptTouchEvent(true)
                     v.cancelLongPress()
                     v.isPressed = false
                 }
-                if (dragging) {
+                if (dragging && resisting) {
+                    v.translationX = dx * RESISTANCE
+                } else if (dragging) {
                     v.translationX = dx
                     v.alpha = 1f - (abs(dx) / v.width).coerceAtMost(1f) * 0.7f
                 }
@@ -63,7 +70,7 @@ class SwipeDismiss(
                 t?.recycle()
                 tracker = null
                 val fling = abs(vx) > cfg.scaledMinimumFlingVelocity * 6 && sign(vx) == sign(dx)
-                if (e.actionMasked == MotionEvent.ACTION_UP && (abs(dx) > v.width * 0.4f || fling)) {
+                if (!resisting && e.actionMasked == MotionEvent.ACTION_UP && (abs(dx) > v.width * 0.4f || fling)) {
                     dismissing = true
                     v.animate().translationX(sign(dx) * v.width).alpha(0f).setDuration(160)
                         .withEndAction(onDismiss).start()
@@ -74,6 +81,11 @@ class SwipeDismiss(
             }
         }
         return dragging
+    }
+
+    private companion object {
+        /** How far a card follows the finger when it can't be swiped away. */
+        const val RESISTANCE = 0.12f
     }
 
     /** The view is being reused for fresh content: forget any finished dismissal. */

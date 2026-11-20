@@ -30,6 +30,9 @@ import app.chronotif.Images
 import app.chronotif.R
 import app.chronotif.Viewable
 import app.chronotif.core.Kind
+import app.chronotif.core.Snooze
+import app.chronotif.core.SnoozeFor
+import java.time.ZoneId
 
 /** Something laid over a window's content that Back closes first: the Preview, the image viewer. */
 interface Overlay {
@@ -72,6 +75,11 @@ class CardPreview private constructor(
         fun replyElsewhere(index: Int)
         fun sendReply(index: Int, text: CharSequence)
         fun viewImages(anchor: View, items: List<Viewable>, start: Int)
+        fun canClear(): Boolean
+        /** Clears what the card shows, as swiping it would. */
+        fun clear()
+        fun canSnooze(): Boolean
+        fun snooze(until: Long)
     }
 
     companion object {
@@ -140,9 +148,7 @@ class CardPreview private constructor(
         }
 
         buttons.orientation = LinearLayout.VERTICAL
-        acts.forEachIndexed { i, a ->
-            buttons.addView(button(a, i), Ui.lp(LayoutParams.WRAP_CONTENT, dp(52)).apply { topMargin = dp(8) })
-        }
+        showButtons()
         buildReply()
 
         val column = LinearLayout(context).apply {
@@ -203,27 +209,94 @@ class CardPreview private constructor(
         return box
     }
 
-    private fun button(a: Notification.Action, index: Int): View =
-        Ui.text(context, 16f, pal.text, bold = true, lines = 1).apply {
-            text = a.title?.takeIf { it.isNotBlank() } ?: context.getString(R.string.open_in_app)
-            gravity = Gravity.CENTER_VERTICAL
-            minWidth = dp(180)
-            setPadding(dp(22), 0, dp(28), 0)
-            background = Ui.pressable(pal.card or 0xFF000000.toInt(), dp(26).toFloat(), pal.ripple)
-            setOnClickListener {
+    /** The app's buttons, then Snooze and Clear. */
+    private fun showButtons() {
+        buttons.removeAllViews()
+        acts.forEachIndexed { i, a ->
+            addButton(a.title?.takeIf { it.isNotBlank() } ?: context.getString(R.string.open_in_app)) {
                 when {
                     Act.replyInput(a) == null -> {
-                        actions.action(index)
+                        actions.action(i)
                         close()
                     }
-                    actions.canReplyHere() -> startReply(index, a)
+                    actions.canReplyHere() -> startReply(i, a)
                     else -> {
-                        actions.replyElsewhere(index)
+                        actions.replyElsewhere(i)
                         close()
                     }
                 }
             }
         }
+        if (actions.canSnooze()) addButton(context.getString(R.string.snooze)) { showSnoozeChoices() }
+        if (actions.canClear()) addButton(context.getString(R.string.clear)) {
+            actions.clear()
+            close()
+        }
+    }
+
+    /** Snooze opens into how long; it comes back as New (ADR 0010). */
+    private fun showSnoozeChoices() {
+        buttons.removeAllViews()
+        listOf(
+            SnoozeFor.MINUTES_15 to R.string.snooze_15_minutes,
+            SnoozeFor.HOUR_1 to R.string.snooze_1_hour,
+            SnoozeFor.HOURS_3 to R.string.snooze_3_hours,
+            SnoozeFor.TOMORROW_MORNING to R.string.snooze_tomorrow_morning,
+        ).forEach { (choice, label) ->
+            addButton(context.getString(label)) {
+                actions.snooze(Snooze.until(choice, System.currentTimeMillis(), ZoneId.systemDefault()))
+                close()
+            }
+        }
+        addButton(context.getString(R.string.snooze_pick_time)) { showTimePicker() }
+    }
+
+    /** A clock time of the user's own; one already past today means tomorrow. */
+    private fun showTimePicker() {
+        buttons.removeAllViews()
+        val zone = ZoneId.systemDefault()
+        val start = Snooze.suggested(System.currentTimeMillis(), zone)
+        // Spinners in the system's light or dark look, to match the card they sit on.
+        val themed = android.view.ContextThemeWrapper(context, android.R.style.Theme_DeviceDefault_DayNight)
+        val picker = android.view.LayoutInflater.from(themed).inflate(R.layout.snooze_time_picker, buttons, false)
+            as android.widget.TimePicker
+        picker.setIs24HourView(android.text.format.DateFormat.is24HourFormat(context))
+        picker.hour = start.hour
+        picker.minute = start.minute
+        // Scrolling only: the keyboard can't come up on the lock screen.
+        picker.descendantFocusability = FOCUS_BLOCK_DESCENDANTS
+        buttons.addView(FrameLayout(context).apply {
+            background = Ui.rounded(pal.card or 0xFF000000.toInt(), dp(22).toFloat())
+            setPadding(dp(8), 0, dp(8), 0)
+            addView(picker, LayoutParams(-2, -2, Gravity.CENTER))
+        }, Ui.lp(LayoutParams.WRAP_CONTENT).apply { topMargin = dp(8) })
+
+        fun until() = Snooze.at(java.time.LocalTime.of(picker.hour, picker.minute), System.currentTimeMillis(), zone)
+        addButton("") {
+            actions.snooze(until())
+            close()
+        }
+        val confirm = buttons.getChildAt(buttons.childCount - 1) as android.widget.TextView
+        fun label() {
+            val at = until()
+            val time = android.text.format.DateFormat.getTimeFormat(context).format(java.util.Date(at))
+            val today = java.time.Instant.ofEpochMilli(at).atZone(zone).toLocalDate() == java.time.LocalDate.now(zone)
+            confirm.text = context.getString(if (today) R.string.snooze_until else R.string.snooze_until_tomorrow, time)
+        }
+        label()
+        picker.setOnTimeChangedListener { _, _, _ -> label() }
+    }
+
+    private fun addButton(label: CharSequence, onClick: () -> Unit) {
+        buttons.addView(Ui.text(context, 16f, pal.text, bold = true, lines = 1).apply {
+            text = label
+            gravity = Gravity.CENTER_VERTICAL
+            minWidth = dp(180)
+            setPadding(dp(22), 0, dp(28), 0)
+            background = Ui.pressable(pal.card or 0xFF000000.toInt(), dp(26).toFloat(), pal.ripple)
+            setOnClickListener { onClick() }
+        }, Ui.lp(LayoutParams.WRAP_CONTENT, dp(52)).apply { topMargin = dp(8) })
+    }
 
     private fun buildReply() {
         replyInput.apply {

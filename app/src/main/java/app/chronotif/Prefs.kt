@@ -54,6 +54,40 @@ object Prefs {
         get() = sp.getBoolean("enabled", true)
         set(v) = sp.edit().putBoolean("enabled", v).apply()
 
+    /** Swiping a card sideways clears it; off, cards clear from their Preview or a section's Clear. */
+    var swipeToClear: Boolean
+        get() = sp.getBoolean("swipe_to_clear", true)
+        set(v) = sp.edit().putBoolean("swipe_to_clear", v).apply()
+
+    /**
+     * Notifications snoozed from Chronotif, as "until<TAB>key", kept across restarts: when Android
+     * posts one again it has come back from its snooze and counts as New (ADR 0010).
+     */
+    private fun snoozes(): Set<String> = sp.getStringSet("snoozed", null).orEmpty()
+
+    fun snoozed(key: String, until: Long) {
+        val kept = snoozes().filterNot { it.substringAfter('\t') == key } + "$until\t$key"
+        sp.edit().putStringSet("snoozed", kept.toSet()).apply()
+    }
+
+    /**
+     * Whether [key] was snoozed, forgetting it. A snooze whose notification the app removed in the
+     * meantime never comes back; it's dropped a day after it would have.
+     */
+    fun unsnooze(key: String, now: Long = System.currentTimeMillis()): Boolean {
+        val all = snoozes()
+        if (all.isEmpty()) return false
+        var found = false
+        val kept = all.filter { s ->
+            val k = s.substringAfter('\t')
+            val until = s.substringBefore('\t').toLongOrNull() ?: 0L
+            if (k == key) found = true
+            k != key && until + 86_400_000L > now
+        }.toSet()
+        if (kept != all) sp.edit().putStringSet("snoozed", kept).apply()
+        return found
+    }
+
     /** The status-bar swipe; it also needs Chronotif's accessibility service turned on. */
     var statusSwipeEnabled: Boolean
         get() = sp.getBoolean("status_swipe_enabled", true)

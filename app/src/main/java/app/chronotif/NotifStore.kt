@@ -145,9 +145,12 @@ object NotifStore {
         val n = sbn.notification
         val live = Content.kind(sbn) != Kind.NOTIFICATION
         val quiet = n.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0 || live
-        val alertTime = clock.onPosted(sbn.key, sbn.postTime, Content.signature(n), quiet,
+        // Back from a snooze: Android reposts it with its old post time, but it arrives now.
+        val returned = Prefs.unsnooze(sbn.key)
+        val postTime = if (returned) maxOf(sbn.postTime, System.currentTimeMillis()) else sbn.postTime
+        val alertTime = clock.onPosted(sbn.key, postTime, Content.signature(n), quiet,
             conversation = !live && Content.isConversation(n),
-            message = Content.incomingMessage(n))
+            message = Content.incomingMessage(n), returned = returned)
         entries.remove(sbn.key)
         val e = Entry(sbn, rankingOf(sbn.key, map), alertTime)
         entries[sbn.key] = e

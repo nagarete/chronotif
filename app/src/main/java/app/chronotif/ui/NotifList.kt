@@ -479,6 +479,7 @@ class NotifList(
         // any other notification's, while what it shows is unchanged.
         val message = c.messages.singleOrNull()?.id
         val shown = Content.signature(e.n)
+        val card = anchor as? CardView
         val stillShows: (Entry) -> Boolean =
             if (message != null) { now -> message in Content.incomingIds(now.n) }
             else { now -> Content.signature(now.n) == shown }
@@ -500,6 +501,18 @@ class NotifList(
             }
 
             override fun viewImages(anchor: View, items: List<Viewable>, start: Int) = onViewImages(anchor, e, items, start)
+
+            // Clear does what swiping the card would: a message card hides that message, a
+            // collapsed stack clears all of it.
+            override fun canClear() = card?.swipeAllowed?.invoke() == true
+
+            override fun clear() {
+                card?.onSwiped?.invoke()
+            }
+
+            override fun canSnooze() = e.kind == Kind.NOTIFICATION && e.clearable
+
+            override fun snooze(until: Long) = Act.snooze(live(e), until)
         }) ?: return
         overlays += Open(e.key, preview, stillShows)
     }
@@ -536,7 +549,7 @@ class NotifList(
         v.layoutParams = gap(0)
     }
 
-    /** An open stack's title, with Show less ([close]) and × ([clear]). */
+    /** An open stack's title, with Show less ([close]) and × ([clear]). Tapping the title closes it too. */
     private fun stackHeader(
         id: String, title: CharSequence, clearable: Boolean, close: () -> Unit, clear: () -> Unit,
     ) = Row(id, {
@@ -558,6 +571,7 @@ class NotifList(
     }) { v ->
         v as LinearLayout
         (v.getChildAt(0) as TextView).text = title
+        v.setOnClickListener { close() }
         v.getChildAt(1).setOnClickListener { close() }
         v.getChildAt(2).apply {
             visibility = if (clearable) View.VISIBLE else View.GONE

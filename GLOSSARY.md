@@ -36,6 +36,10 @@ _Avoid_: Picture (a non-conversation notification's single image, which opens th
 One card held up on its own over a dimmed screen by pressing and holding it: its full text, its Attachment large, and the app's buttons. Nothing in the app is opened or marked read.
 _Avoid_: Peek, long-press menu
 
+**Snooze**:
+Hiding a notification for a chosen time, from its Preview. Android hides it everywhere and posts it again when the time is up; it then counts as New.
+_Avoid_: Remind me, later
+
 **Wake session**:
 One continuous period from the display waking until it sleeps. Chronotif and the stock lock screen share this period.
 
