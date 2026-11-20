@@ -191,6 +191,20 @@ class SetupActivity : Activity() {
             applyHandle()
         }
         body.addView(text(getString(R.string.fill_count_desc), 13f, secondary = true), gap(4))
+        body.addView(text(getString(R.string.handle_colour), 15f), gap(12))
+        radios(listOf(R.string.colour_grey, R.string.colour_white, R.string.colour_black), selected = Prefs.handleColour) {
+            Prefs.handleColour = it
+            applyHandle()
+        }
+        body.addView(text(getString(R.string.handle_new_colour), 15f), gap(12))
+        radios(
+            listOf(R.string.colour_accent, R.string.colour_blue, R.string.colour_green, R.string.colour_orange,
+                R.string.colour_red, R.string.colour_purple, R.string.colour_unchanged),
+            selected = Prefs.handleNewColour, vertical = true,
+        ) {
+            Prefs.handleNewColour = it
+            applyHandle()
+        }
         body.addView(text(getString(R.string.handle_position), 15f), gap(12))
         body.addView(SeekBar(this).apply {
             max = 100

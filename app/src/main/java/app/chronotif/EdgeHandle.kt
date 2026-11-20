@@ -32,8 +32,8 @@ import kotlin.math.abs
  * circle outline by default). Tap it, or swipe down or inward on it, to open the panel; hold it to open
  * Search. Hold it and drag to move it: it snaps to the nearer side at the height it's let go.
  * What's drawn spans the area that takes touches, so it's easy to hit and never catches a touch
- * where nothing shows; the original thin line stays a choice, in its wider touch area. It takes
- * the accent colour while anything is NEW.
+ * where nothing shows; the original thin line stays a choice, in its wider touch area. It lights up
+ * while anything is NEW, in the accent colour unless another (or none) is picked.
  *
  * It steps aside while a fullscreen app hides the status bar (the keyboard can't be followed: Android
  * tells only the app being typed in), and asks Android to keep the Back gesture off it. MIUI/HyperOS keep their own Back strip on the lower
@@ -115,6 +115,20 @@ class EdgeHandle(service: Context) {
             params.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
         }
         v.right = Prefs.handleRight
+        v.idle = when (Prefs.handleColour) {
+            Prefs.COLOUR_WHITE -> 0xFFFFFF
+            Prefs.COLOUR_BLACK -> 0x1C1C1E
+            else -> 0x9A9AA2
+        }
+        v.lit = when (Prefs.handleNewColour) {
+            Prefs.NEW_UNCHANGED -> null
+            Prefs.NEW_BLUE -> 0x0A84FF
+            Prefs.NEW_GREEN -> 0x30D158
+            Prefs.NEW_ORANGE -> 0xFF9F0A
+            Prefs.NEW_RED -> 0xFF453A
+            Prefs.NEW_PURPLE -> 0xBF5AF2
+            else -> Ui.accent(ctx) and 0xFFFFFF
+        }
         v.shape = Prefs.handleShape
         v.look = Prefs.handleLook
         v.newCount = NotifStore.newCount()
@@ -174,6 +188,22 @@ class EdgeHandle(service: Context) {
                     invalidate()
                 }
             }
+        /** The usual colour, as RGB: see [Prefs.handleColour]. */
+        var idle = 0x9A9AA2
+            set(v) {
+                if (field != v) {
+                    field = v
+                    invalidate()
+                }
+            }
+        /** The colour while anything is New, as RGB, or null to keep [idle]: see [Prefs.handleNewColour]. */
+        var lit: Int? = 0
+            set(v) {
+                if (field != v) {
+                    field = v
+                    invalidate()
+                }
+            }
         /** [Prefs.handleShape]. */
         var shape = Prefs.SHAPE_HALF_SMALL
             set(v) {
@@ -199,7 +229,6 @@ class EdgeHandle(service: Context) {
             textSize = context.dp(11).toFloat()
             typeface = Typeface.create(Typeface.DEFAULT, 600, false)
         }
-        private val accent = Ui.accent(context)
         private val trigger = context.dp(22).toFloat()
         private val tab = RectF()
         private val slop = ViewConfiguration.get(context).scaledTouchSlop.toFloat()
@@ -216,28 +245,35 @@ class EdgeHandle(service: Context) {
             systemGestureExclusionRects = listOf(Rect(0, 0, width, height))
         }
 
+        /** [rgb] at [alpha] (0 to 255). */
+        private fun tint(rgb: Int, alpha: Int) = (alpha shl 24) or (rgb and 0xFFFFFF)
+
+        /** Lit while anything is New, unless the New colour is set to stay unchanged. */
+        private val on get() = newCount > 0 && lit != null
+        /** The colour to draw in right now, as RGB. */
+        private val hue get() = if (on) lit!! else idle
+        /** White text on the count badge, black on a light one. */
+        private val badgeText get() = if (Color.luminance(tint(hue, 255)) > 0.6f) Color.BLACK else Color.WHITE
+
         override fun onDraw(canvas: Canvas) {
-            val fresh = newCount > 0
-            if (shape == Prefs.SHAPE_LINE) {
-                drawLine(canvas, fresh)
-                return
+            when (shape) {
+                Prefs.SHAPE_LINE -> drawLine(canvas)
+                Prefs.SHAPE_TAB -> drawTab(canvas)
+                else -> drawRing(canvas)
             }
-            if (shape != Prefs.SHAPE_TAB) {
-                drawRing(canvas, fresh)
-                return
-            }
+        }
+
+        private fun drawTab(canvas: Canvas) {
             val solid = look == Prefs.LOOK_SOLID
             fill.color = when {
-                solid && fresh -> accent
-                solid -> 0xC76E6E76.toInt()
-                fresh -> (accent and 0x00FFFFFF) or 0x4D000000
-                else -> 0x52808088
+                solid -> tint(hue, if (on) 255 else 0xC7)
+                else -> tint(hue, if (on) 0x4D else 0x52)
             }
             line.color = 0x4DFFFFFF
             line.strokeWidth = 1f
             val w = width.toFloat()
             val h = height.toFloat()
-            // The tab: rounded on the inner side only, its outer corners past the screen edge.
+            // Rounded on the inner side only: the outer corners sit past the screen edge.
             val r = context.dp(10).toFloat()
             if (right) tab.set(0f, 0f, w + r, h) else tab.set(-r, 0f, w, h)
             canvas.drawRoundRect(tab, r, r, fill)
@@ -246,28 +282,27 @@ class EdgeHandle(service: Context) {
             canvas.drawLine(edge, r, edge, h - r, line)
             val cx = w / 2
             val cy = h / 2
-            if (look == Prefs.LOOK_COUNT && fresh) {
-                fill.color = accent
+            if (look == Prefs.LOOK_COUNT && newCount > 0) {
+                fill.color = tint(hue, 255)
                 canvas.drawCircle(cx, cy, context.dp(9).toFloat(), fill)
-                val label = if (newCount > 99) "99" else newCount.toString()
-                canvas.drawText(label, cx, cy - (count.ascent() + count.descent()) / 2, count)
+                drawCount(canvas, cx, cy, badgeText)
                 return
             }
             // A grip line in the middle.
-            fill.color = if (fresh) accent else 0xF2787880.toInt()
-            val gw = context.dp(if (fresh) 6 else 5).toFloat()
+            fill.color = tint(hue, if (on) 255 else 0xF2)
+            val gw = context.dp(if (on) 6 else 5).toFloat()
             val gh = h * 0.5f
             canvas.drawRoundRect(cx - gw / 2, cy - gh / 2, cx + gw / 2, cy + gh / 2, gw / 2, gw / 2, fill)
         }
 
-        /** The original look, kept for those who like it: a slim line, accent while anything is New. */
-        private fun drawLine(canvas: Canvas, fresh: Boolean) {
-            val w = context.dp(if (fresh) 5 else 4).toFloat()
+        /** The original look, kept for those who like it: a slim line, lit while anything is New. */
+        private fun drawLine(canvas: Canvas) {
+            val w = context.dp(if (on) 5 else 4).toFloat()
             val h = height * 0.62f
             val inset = context.dp(3).toFloat()
             val left = if (right) width - inset - w else inset
             val top = (height - h) / 2
-            linePaint.color = if (fresh) accent else 0x99808086.toInt() // visible on light and dark
+            linePaint.color = tint(hue, if (on) 255 else 0x99)
             canvas.drawRoundRect(left, top, left + w, top + h, w / 2, w / 2, linePaint)
         }
 
@@ -276,34 +311,34 @@ class EdgeHandle(service: Context) {
         }
 
         /**
-         * Circles and half circles are only a border, so what's behind shows through: accent while
+         * Circles and half circles are only a border, so what's behind shows through: lit while
          * anything is New, the bold style thicker. Subtle with count puts the number inside.
          * A half circle is a circle centred on the screen edge, its other half off screen.
          */
-        private fun drawRing(canvas: Canvas, fresh: Boolean) {
+        private fun drawRing(canvas: Canvas) {
             val solid = look == Prefs.LOOK_SOLID
             val stroke = context.dp(if (solid) 4 else 3).toFloat()
             val half = shape != Prefs.SHAPE_CIRCLE
             val cy = height / 2f
             val c = if (!half) width / 2f else if (right) width.toFloat() else 0f
             val r = (if (half) width.toFloat() else width / 2f) - stroke / 2 - 1f
+            // A faint contrasting edge, so the ring still shows on a background of its own colour.
             line.strokeWidth = stroke + 2f
-            line.color = 0x40000000 // A faint dark edge, so a light ring still shows on white.
+            line.color = if (Color.luminance(tint(hue, 255)) < 0.2f) 0x40FFFFFF else 0x40000000
             canvas.drawCircle(c, cy, r, line)
             line.strokeWidth = stroke
-            line.color = when {
-                fresh -> accent
-                solid -> 0xF2B4B4BC.toInt()
-                else -> 0xD9A0A0A8.toInt()
-            }
+            line.color = tint(hue, if (on) 255 else if (solid) 0xF2 else 0xD9)
             canvas.drawCircle(c, cy, r, line)
-            if (look == Prefs.LOOK_COUNT && fresh) {
-                count.color = accent
-                val label = if (newCount > 99) "99" else newCount.toString()
+            if (look == Prefs.LOOK_COUNT && newCount > 0) {
                 val tx = if (!half) c else if (right) width * 0.6f else width * 0.4f
-                canvas.drawText(label, tx, cy - (count.ascent() + count.descent()) / 2, count)
-                count.color = Color.WHITE
+                drawCount(canvas, tx, cy, tint(hue, 255))
             }
+        }
+
+        private fun drawCount(canvas: Canvas, x: Float, y: Float, colour: Int) {
+            count.color = colour
+            val label = if (newCount > 99) "99" else newCount.toString()
+            canvas.drawText(label, x, y - (count.ascent() + count.descent()) / 2, count)
         }
 
         @SuppressLint("ClickableViewAccessibility")

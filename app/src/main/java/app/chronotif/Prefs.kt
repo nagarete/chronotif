@@ -14,6 +14,17 @@ object Prefs {
     const val SHAPE_CIRCLE = 3
     /** The original handle: a thin line in a wider, unseen touch area. */
     const val SHAPE_LINE = 4
+    const val COLOUR_GREY = 0
+    const val COLOUR_WHITE = 1
+    const val COLOUR_BLACK = 2
+    const val NEW_ACCENT = 0
+    const val NEW_BLUE = 1
+    const val NEW_GREEN = 2
+    const val NEW_ORANGE = 3
+    const val NEW_RED = 4
+    const val NEW_PURPLE = 5
+    /** The handle keeps its usual colour when something is New. */
+    const val NEW_UNCHANGED = 6
     const val LOOK_FROSTED = 0
     const val LOOK_SOLID = 1
     const val LOOK_COUNT = 2
@@ -65,6 +76,16 @@ object Prefs {
     var handleShape: Int
         get() = sp.getInt("handle_shape", SHAPE_HALF_SMALL)
         set(v) = sp.edit().putInt("handle_shape", v).apply()
+
+    /** The edge handle's usual colour: one of the COLOUR_ constants. */
+    var handleColour: Int
+        get() = sp.getInt("handle_colour", COLOUR_GREY)
+        set(v) = sp.edit().putInt("handle_colour", v).apply()
+
+    /** The edge handle's colour while anything is New: one of the NEW_ constants. */
+    var handleNewColour: Int
+        get() = sp.getInt("handle_new_colour", NEW_ACCENT)
+        set(v) = sp.edit().putInt("handle_new_colour", v).apply()
 
     /** The edge handle's style: one of the LOOK_ constants (subtle, bold, subtle with the New count). */
     var handleLook: Int

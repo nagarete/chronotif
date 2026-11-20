@@ -56,7 +56,7 @@ Opening the panel by swiping down on, or tapping, the notification side of the s
 _Avoid_: Top swipe, top-edge gesture
 
 **Edge handle**:
-A small handle on the side of the screen, in a shape and style the user picks, that works without the accessibility service. Tapping it or swiping down on it opens the Panel, and holding it opens Search. It is tinted while anything is New.
+A small handle on the side of the screen, in a shape and style the user picks, that works without the accessibility service. Tapping it or swiping down on it opens the Panel, and holding it opens Search. Unless the user turns it off, it is tinted while anything is New.
 _Avoid_: Edge bar, sidebar, handle strip
 
 **Search**:
