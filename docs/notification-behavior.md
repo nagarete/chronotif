@@ -69,7 +69,7 @@ The status-bar swipe brings the Panel down under the finger, like the system sha
 
 The header and dim show at once and the cards right after. A long list fills in from the top. Every open starts like a new one: cards collapsed, no reply box, scrolled to the top.
 
-Being on screen counts as a check once the Panel is fully open with its cards showing for about 1.5 seconds, or as soon as it's used. A pull that slides back is never a check, and the 1.5 seconds only start once the Panel has settled open.
+Being on screen counts as a check once the Panel's cards have shown for about 1.5 seconds and it has opened fully, or as soon as it's used. For a pull that opens, the 1.5 seconds count from when its cards first showed during the pull. A pull that slides back is never a check.
 
 ## Search
 

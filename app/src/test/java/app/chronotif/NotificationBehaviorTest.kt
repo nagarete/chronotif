@@ -932,25 +932,25 @@ class NotificationBehaviorTest {
     }
 
     @Test
-    fun aSettledPullIsACheckOnlyOnceItHasBeenOpenForAMoment() {
+    fun aPullThatOpensCountsFromWhenItsCardsFirstShowed() {
         post(notification("hi"), time = 1000)
         val before = Prefs.lastCheck
         withPanelView { panel ->
             panel.shown(pulling = true)
-            // A long pull before letting go doesn't count towards the moment.
-            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(3))
-            panel.settle()
-            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(500))
-            panel.dismissed()
-            assertEquals("Open only briefly", before, Prefs.lastCheck)
-            panel.shown(pulling = true)
             shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(100))
             assertTrue("The cards come in during the pull", texts(panel).any { "hi" in it })
             panel.settle()
-            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(2))
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(500))
+            panel.dismissed()
+            assertEquals("A glance shorter than a moment", before, Prefs.lastCheck)
+            // Pulled for a second before letting go: that second counts.
+            panel.shown(pulling = true)
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(1))
+            panel.settle()
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
             panel.dismissed()
         }
-        assertNotEquals("Open for a moment", before, Prefs.lastCheck)
+        assertNotEquals("On screen for a moment, and opened", before, Prefs.lastCheck)
     }
 
     // --- Panel header ---

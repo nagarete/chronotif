@@ -31,8 +31,9 @@ import kotlin.math.abs
  * interacting) counts as a meaningful check: on [dismissed], what was shown moves to EARLIER.
  *
  * The window, dim and header draw first; the cards are built right after that frame, so building
- * them never holds the panel back. A check counts from when the cards are on a panel that is fully
- * open: closing before then, or letting a status-bar pull slide back, is no check.
+ * them never holds the panel back. A check counts from when the cards first showed, once the panel
+ * has opened fully: closing before the cards show, or letting a status-bar pull slide back, is no
+ * check.
  *
  * [Panel] keeps one between opens, so the cards are already built; [reset] starts each open afresh.
  */
@@ -82,7 +83,10 @@ class PanelView(
     private var cardsAt = 0L
     /** Fully open; a status-bar pull still in progress isn't. */
     private var settled = false
-    /** When the cards were first on screen on a settled panel; 0 until then. A check counts from here. */
+    /**
+     * When the cards were first on screen, once the panel is settled open; 0 until then. A check
+     * counts from here, so a pull that opens counts from its cards showing during the pull.
+     */
     private var seenSince = 0L
     private var interacted = false
     private var closing = false
@@ -238,7 +242,7 @@ class PanelView(
     }
 
     private fun startSeen() {
-        if (settled && cardsAt != 0L && seenSince == 0L) seenSince = android.os.SystemClock.uptimeMillis()
+        if (settled && cardsAt != 0L && seenSince == 0L) seenSince = cardsAt
     }
 
     /** Ready to open again. A panel kept between opens starts each one the way a new one would. */
