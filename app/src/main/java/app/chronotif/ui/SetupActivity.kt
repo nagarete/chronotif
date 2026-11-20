@@ -170,6 +170,43 @@ class SetupActivity : Activity() {
             Prefs.handleRight = it == 1
             applyHandle()
         }
+        body.addView(text(getString(R.string.handle_shape), 15f), gap(12))
+        val shapes = listOf(
+            R.string.shape_half to Prefs.SHAPE_HALF_SMALL,
+            R.string.shape_half_large to Prefs.SHAPE_HALF_LARGE,
+            R.string.shape_tab to Prefs.SHAPE_TAB,
+            R.string.shape_circle to Prefs.SHAPE_CIRCLE,
+            R.string.shape_line to Prefs.SHAPE_LINE,
+        )
+        radios(shapes.map { it.first }, selected = shapes.indexOfFirst { it.second == Prefs.handleShape }, vertical = true) {
+            Prefs.handleShape = shapes[it].second
+            applyHandle()
+        }
+        body.addView(text(getString(R.string.handle_fill), 15f), gap(12))
+        val fills = listOf(
+            R.string.fill_frosted to Prefs.LOOK_FROSTED,
+            R.string.fill_solid to Prefs.LOOK_SOLID,
+            R.string.fill_count to Prefs.LOOK_COUNT,
+        )
+        radios(fills.map { it.first }, selected = fills.indexOfFirst { it.second == Prefs.handleLook }, vertical = true) {
+            Prefs.handleLook = fills[it].second
+            applyHandle()
+        }
+        body.addView(text(getString(R.string.fill_count_desc), 13f, secondary = true), gap(4))
+        body.addView(text(getString(R.string.handle_colour), 15f), gap(12))
+        radios(listOf(R.string.colour_grey, R.string.colour_white, R.string.colour_black), selected = Prefs.handleColour) {
+            Prefs.handleColour = it
+            applyHandle()
+        }
+        body.addView(text(getString(R.string.handle_new_colour), 15f), gap(12))
+        radios(
+            listOf(R.string.colour_accent, R.string.colour_blue, R.string.colour_green, R.string.colour_orange,
+                R.string.colour_red, R.string.colour_purple, R.string.colour_unchanged),
+            selected = Prefs.handleNewColour, vertical = true,
+        ) {
+            Prefs.handleNewColour = it
+            applyHandle()
+        }
         body.addView(text(getString(R.string.handle_position), 15f), gap(12))
         body.addView(SeekBar(this).apply {
             max = 100
