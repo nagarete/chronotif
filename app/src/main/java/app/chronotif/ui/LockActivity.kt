@@ -35,7 +35,6 @@ import android.window.OnBackInvokedDispatcher
 import app.chronotif.BuildConfig
 import app.chronotif.Entry
 import app.chronotif.LockSession
-import app.chronotif.NotifStore
 import app.chronotif.Prefs
 import app.chronotif.R
 import kotlin.math.abs
@@ -212,7 +211,7 @@ class LockActivity : Activity(), NotifList.Host {
             finish()
             return
         }
-        NotifStore.addListener(render)
+        list.source.addListener(render)
         list.render()
         // Seen long enough to count — committed only if the user goes on to unlock.
         main.postDelayed(markSeen, 1200)
@@ -220,7 +219,7 @@ class LockActivity : Activity(), NotifList.Host {
 
     override fun onPause() {
         super.onPause()
-        NotifStore.removeListener(render)
+        list.source.removeListener(render)
         main.removeCallbacks(markSeen)
         // Unlocked (any method) while we were up: what was shown has now been seen.
         if (!getSystemService(KeyguardManager::class.java).isKeyguardLocked) LockSession.unlocked()

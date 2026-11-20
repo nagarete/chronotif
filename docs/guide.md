@@ -338,6 +338,8 @@ next patch version before publishing more nightlies. v0.2.6 is the current stabl
 app/src/main/java/app/chronotif/
   core/Attention.kt     pure attention model: NEW/EARLIER split, stacks, arrival tracking (unit-tested)
   NotifStore.kt         in-memory mirror of active notifications
+  CardSource.kt         where the panel and lock-screen list get notifications, their last check,
+                        and send what the user does: the real ones, or made-up samples that never reach Android
   ListenerService.kt    the notification listener; screen on/off/unlock events
   EdgeHandle.kt         edge overlay
   PanelTile.kt          Quick Settings tile

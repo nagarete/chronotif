@@ -28,6 +28,13 @@ class Entry(
     val isSummary get() = n.flags and Notification.FLAG_GROUP_SUMMARY != 0
     /** Includes the system's auto-grouping, so its empty summaries can be hidden too. */
     val groupId: String? get() = if (sbn.isGroup) sbn.groupKey else null
+    /** A made-up notification Chronotif draws itself, as the Tutorial does: never Android's, so nothing acts on it there. */
+    val isSample: Boolean get() = pkg.startsWith(SAMPLE_PREFIX)
+
+    companion object {
+        /** The package prefix of made-up notifications; no installed app has it. */
+        const val SAMPLE_PREFIX = "app.chronotif.sample."
+    }
 }
 
 /**

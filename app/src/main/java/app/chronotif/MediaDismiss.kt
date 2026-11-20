@@ -56,6 +56,7 @@ object MediaDismiss {
      * Never send the old notification's deleteIntent after an app has replaced it.
      */
     internal fun dismiss(context: Context, entry: Entry, gateway: Gateway): Boolean {
+        if (entry.isSample) return false
         val live = gateway.current(entry.key) ?: return false
         if (live.kind != Kind.MEDIA || entry.kind != Kind.MEDIA) return false
         val token = mediaToken(live.n)

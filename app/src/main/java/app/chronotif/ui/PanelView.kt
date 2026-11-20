@@ -19,8 +19,7 @@ import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
-import app.chronotif.NotifStore
-import app.chronotif.Prefs
+import app.chronotif.CardSource
 import kotlin.math.abs
 
 /**
@@ -43,6 +42,8 @@ class PanelView(
     private val host: NotifList.Host,
     blur: Boolean,
     private val windowDims: Boolean = false,
+    /** Whose notifications the panel shows: the phone's, or the Tutorial's samples. */
+    source: CardSource = CardSource.Real,
     private val onClose: () -> Unit,
 ) : FrameLayout(context) {
 
@@ -183,7 +184,7 @@ class PanelView(
             if (ime.bottom > 0) scroll.post(::revealFocusedEditor)
             insets
         }
-        list = NotifList(host, content, onLock = false)
+        list = NotifList(host, content, onLock = false, source = source)
     }
 
     /** Scrolls the focused reply box above the keyboard; the scroll view's bottom padding is the keyboard. */
@@ -211,7 +212,7 @@ class PanelView(
         settled = !pulling
         // The header was filled when the panel was built. Its clock and date keep themselves
         // current, and a kept panel is dropped once settings change, so it needs no refill.
-        NotifStore.addListener(render)
+        list.source.addListener(render)
         afterNextFrame {
             if (!showing || cardsAt != 0L) return@afterNextFrame
             cardsAt = android.os.SystemClock.uptimeMillis()
@@ -302,7 +303,7 @@ class PanelView(
     /** The panel left the screen, by any route: stop following, and record the check. */
     fun dismissed() {
         showing = false
-        NotifStore.removeListener(render)
+        list.source.removeListener(render)
         main.removeCallbacks(ticker)
         // Coming back (the activity resuming) brings the cards up to date again.
         cardsAt = 0L
@@ -310,7 +311,7 @@ class PanelView(
         seenSince = 0L
         if (since == 0L) return
         if (interacted || android.os.SystemClock.uptimeMillis() - since >= CHECK_DWELL_MS) {
-            Prefs.markChecked(list.shownUpTo)
+            list.source.markChecked(list.shownUpTo)
         }
     }
 
