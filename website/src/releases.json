@@ -2,7 +2,9 @@
   "next": {
     "version": "0.2.7",
     "headline": "The panel comes down under your finger, and the edge handle is yours to shape.",
-    "notes": []
+    "notes": [
+      "The panel opens faster, most of all the first time after an update: the header is there at once and your notifications follow right after."
+    ]
   },
   "stable": [
     {

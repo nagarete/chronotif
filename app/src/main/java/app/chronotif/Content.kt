@@ -307,72 +307,143 @@ class Content(
     }
 }
 
-/** App labels and icons, cached; resolved locally via the package manager. */
+/**
+ * App labels and icons, cached; resolved locally via the package manager. Anything that has to
+ * read another app's files loads on a background [Lane], so drawing the panel never waits on
+ * it: a miss returns a placeholder (null, or an empty label) and the list redraws once the lane
+ * has caught up. [warm] loads them ahead of time, as notifications arrive.
+ */
 object Apps {
     private val labels = HashMap<String, CharSequence>()
-    private val icons = LruCache<String, Drawable>(48)
+    private val icons = LruCache<String, Drawable>(128)
     private val large = LruCache<String, Drawable>(48)
-    private val loading = HashSet<String>()
-    private val io = java.util.concurrent.Executors.newSingleThreadExecutor()
     private val main = android.os.Handler(android.os.Looper.getMainLooper())
 
-    fun label(context: Context, pkg: String): CharSequence = labels.getOrPut(pkg) {
-        val pm = context.packageManager
-        try {
-            pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0))
-        } catch (_: PackageManager.NameNotFoundException) {
-            pkg
+    /**
+     * One background thread whose results land on the main thread. Everything here is touched on
+     * the main thread only. The list redraws once the lane runs dry, so a burst of loads (the
+     * first panel after an update reads dozens of apps) redraws once rather than per app.
+     */
+    private class Lane(name: String) {
+        val looper: android.os.Looper = android.os.HandlerThread(name).apply { start() }.looper
+        private val handler = android.os.Handler(looper)
+        private val keys = HashSet<String>()
+
+        fun <T : Any> load(key: String, work: () -> T?, done: (T?) -> Unit) {
+            if (!keys.add(key)) return
+            handler.post {
+                val v = runCatching(work).getOrNull()
+                main.post {
+                    keys.remove(key)
+                    done(v)
+                    if (keys.isEmpty()) NotifStore.changed()
+                }
+            }
         }
     }
 
+    /** The package manager and app resources: labels, icons, large icons. */
+    private val apps = Lane("chronotif-apps")
+
+    /** Other apps' content, which can be slow: avatar URIs, custom layouts. Kept apart so it never holds up icons. */
+    private val content = Lane("chronotif-content")
+
+    /** For tests, which wait for the lanes to finish. */
+    internal val loopers get() = listOf(apps.looper, content.looper)
+
+    /** Starts loading what [entries] will need, so the panel finds it ready. */
+    fun warm(context: Context, entries: Collection<Entry>) {
+        for (e in entries) {
+            label(context, e.pkg)
+            icon(context, e)
+        }
+    }
+
+    /** The app's name, or an empty one while it loads. */
+    fun label(context: Context, pkg: String): CharSequence {
+        labels[pkg]?.let { return it }
+        val app = context.applicationContext
+        apps.load("l:$pkg", {
+            val pm = app.packageManager
+            try {
+                pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0))
+            } catch (_: PackageManager.NameNotFoundException) {
+                pkg
+            }
+        }) { labels[pkg] = it ?: pkg }
+        return ""
+    }
+
+    /** Apps with no icon to show, so a failed load isn't retried on every redraw. */
+    private val noIcon = HashSet<String>()
+
+    /** The app's icon, badged for a work profile, or null while it loads. */
     fun icon(context: Context, e: Entry): Drawable? {
         icons.get(e.appId)?.let { return it }
-        val pm = context.packageManager
-        val d = try {
-            val plain = pm.getApplicationIcon(e.pkg)
-            if (e.sbn.user == Process.myUserHandle()) plain
-            else runCatching { pm.getUserBadgedIcon(plain, e.sbn.user) }.getOrDefault(plain)
-        } catch (_: PackageManager.NameNotFoundException) {
-            runCatching { e.n.smallIcon?.loadDrawable(context) }.getOrNull()
-        } ?: return null
-        icons.put(e.appId, d)
-        return d
+        if (e.appId in noIcon) return null
+        val app = context.applicationContext
+        val pkg = e.pkg
+        val user = e.sbn.user
+        val small = e.n.smallIcon
+        apps.load("i:${e.appId}", {
+            val pm = app.packageManager
+            try {
+                val plain = pm.getApplicationIcon(pkg)
+                if (user == Process.myUserHandle()) plain
+                else runCatching { pm.getUserBadgedIcon(plain, user) }.getOrDefault(plain)
+            } catch (_: PackageManager.NameNotFoundException) {
+                small?.loadDrawable(app)
+            }
+        }) { d -> if (d != null) icons.put(e.appId, d) else remember(noIcon, e.appId) }
+        return null
     }
+
+    /** Keys whose large icon or avatar couldn't be loaded, so it isn't retried on every redraw. */
+    private val noLarge = HashSet<String>()
 
     /**
      * Contact photo / sender avatar etc. Keyed by post time so updates refresh it. With no large icon,
-     * the photo inside the app's custom layout stands in for it (see [customPicture]).
+     * the photo inside the app's custom layout stands in for it (see [customPicture]). A bitmap is
+     * already in memory; anything else (another app's resource, a URI) loads on [apps].
      */
     fun largeIcon(context: Context, e: Entry): Drawable? {
         val k = "${e.key}@${e.sbn.postTime}"
         large.get(k)?.let { return it }
-        val d = runCatching { e.n.getLargeIcon()?.loadDrawable(context) }.getOrNull()
-            ?: return customPicture(context, e, k)
-        large.put(k, d)
-        return d
+        val icon = e.n.getLargeIcon()
+        if (icon == null || k in noLarge) return customPicture(context, e, k)
+        if (icon.type == Icon.TYPE_BITMAP || icon.type == Icon.TYPE_ADAPTIVE_BITMAP) {
+            runCatching { icon.loadDrawable(context) }.getOrNull()?.let {
+                large.put(k, it)
+                return it
+            }
+            remember(noLarge, k)
+            return customPicture(context, e, k)
+        }
+        val app = context.applicationContext
+        apps.load(k, { icon.loadDrawable(app) }) { d -> if (d != null) large.put(k, d) else remember(noLarge, k) }
+        return null
     }
 
     /** Keys whose custom layout has been searched and held no picture. */
     private val noPicture = HashSet<String>()
 
+    /** Failure sets are keyed per post, so they're bounded rather than kept forever. */
+    private fun remember(set: HashSet<String>, k: String) {
+        if (set.size >= 512) set.clear()
+        set += k
+    }
+
     /**
      * The biggest photo inside a notification's custom layout. TikTok draws a LIVE host's profile
-     * photo only there, with no large icon. The layout is inflated once, on a later main-thread
-     * pass so binding a card never waits on it; the card redraws once the photo is in.
+     * photo only there, with no large icon. The layout is inflated once, on [content], so binding a
+     * card never waits on it; the card redraws once the photo is in.
      */
     private fun customPicture(context: Context, e: Entry, k: String): Drawable? {
         val rv = e.n.contentView ?: e.n.bigContentView ?: return null
-        if (k in noPicture || !loading.add(k)) return null
+        if (k in noPicture) return null
         val app = context.applicationContext
-        main.post {
-            loading.remove(k)
-            val d = runCatching { biggestPhoto(app, rv) }.getOrNull()
-            if (d == null) {
-                noPicture.add(k)
-            } else {
-                large.put(k, d)
-                NotifStore.changed()
-            }
+        content.load("p:$k", { biggestPhoto(app, rv) }) { d ->
+            if (d == null) remember(noPicture, k) else large.put(k, d)
         }
         return null
     }
@@ -407,31 +478,21 @@ object Apps {
 
     /**
      * The conversation's [Content.avatar], keyed by post time like [largeIcon]. A photo behind
-     * another app's content link loads off the main thread, which a slow app could otherwise
+     * another app's content link loads on [content], which a slow app could otherwise
      * freeze; the card redraws once it's in.
      */
     fun avatar(context: Context, e: Entry): Drawable? {
         val k = "a:${e.key}@${e.sbn.postTime}"
         large.get(k)?.let { return it }
+        if (k in noLarge) return null
         val icon = Content.avatar(e.n) ?: return null
         if (icon.type != Icon.TYPE_URI && icon.type != Icon.TYPE_URI_ADAPTIVE_BITMAP) {
             val d = runCatching { icon.loadDrawable(context) }.getOrNull() ?: return null
             large.put(k, d)
             return d
         }
-        if (loading.add(k)) {
-            val app = context.applicationContext
-            io.execute {
-                val d = runCatching { icon.loadDrawable(app) }.getOrNull()
-                main.post {
-                    loading.remove(k)
-                    if (d != null) {
-                        large.put(k, d)
-                        NotifStore.changed()
-                    }
-                }
-            }
-        }
+        val app = context.applicationContext
+        content.load(k, { icon.loadDrawable(app) }) { d -> if (d != null) large.put(k, d) else remember(noLarge, k) }
         return null
     }
 
