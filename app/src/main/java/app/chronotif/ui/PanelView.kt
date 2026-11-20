@@ -89,6 +89,10 @@ class PanelView(
      */
     private var seenSince = 0L
     private var interacted = false
+    /** Something covers the cards (What's new): the panel isn't seen, so nothing counts toward a check. */
+    private var held = false
+    /** What's new is looked for once per open, once the cards are on screen and the panel is open. */
+    private var whatsNewLooked = false
     private var closing = false
     private var blankDownX = 0f
     private var blankDownY = 0f
@@ -242,13 +246,39 @@ class PanelView(
     }
 
     private fun startSeen() {
+        if (held) return
         if (settled && cardsAt != 0L && seenSince == 0L) seenSince = cardsAt
+        whatsNew()
+    }
+
+    /**
+     * After an update, the first open shows What's new over the cards. While it does, the panel is
+     * held: closing then is no check, and the check counts from when the sheet goes, as if the
+     * panel had only just opened.
+     */
+    private fun whatsNew() {
+        if (whatsNewLooked || !settled || cardsAt == 0L) return
+        whatsNewLooked = true
+        val releases = WhatsNewSheet.pending(context) ?: return
+        held = true
+        seenSince = 0L
+        val shown = WhatsNewSheet.show(this, host, releases) {
+            held = false
+            interacted = false
+            if (showing && settled && cardsAt != 0L) seenSince = android.os.SystemClock.uptimeMillis()
+        }
+        if (!shown) {
+            held = false
+            startSeen()
+        }
     }
 
     /** Ready to open again. A panel kept between opens starts each one the way a new one would. */
     fun reset() {
         closing = false
         interacted = false
+        held = false
+        whatsNewLooked = false
         swallowGesture = false
         cardsAt = 0L
         seenSince = 0L
@@ -313,7 +343,7 @@ class PanelView(
         if (pull.onTouch(ev) { cancelChildren(ev) }) return true
         when (ev.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
-                interacted = true
+                if (!held) interacted = true
                 downX = ev.rawX
                 downY = ev.rawY
                 edgeSwipe = ev.x < dp(24) || ev.x > width - dp(24)

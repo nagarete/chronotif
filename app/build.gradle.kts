@@ -81,3 +81,33 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.robolectric:robolectric:4.17")
 }
+
+/**
+ * Bundles the website's release notes into the APK, so What's new can show them offline after an
+ * update. One file, website/src/releases.json, is the source for both.
+ */
+abstract class ReleaseNotesAsset : DefaultTask() {
+    @get:InputFile
+    @get:PathSensitive(PathSensitivity.NONE)
+    abstract val source: RegularFileProperty
+
+    @get:OutputDirectory
+    abstract val output: DirectoryProperty
+
+    @TaskAction
+    fun copy() {
+        val out = output.get().asFile
+        out.mkdirs()
+        source.get().asFile.copyTo(File(out, "releases.json"), overwrite = true)
+    }
+}
+
+val releaseNotesAsset = tasks.register<ReleaseNotesAsset>("releaseNotesAsset") {
+    source.set(rootProject.layout.projectDirectory.file("website/src/releases.json"))
+}
+
+androidComponents {
+    onVariants { variant ->
+        variant.sources.assets?.addGeneratedSourceDirectory(releaseNotesAsset, ReleaseNotesAsset::output)
+    }
+}

@@ -312,6 +312,10 @@ must be on main when the tag is pushed. A release video goes in `website/public/
 `release-<version>.mp4` with a `-poster.webp` beside it (see `website/video/README.md`); the
 entry shows it only once the file exists.
 
+The app bundles the same file and shows its notes as What's new after an update, one line at a
+time: a line added since the last build shows as new, and so does a reworded one. Reword a line
+only when it's worth showing again.
+
 To publish stable, push a tag matching `versionName`:
 
 ```sh

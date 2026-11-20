@@ -82,3 +82,7 @@ _Avoid_: Beta, preview, dev build
 **Release notes**:
 The plain-language account of what a Stable changed for the people using it, plus one entry for the next Stable while it is in Nightly. Changes that don't reach the app, such as website or build work, are left out.
 _Avoid_: Changelog, What's Changed (GitHub's generated list of pull requests)
+
+**What's new**:
+The sheet over the Panel's cards on its first open after an update, listing the Release notes not shown before. While it shows, the Panel isn't seen, so it counts toward no check.
+_Avoid_: Changelog, update dialog
