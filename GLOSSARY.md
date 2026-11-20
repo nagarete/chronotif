@@ -52,7 +52,7 @@ How the lock-screen view holds New at rest: below the clock, the newest card who
 _Avoid_: Stack (Conversation and App stacks), Peek, compact view
 
 **Media player**:
-A playback control for an app that is playing or paused, shown above everything else and never counted as New. A paused or stopped Media player may be swiped away using Android's normal cancellation for clearable notifications, or the sending app's deleteIntent for protected media. The player stays visible if no real dismissal occurs. Active playback cannot be dismissed.
+A playback control for an app that is playing or paused, shown above everything else and never counted as New. On the lock-screen view at rest, the newest one shows its artwork large above it (ADR 0012). A paused or stopped Media player may be swiped away using Android's normal cancellation for clearable notifications, or the sending app's deleteIntent for protected media. The player stays visible if no real dismissal occurs. Active playback cannot be dismissed.
 _Avoid_: Now playing card
 
 **Running**:

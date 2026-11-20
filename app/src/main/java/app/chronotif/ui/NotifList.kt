@@ -79,6 +79,25 @@ class NotifList(
             views["sp"]?.let { it.layoutParams = LinearLayout.LayoutParams(-1, v) }
         }
 
+    /**
+     * Lock screen only: room above the newest Media player for its artwork, shown large while the
+     * list rests (ADR 0012). The lock-screen view sizes it; 0 when there is no artwork to show.
+     */
+    var artRoom = 0
+        set(v) {
+            if (field == v) return
+            field = v
+            views["art"]?.let { it.layoutParams = LinearLayout.LayoutParams(-1, v) }
+        }
+
+    /** The row [artRoom] sizes. */
+    val artRow: View? get() = views["art"]?.takeIf { it.parent === container }
+
+    /** The player whose artwork shows large: the newest one, on the lock screen, with no call going. */
+    val featured: MediaPlayerView?
+        get() = (featuredId?.let { views[it] } as? MediaPlayerView)?.takeIf { it.parent === container }
+    private var featuredId: String? = null
+
     /** The row [gap] sizes; the rows after it are the list the Pile unfolds into. */
     val spacer: View? get() = views["sp"]?.takeIf { it.parent === container }
 
@@ -201,6 +220,11 @@ class NotifList(
 
         // Live state first, like the system shade: calls, then media players.
         s.calls.forEach { card(it, CardView.Style.FULL) }
+        featuredId = null
+        if (onLock && s.calls.isEmpty() && s.media.isNotEmpty() && !redacted(s.media[0])) {
+            featuredId = "mp:${s.media[0].key}"
+            rows += Row("art", { View(ctx) }) { v -> v.layoutParams = LinearLayout.LayoutParams(-1, artRoom) }
+        }
         s.media.forEach { player(it) }
         // On the lock screen, the clock's room: the rest of the list unfolds from the Pile below it.
         if (onLock) rows += Row("sp", { View(ctx) }) { v -> v.layoutParams = LinearLayout.LayoutParams(-1, gap) }

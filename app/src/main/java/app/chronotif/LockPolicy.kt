@@ -49,11 +49,31 @@ object LockPolicy {
         if (busy(context)) return false
 
         val lastCheck = Prefs.lastCheck
-        // Calls, media and running work never bring the view up on their own.
+        // Playing media brings the view up, to show its artwork and controls (ADR 0012).
+        // Paused players don't: apps leave them around for hours.
+        if (NotifStore.visible().any { it.kind == Kind.MEDIA && playing(context, it) && visibility(context, it) != Vis.HIDE }) return true
+        // Calls and running work never bring the view up on their own.
         val shown = NotifStore.visible().filter { it.kind == Kind.NOTIFICATION && visibility(context, it) != Vis.HIDE }
         return when (mode) {
             Prefs.LOCK_ALWAYS -> shown.isNotEmpty()
             else -> shown.any { Attention.isNew(it, lastCheck) }
+        }
+    }
+
+    /**
+     * Whether a Media player is playing. Its session says so when it shares one; otherwise the
+     * ongoing flag does, which players drop when paused.
+     */
+    internal fun playing(context: Context, e: Entry): Boolean {
+        val state = MediaDismiss.mediaToken(e.n)?.let { token ->
+            runCatching { android.media.session.MediaController(context.applicationContext, token).playbackState?.state }.getOrNull()
+        }
+        return when (state) {
+            null -> e.n.flags and Notification.FLAG_ONGOING_EVENT != 0
+            android.media.session.PlaybackState.STATE_PLAYING,
+            android.media.session.PlaybackState.STATE_BUFFERING,
+            android.media.session.PlaybackState.STATE_CONNECTING -> true
+            else -> false
         }
     }
 
