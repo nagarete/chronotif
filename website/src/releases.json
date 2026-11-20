@@ -24,7 +24,8 @@
       "More works on the lock screen without unlocking: reply right there, use a notification's buttons that don't open the app, see Running, and find contacts and events in Search. Turn on Hide sensitive content to keep contacts and events behind the unlock. Opening an app still asks to unlock.",
       "Double-tap an empty part of the lock screen to turn the screen off, as on your phone's own lock screen. It goes black at once and the phone sleeps a few seconds later. Settings → Lock screen → Double-tap to sleep switches the double tap off.",
       "On the lock screen, tap the clock to open your alarms or the date to open your calendar, as in the panel. Both ask you to unlock first.",
-      "New installs show Chronotif on the lock screen whenever there are notifications, and Search converts currencies without asking first. If you're updating, your settings stay as they were."
+      "New installs show Chronotif on the lock screen whenever there are notifications, and Search converts currencies without asking first. If you're updating, your settings stay as they were.",
+      "Settings → Search starts with a checklist, like General: let Search find contacts and calendar events, place calls and convert currencies, and add its widget to your home screen. Say Not now to any of them; the Search tile is there too if you want it."
     ],
     "video": {
       "src": "/video/release-0.2.7.mp4",

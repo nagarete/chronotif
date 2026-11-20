@@ -280,6 +280,16 @@ object Prefs {
         get() = sp.getBoolean("search_calendar", false)
         set(v) = sp.edit().putBoolean("search_calendar", v).apply()
 
+    /** Search checklist steps the user said Not now to, by [SearchSetup.Step] name. */
+    var searchSetupSkipped: Set<String>
+        get() = sp.getStringSet("search_setup_skipped", null).orEmpty().toSet()
+        set(v) = sp.edit().putStringSet("search_setup_skipped", v).apply()
+
+    /** Whether the Search tile is in Quick Settings, as far as Android has told the tile. */
+    var searchTileAdded: Boolean
+        get() = sp.getBoolean("search_tile_added", false)
+        set(v) = sp.edit().putBoolean("search_tile_added", v).apply()
+
     /**
      * When each app last notified, for Search's suggestion row: app id (package|user) to
      * arrival time. Times only, never content, and only the most recent few apps are kept.

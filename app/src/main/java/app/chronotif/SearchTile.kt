@@ -10,6 +10,19 @@ import app.chronotif.ui.SearchActivity
 
 /** A Quick Settings tile that opens Search (ADR 0008). On the lock screen, Search itself asks to unlock before opening anything. */
 class SearchTile : TileService() {
+    // Remembered for the Search checklist, which offers to add the tile. Listening means it's in Quick Settings.
+    override fun onTileAdded() {
+        Prefs.searchTileAdded = true
+    }
+
+    override fun onTileRemoved() {
+        Prefs.searchTileAdded = false
+    }
+
+    override fun onStartListening() {
+        Prefs.searchTileAdded = true
+    }
+
     @SuppressLint("StartActivityAndCollapseDeprecated")
     @Suppress("DEPRECATION")
     override fun onClick() {

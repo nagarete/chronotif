@@ -125,6 +125,27 @@
     <string name="handle_look">Look</string>
     <string name="handle_colours">Colour</string>
     <string name="handle_placement">Placement</string>
+    <string name="search_setup">Set up Search</string>
+    <string name="search_setup_next">Next: %1$s</string>
+    <string name="search_setup_done">Each step is on or put off. The switches below change any of it.</string>
+    <string name="search_setup_contacts_desc">Find people by name, with buttons to call or message them.</string>
+    <string name="search_setup_calls_desc">A contact\'s call button places the call, on WhatsApp when they use it, instead of opening the dialer.</string>
+    <string name="search_setup_currency_desc">Convert money with the European Central Bank\'s daily rates, downloaded when you type a currency. Nothing you type is sent.</string>
+    <string name="search_setup_calendar_desc">Find your events by name, from the past month to a year ahead.</string>
+    <string name="search_setup_widget">Add the Search widget</string>
+    <string name="search_setup_widget_desc">A search bar on your home screen, one tap from Search.</string>
+    <string name="search_setup_widget_manual">Your home screen doesn\'t let apps add widgets. Touch and hold an empty spot on it, open Widgets and find Chronotif.</string>
+    <string name="search_setup_tile">Add the Search tile</string>
+    <string name="search_setup_tile_desc">Open Search from Quick Settings.</string>
+    <string name="search_setup_tile_manual">Open Quick Settings, tap the pencil to edit them, and drag Chronotif Search in.</string>
+    <string name="search_setup_optional">Optional. %1$s</string>
+    <string name="search_setup_on">On</string>
+    <string name="search_setup_added">Added</string>
+    <string name="search_setup_skipped">Not now. Turn it on below whenever you like.</string>
+    <string name="search_setup_skipped_widget">Not now. Add it here whenever you like.</string>
+    <string name="turn_on">Turn on</string>
+    <string name="add">Add</string>
+    <string name="not_now">Not now</string>
     <string name="search_finds">What Search finds</string>
     <string name="setup_progress_count">%1$d/%2$d</string>
 

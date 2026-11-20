@@ -40,6 +40,7 @@ import app.chronotif.ListenerService
 import app.chronotif.PanelTile
 import app.chronotif.Prefs
 import app.chronotif.R
+import app.chronotif.SearchSetup
 import app.chronotif.StatusBarSwipe
 import app.chronotif.Updater
 import app.chronotif.core.SettingMatch
@@ -52,7 +53,7 @@ import kotlin.math.abs
  * the last section, or on General while a permission is missing.
  *
  * The look is Material 3: settings sit in rows joined into rounded groups, in colours taken from
- * the wallpaper ([M3]). General starts with the setup checklist.
+ * the wallpaper ([M3]). General starts with the setup checklist, and Search with its own ([SearchSetup]).
  */
 @Suppress("SetTextI18n")
 class SetupActivity : Activity() {
@@ -360,7 +361,11 @@ class SetupActivity : Activity() {
     private fun drawerRow(s: Section): View {
         val on = s == current
         val tint = if (on) c.onPrimaryContainer else c.textSecondary
-        val missing = if (s == Section.GENERAL) setupSteps - stepsDone() else 0
+        val missing = when (s) {
+            Section.GENERAL -> setupSteps - stepsDone()
+            Section.SEARCH -> SearchSetup.left(this)
+            else -> 0
+        }
         return LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -505,7 +510,17 @@ class SetupActivity : Activity() {
     }
 
     /** How much of setup is left, in words, with a ring; "All set" once nothing is. */
-    private fun progressCard() {
+    private fun progressCard() = progressCard({ stepsDone() }, setupSteps) {
+        getString(when {
+            !ListenerService.isEnabled(this) -> R.string.setup_next_listener
+            disconnected() -> R.string.setup_next_reconnect
+            !Settings.canDrawOverlays(this) -> R.string.setup_next_overlay
+            else -> R.string.setup_done_desc
+        })
+    }
+
+    /** A checklist's card: [done] of [total] on a ring, the steps left (or "All set"), and [next] under them. */
+    private fun progressCard(done: () -> Int, total: Int, next: () -> String) {
         val ring = ProgressRing(this)
         val title = text("", 17f, weight = 600).apply { setTextColor(c.onPrimaryContainer) }
         val desc = text("", 13.5f).apply { setTextColor(c.onPrimaryContainer); alpha = 0.85f }
@@ -522,17 +537,12 @@ class SetupActivity : Activity() {
             }, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(16) })
         }, gap(16))
         refreshers += {
-            val done = stepsDone()
-            val left = setupSteps - done
-            ring.set(done, setupSteps, c.onPrimaryContainer)
+            val n = done()
+            val left = total - n
+            ring.set(n, total, c.onPrimaryContainer)
             title.text = if (left == 0) getString(R.string.setup_all_set)
             else resources.getQuantityString(R.plurals.setup_steps_left, left, left)
-            desc.text = getString(when {
-                !ListenerService.isEnabled(this) -> R.string.setup_next_listener
-                disconnected() -> R.string.setup_next_reconnect
-                !Settings.canDrawOverlays(this) -> R.string.setup_next_overlay
-                else -> R.string.setup_done_desc
-            })
+            desc.text = next()
         }
     }
 
@@ -667,6 +677,7 @@ class SetupActivity : Activity() {
     }
 
     private fun search() {
+        searchChecklist()
         group {
             toggle(R.string.search_pull_down, R.string.search_pull_down_desc, { Prefs.pullDownSearch }) {
                 Prefs.pullDownSearch = it
@@ -870,6 +881,8 @@ class SetupActivity : Activity() {
         R.string.lock_mode to "lockscreen keyguard",
         R.string.lock_privacy to "private hide privacy",
         R.string.lock_double_tap to "screen off turn off gesture wake",
+        R.string.search_setup_widget to "home screen bar launcher",
+        R.string.search_setup_tile to "quick settings",
         R.string.search_engine to "google duckduckgo bing brave web browser",
         R.string.update_auto to "upgrade install",
         R.string.update_channel_label to "beta nightly stable",
@@ -1333,32 +1346,186 @@ class SetupActivity : Activity() {
             changed()
             renderDrawer()
         }
+        // Kept in step with the setting, which a checklist step above may change, or a permission taken away.
+        refreshers += { if (sw.isChecked != value()) sw.setChecked(value(), animate = true) }
         return sw
     }
 
-    /** Switches waiting on a permission answer, by request code. */
-    private val pendingPermission = HashMap<Int, Pair<M3Switch, (Boolean) -> Unit>>()
+    // --- Search's checklist ([SearchSetup]).
+
+    /** Search's card and steps: what it can do once allowed, its widget, and the tile as an extra. */
+    private fun searchChecklist() {
+        val counted = SearchSetup.counted
+        progressCard({ counted.size - SearchSetup.left(this) }, counted.size) {
+            SearchSetup.next(this)?.let { getString(R.string.search_setup_next, getString(stepTitle(it))) }
+                ?: getString(R.string.search_setup_done)
+        }
+        group(R.string.search_setup) {
+            searchStep(SearchSetup.Step.CONTACTS, R.string.search_setup_contacts_desc, R.string.allow,
+                permissionRequest(android.Manifest.permission.READ_CONTACTS) { Prefs.searchContacts = it })
+            searchStep(SearchSetup.Step.CALLS, R.string.search_setup_calls_desc, R.string.allow,
+                permissionRequest(android.Manifest.permission.CALL_PHONE) { Prefs.searchCalls = it })
+            searchStep(SearchSetup.Step.CURRENCY, R.string.search_setup_currency_desc, R.string.turn_on, onAct = {
+                Prefs.currencyRates = true
+                refreshAll()
+            })
+            searchStep(SearchSetup.Step.CALENDAR, R.string.search_setup_calendar_desc, R.string.allow,
+                permissionRequest(android.Manifest.permission.READ_CALENDAR) { Prefs.searchCalendar = it })
+            searchStep(SearchSetup.Step.WIDGET, R.string.search_setup_widget_desc, R.string.add, ::addSearchWidget,
+                hint = { getString(R.string.search_setup_widget_manual).takeUnless { canPinWidget() } })
+            searchStep(SearchSetup.Step.TILE, R.string.search_setup_tile_desc, R.string.add, ::addSearchTile,
+                hint = { getString(R.string.search_setup_tile_manual).takeIf { Build.VERSION.SDK_INT < 33 } })
+        }
+    }
+
+    private fun stepTitle(step: SearchSetup.Step) = when (step) {
+        SearchSetup.Step.CONTACTS -> R.string.search_find_contacts
+        SearchSetup.Step.CALLS -> R.string.search_calls
+        SearchSetup.Step.CURRENCY -> R.string.search_currency_rates
+        SearchSetup.Step.CALENDAR -> R.string.search_find_calendar
+        SearchSetup.Step.WIDGET -> R.string.search_setup_widget
+        SearchSetup.Step.TILE -> R.string.search_setup_tile
+    }
+
+    /**
+     * One step of Search's checklist: a mark, its name and what it does, then [act] (Allow, Turn on
+     * or Add) and Not now. Done, it shows a check and no buttons; put off, it keeps [act] so the
+     * user can still do it here. The optional tile has no Not now and never counts. When the
+     * step's own button can't work, [hint] says how to do it by hand.
+     */
+    private fun searchStep(step: SearchSetup.Step, desc: Int, act: Int, onAct: () -> Unit, hint: () -> String? = { null }) {
+        val title = stepTitle(step)
+        val mark = ImageView(this).apply { scaleType = ImageView.ScaleType.CENTER }
+        val descView = text("", 13.5f, secondary = true)
+        val hintView = text("", 13f, secondary = true)
+        val action = button(getString(act), filled = true, onAct)
+        val notNow = button(getString(R.string.not_now), filled = false) {
+            SearchSetup.skip(step)
+            refreshAll()
+        }
+        val buttons = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            addView(action, LinearLayout.LayoutParams(-2, -2))
+            if (step.counted) addView(notNow, LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(8) })
+        }
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(16), dp(14), dp(18), dp(14))
+            tag = title
+            addView(mark, LinearLayout.LayoutParams(dp(28), dp(28)).apply { topMargin = dp(1) })
+            addView(LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                addView(text(getString(title), 16f, weight = 500))
+                addView(descView, gap(3))
+                addView(hintView, gap(6))
+                addView(buttons, gap(12))
+            }, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(14) })
+        }
+        target.addView(row, Ui.lp())
+        // The widget and the tile have no switch below, so search finds them here.
+        if (step == SearchSetup.Step.WIDGET || step == SearchSetup.Step.TILE) indexed(title, getString(desc), row)
+        refreshers += {
+            val done = SearchSetup.done(this, step)
+            val skipped = !done && SearchSetup.skipped(step)
+            mark.background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                when {
+                    done -> setColor(c.goodContainer)
+                    skipped -> setColor(c.highest)
+                    else -> setStroke(dp(2), c.outline)
+                }
+            }
+            mark.setImageResource(if (done) R.drawable.ic_check else 0)
+            mark.imageTintList = ColorStateList.valueOf(c.good)
+            val placed = step == SearchSetup.Step.WIDGET || step == SearchSetup.Step.TILE
+            descView.text = when {
+                done -> getString(if (placed) R.string.search_setup_added else R.string.search_setup_on)
+                skipped -> getString(if (placed) R.string.search_setup_skipped_widget else R.string.search_setup_skipped)
+                step.counted -> getString(desc)
+                else -> getString(R.string.search_setup_optional, getString(desc))
+            }
+            descView.setTextColor(if (done) c.good else c.textSecondary)
+            val h = if (done) null else hint()
+            hintView.text = h
+            hintView.visibility = if (h == null) View.GONE else View.VISIBLE
+            // A button that can't work is left out; the hint says what to do instead.
+            action.visibility = if (h == null) View.VISIBLE else View.GONE
+            notNow.visibility = if (skipped || !step.counted) View.GONE else View.VISIBLE
+            buttons.visibility = if (done || (action.visibility == View.GONE && notNow.visibility == View.GONE)) View.GONE
+            else View.VISIBLE
+        }
+    }
+
+    private fun canPinWidget() = android.appwidget.AppWidgetManager.getInstance(this)?.isRequestPinAppWidgetSupported == true
+
+    /** Asks the home screen to place the Search bar; back here, the step shows whether it did. */
+    private fun addSearchWidget() {
+        if (!canPinWidget()) return
+        android.appwidget.AppWidgetManager.getInstance(this)
+            .requestPinAppWidget(ComponentName(this, app.chronotif.SearchWidget::class.java), null, null)
+    }
+
+    /** Asks Android (13 and newer) to add the Search tile to Quick Settings. */
+    private fun addSearchTile() {
+        if (Build.VERSION.SDK_INT < 33) return
+        getSystemService(android.app.StatusBarManager::class.java).requestAddTileService(
+            ComponentName(this, app.chronotif.SearchTile::class.java),
+            getString(R.string.search_tile_label),
+            android.graphics.drawable.Icon.createWithResource(this, R.drawable.ic_search),
+            mainExecutor,
+        ) { result ->
+            if (result == android.app.StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ADDED ||
+                result == android.app.StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ALREADY_ADDED) {
+                Prefs.searchTileAdded = true
+            }
+            refreshAll()
+        }
+    }
+
+    /** What to do with a permission answer, by request code: a switch or a checklist step waits on each. */
+    private val pendingPermission = HashMap<Int, (Boolean) -> Unit>()
+
+    private fun granted(permission: String) =
+        checkSelfPermission(permission) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+    /**
+     * Turns on what needs [permission]: at once if it's granted, otherwise after Android asks and
+     * the user allows it. [set] gets the answer.
+     */
+    private fun permissionRequest(permission: String, set: (Boolean) -> Unit): () -> Unit {
+        val code = REQUEST_SEARCH_PERMISSION + pendingPermission.size
+        pendingPermission[code] = set
+        return {
+            if (!granted(permission)) {
+                requestPermissions(arrayOf(permission), code)
+            } else {
+                set(true)
+                refreshAll()
+            }
+        }
+    }
 
     /**
      * A switch that needs [permission] (ADR 0008): turning it on asks for it, and it stays on only
      * if granted. Once Android stops asking, the switch points to the app's permission page.
      */
     private fun permissionToggle(title: Int, desc: Int, permission: String, value: () -> Boolean, set: (Boolean) -> Unit) {
-        val code = REQUEST_SEARCH_PERMISSION + pendingPermission.size
-        val granted = { checkSelfPermission(permission) == android.content.pm.PackageManager.PERMISSION_GRANTED }
-        val s = toggle(title, desc, { value() && granted() }) { on ->
-            if (!on || granted()) return@toggle set(on)
-            requestPermissions(arrayOf(permission), code)
+        lateinit var s: M3Switch
+        val ask = permissionRequest(permission) { granted ->
+            set(granted)
+            s.setChecked(granted, animate = true)
         }
-        pendingPermission[code] = s to set
+        s = toggle(title, desc, { value() && granted(permission) }) { on ->
+            if (!on || granted(permission)) set(on) else ask()
+        }
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        val (s, set) = pendingPermission[requestCode] ?: return
+        val answer = pendingPermission[requestCode] ?: return
         val granted = grantResults.firstOrNull() == android.content.pm.PackageManager.PERMISSION_GRANTED
-        set(granted)
-        s.setChecked(granted, animate = true)
+        answer(granted)
+        refreshAll()
         if (!granted && permissions.firstOrNull()?.let(::shouldShowRequestPermissionRationale) == false) {
             android.widget.Toast.makeText(this, R.string.search_permission_denied, android.widget.Toast.LENGTH_LONG).show()
             open(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
