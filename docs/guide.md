@@ -204,8 +204,8 @@ To open Chronotif in fullscreen, use the Quick Settings tile, or turn off the ed
   screen's short timeout, not the device's longer display timeout. Double-tap empty space to turn
   the screen off: it goes black at once and the display sleeps a few seconds later (ADR 0014).
   Tap the clock for your alarms or the date for your calendar; both ask you to unlock first.
-  *Settings → Lock screen* chooses Off / *When something is new* (default) /
-  *Whenever there are notifications*, and *Double-tap to sleep* (on by default) turns the
+  *Settings → Lock screen* chooses Off / *When something is new* /
+  *Whenever there are notifications* (default; installs from before 0.2.7 keep *When something is new*), and *Double-tap to sleep* (on by default) turns the
   double tap off.
 - **Search**: find and open apps, do quick math, convert units, check the time in another city,
   convert currencies, find a contact or calendar event, jump to a Settings page, or hand anything else to your browser, all without the accessibility
@@ -214,7 +214,7 @@ To open Chronotif in fullscreen, use the Quick Settings tile, or turn off the ed
   *Search*. Before you type, it suggests the four apps that notified most recently. Tap an answer
   to copy it. On the lock screen, opening anything asks you to unlock first, and contacts and
   events stay hidden until you do. *Settings → Search* turns the pull-down off, picks the web
-  search engine, and turns on currency rates, contacts, calendar events and calling from Search, each off until you allow it.
+  search engine, turns currency rates off (on for new installs, off for installs from before 0.2.7 until turned on), and turns on contacts, calendar events and calling from Search, each off until you allow it.
 - **Header**: the clock and date at the top of the panel, with a settings gear at the end. Tap the
   clock to open your alarms, the date to open your calendar, or the gear to open Android's
   Settings; tapping elsewhere in the header closes the panel.
@@ -343,7 +343,7 @@ app/src/main/java/app/chronotif/
   Content.kt            extracting text/messages/pictures from notifications; app labels & icons
   Act.kt                open / dismiss / action / inline reply
   Updater.kt            opt-in self-update from GitHub Releases (network code)
-  ExchangeRates.kt      opt-in ECB daily rates for Search's currency (the other network code);
+  ExchangeRates.kt      ECB daily rates for Search's currency, on by default (the other network code);
                         res/xml/network_security_config.xml trusts the ECB's root on older Androids
   core/Version.kt       version comparison and checksum parsing (unit-tested)
   ui/NotifList.kt       renders sections with keyed view reuse (shared by panel and lock view)

@@ -36,7 +36,32 @@ object Prefs {
 
     fun init(context: Context) {
         sp = context.applicationContext.getSharedPreferences("chronotif", Context.MODE_PRIVATE)
+        keepOldDefaults(context)
     }
+
+    /**
+     * Two defaults changed in 0.2.7: the lock-screen view shows whenever there are notifications,
+     * and Search's currency rates are on (ADR 0015). An install from before keeps what it had: its
+     * first start after the update writes the old default into each of these it never set. A new
+     * install, with nothing saved yet, gets the new ones. Runs once.
+     */
+    private fun keepOldDefaults(context: Context) {
+        if (sp.getBoolean(DEFAULTS_SETTLED, false)) return
+        val info = try {
+            context.packageManager.getPackageInfo(context.packageName, 0)
+        } catch (_: android.content.pm.PackageManager.NameNotFoundException) {
+            null
+        }
+        val updated = info != null && info.firstInstallTime != info.lastUpdateTime
+        val edit = sp.edit()
+        if (updated || sp.all.isNotEmpty()) {
+            if (!sp.contains("lock_mode")) edit.putInt("lock_mode", LOCK_WHEN_NEW)
+            if (!sp.contains("currency_rates")) edit.putBoolean("currency_rates", false)
+        }
+        edit.putBoolean(DEFAULTS_SETTLED, true).apply()
+    }
+
+    private const val DEFAULTS_SETTLED = "defaults_0_2_7"
 
     /** Wall-clock time up to which the user has seen notifications. */
     val lastCheck: Long get() = sp.getLong("last_check", 0L)
@@ -154,8 +179,9 @@ object Prefs {
         get() = sp.getBoolean("handle_hide_landscape", true)
         set(v) = sp.edit().putBoolean("handle_hide_landscape", v).apply()
 
+    /** When the lock-screen view shows. Whenever there are notifications, unless the install predates 0.2.7. */
     var lockMode: Int
-        get() = sp.getInt("lock_mode", LOCK_WHEN_NEW)
+        get() = sp.getInt("lock_mode", LOCK_ALWAYS)
         set(v) = sp.edit().putInt("lock_mode", v).apply()
 
     var lockHideContent: Boolean
@@ -232,9 +258,12 @@ object Prefs {
         get() = sp.getBoolean("search_calls", false)
         set(v) = sp.edit().putBoolean("search_calls", v).apply()
 
-    /** Search converts currencies with the ECB's daily rates. Off until turned on: it's a download. */
+    /**
+     * Search converts currencies with the ECB's daily rates, downloaded when a currency is typed.
+     * On, unless the install predates 0.2.7, when it was opt-in (ADR 0015).
+     */
     var currencyRates: Boolean
-        get() = sp.getBoolean("currency_rates", false)
+        get() = sp.getBoolean("currency_rates", true)
         set(v) = sp.edit().putBoolean("currency_rates", v).apply()
 
     /** The last downloaded rates, in [app.chronotif.core.Money.encode]'s form. */
