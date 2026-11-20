@@ -55,6 +55,18 @@ object Act {
         return send(context, a.actionIntent, fill)
     }
 
+    /**
+     * Whether [a] has to wait for an unlock on the lock screen: when the app asks for that, or
+     * when it brings up an activity, which Android can't show over the keyguard. A reply or a
+     * button that works in the background runs right away (ADR 0013).
+     */
+    fun needsUnlock(a: Notification.Action): Boolean {
+        if (Build.VERSION.SDK_INT < 31) return replyInput(a) == null
+        if (a.isAuthenticationRequired) return true
+        val pi = a.actionIntent ?: return false
+        return replyInput(a) == null && pi.isActivity
+    }
+
     fun replyInput(a: Notification.Action): RemoteInput? =
         a.remoteInputs?.firstOrNull { it.allowFreeFormInput }
 

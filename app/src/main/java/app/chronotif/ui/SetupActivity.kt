@@ -42,10 +42,11 @@ import app.chronotif.Updater
 import kotlin.math.abs
 
 /**
- * Setup and settings, not needed in daily use. A sidebar lists the sections, each with a summary of
- * its settings, and each section is its own page. On a narrow screen the sidebar collapses to its
- * icons beside the page and expands over it; on a wide one it stays open beside the page. Settings
- * reopen on the last section, or on General while a permission is missing.
+ * Setup and settings, not needed in daily use. Each section is its own page, and a drawer lists the
+ * sections, a row each with its icon and a summary of its settings. On a narrow screen the page has
+ * the full width and the drawer slides in over it from the menu button; on a wide one the drawer
+ * stays open beside the page. Settings reopen on the last section, or on General while a permission
+ * is missing.
  */
 @Suppress("SetTextI18n")
 class SetupActivity : Activity() {
@@ -65,13 +66,14 @@ class SetupActivity : Activity() {
     /** The open section's page content. */
     private lateinit var body: LinearLayout
     private lateinit var page: ScrollView
-    /** The collapsed sidebar: the sections' icons. */
-    private lateinit var rail: LinearLayout
-    /** The expanded sidebar: a card per section. */
-    private lateinit var side: View
-    private lateinit var cards: LinearLayout
+    /** Above the page: the open section's name, after the menu button. */
+    private lateinit var pageTitle: TextView
+    /** The sections, full height: over the page on a narrow screen, beside it on a wide one. */
+    private lateinit var drawer: View
+    private lateinit var rows: LinearLayout
+    private var drawerWidth = 0
     private var scrim: View? = null
-    /** Wide enough for the expanded sidebar to sit beside the page rather than over it. */
+    /** Wide enough for the drawer to stay beside the page rather than over it. */
     private var wide = false
     private var expanded = false
     private var current = Section.GENERAL
@@ -98,31 +100,39 @@ class SetupActivity : Activity() {
         wide = resources.configuration.screenWidthDp >= 600
         body = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(16), dp(12), dp(16), dp(32))
+            setPadding(dp(16), dp(4), dp(16), dp(32))
         }
         page = ScrollView(this).apply { addView(body) }
-        rail = LinearLayout(this).apply {
+        pageTitle = text("", 20f, bold = true).apply {
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
+        }
+        val bar = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(if (wide) 16 else 6), dp(6), dp(16), dp(6))
+            if (!wide) addView(menuButton(), LinearLayout.LayoutParams(dp(48), dp(48)).apply { marginEnd = dp(6) })
+            addView(pageTitle, LinearLayout.LayoutParams(0, dp(48), 1f))
+        }
+        pageTitle.gravity = Gravity.CENTER_VERTICAL
+        val main = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(0, dp(8), 0, dp(12))
+            addView(bar, Ui.lp())
+            addView(page, LinearLayout.LayoutParams(-1, 0, 1f))
         }
-        cards = LinearLayout(this).apply {
+        rows = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(10), dp(8), dp(10), dp(16))
+            setPadding(0, dp(8), 0, dp(16))
         }
-        val railScroll = Swipes(this, onRight = { expand(true) }, onLeft = {}).apply {
+        drawer = Swipes(this, onRight = {}, onLeft = { if (!wide) expand(false) }).apply {
             setBackgroundColor(sideBg)
-            addView(ScrollView(context).apply { isVerticalScrollBarEnabled = false; addView(rail) })
-        }
-        side = Swipes(this, onRight = {}, onLeft = { if (!wide) expand(false) }).apply {
-            setBackgroundColor(sideBg)
-            addView(ScrollView(context).apply { addView(cards) })
-            elevation = if (wide) 0f else dp(8).toFloat()
+            addView(ScrollView(context).apply { isVerticalScrollBarEnabled = false; addView(rows) })
+            elevation = if (wide) 0f else dp(16).toFloat()
         }
         val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        row.addView(railScroll, LinearLayout.LayoutParams(dp(64), -1))
-        if (wide) row.addView(side, LinearLayout.LayoutParams(dp(290), -1))
-        row.addView(page, LinearLayout.LayoutParams(0, -1, 1f))
+        drawerWidth = if (wide) dp(300) else minOf(dp(340), (resources.displayMetrics.widthPixels * 0.82f).toInt())
+        if (wide) row.addView(drawer, LinearLayout.LayoutParams(drawerWidth, -1))
+        row.addView(main, LinearLayout.LayoutParams(0, -1, 1f))
         val root = FrameLayout(this)
         root.addView(row, FrameLayout.LayoutParams(-1, -1))
         if (!wide) {
@@ -131,13 +141,12 @@ class SetupActivity : Activity() {
                 setOnClickListener { expand(false) }
             }
             root.addView(scrim, FrameLayout.LayoutParams(-1, -1))
-            val width = minOf(dp(300), (resources.displayMetrics.widthPixels * 0.85f).toInt())
-            root.addView(side, FrameLayout.LayoutParams(width, -1))
+            root.addView(drawer, FrameLayout.LayoutParams(drawerWidth, -1))
         }
         root.setOnApplyWindowInsetsListener { _, insets ->
             val bars = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())
             row.setPadding(bars.left, bars.top, bars.right, bars.bottom)
-            if (!wide) side.setPadding(bars.left, bars.top, 0, bars.bottom)
+            if (!wide) drawer.setPadding(bars.left, bars.top, 0, bars.bottom)
             insets
         }
         setContentView(root)
@@ -145,7 +154,7 @@ class SetupActivity : Activity() {
         else Section.entries.firstOrNull { it.name == Prefs.settingsSection } ?: Section.GENERAL
         expanded = wide
         show(current)
-        applyExpanded()
+        applyExpanded(animate = false)
     }
 
     override fun onResume() {
@@ -166,7 +175,7 @@ class SetupActivity : Activity() {
         Panel.drop()
     }
 
-    /** Back collapses a sidebar expanded over the page, before it leaves settings. */
+    /** Back closes the drawer over the page, before it leaves settings. */
     private val collapseOnBack = if (Build.VERSION.SDK_INT >= 33) android.window.OnBackInvokedCallback { expand(false) } else null
     private var backRegistered = false
 
@@ -193,15 +202,14 @@ class SetupActivity : Activity() {
 
     private fun refreshAll() {
         refreshers.forEach { it() }
-        renderSidebar()
+        renderDrawer()
     }
 
-    // --- Sidebar ---
+    // --- Drawer ---
 
     private val dark get() = palette.dark
     private val sideBg get() = if (dark) 0xFF1A1B1D.toInt() else 0xFFEDEDF0.toInt()
     private val cardBg get() = if (dark) 0xFF2A2B2F.toInt() else 0xFFFFFFFF.toInt()
-    private val tileBg get() = if (dark) 0xFF2E3038.toInt() else 0xFFE2E3EA.toInt()
 
     /** Notification access and display over other apps: without them Chronotif can't work. */
     private fun missingPermission() = !ListenerService.isEnabled(this) || !Settings.canDrawOverlays(this)
@@ -212,59 +220,113 @@ class SetupActivity : Activity() {
         applyExpanded()
     }
 
-    private fun applyExpanded() {
-        if (wide) {
-            rail.parentFrame().visibility = if (expanded) View.GONE else View.VISIBLE
-            side.visibility = if (expanded) View.VISIBLE else View.GONE
-        } else {
-            side.visibility = if (expanded) View.VISIBLE else View.GONE
-            scrim?.visibility = side.visibility
-        }
+    /** Slides the drawer in or out over the page; a wide screen keeps it in place. */
+    private fun applyExpanded(animate: Boolean = true) {
         updateBack()
+        val scrim = scrim ?: return
+        val rtl = resources.configuration.layoutDirection == View.LAYOUT_DIRECTION_RTL
+        val away = (drawerWidth + dp(16)).toFloat() * if (rtl) 1 else -1
+        drawer.animate().cancel()
+        scrim.animate().cancel()
+        if (expanded) {
+            drawer.visibility = View.VISIBLE
+            scrim.visibility = View.VISIBLE
+            if (!animate) {
+                drawer.translationX = 0f
+                scrim.alpha = 1f
+                return
+            }
+            drawer.animate().translationX(0f).setDuration(260)
+                .setInterpolator(android.view.animation.DecelerateInterpolator(2f)).start()
+            scrim.animate().alpha(1f).setDuration(260).start()
+        } else {
+            if (!animate) {
+                drawer.translationX = away
+                drawer.visibility = View.GONE
+                scrim.alpha = 0f
+                scrim.visibility = View.GONE
+                return
+            }
+            drawer.animate().translationX(away).setDuration(200)
+                .setInterpolator(android.view.animation.AccelerateInterpolator(1.5f))
+                .withEndAction { if (!expanded) drawer.visibility = View.GONE }.start()
+            scrim.animate().alpha(0f).setDuration(200)
+                .withEndAction { if (!expanded) scrim.visibility = View.GONE }.start()
+        }
     }
-
-    private fun View.parentFrame(): View = (parent as View).parent as View
 
     private fun select(s: Section) {
+        if (s != current) {
+            current = s
+            Prefs.settingsSection = s.name
+            show(s)
+            renderDrawer()
+        }
+        // The new page is in place before the drawer slides off it.
         if (!wide) expand(false)
-        if (s == current) return
-        current = s
-        Prefs.settingsSection = s.name
-        show(s)
-        renderSidebar()
     }
 
-    private fun renderSidebar() {
-        rail.removeAllViews()
-        rail.addView(menuButton(), LinearLayout.LayoutParams(dp(44), dp(44)).apply { bottomMargin = dp(6) })
-        for (s in Section.entries) {
-            rail.addView(iconTile(s, outlineCurrent = true).apply {
-                setOnClickListener { select(s) }
-                contentDescription = getString(s.title)
-            }, LinearLayout.LayoutParams(dp(42), dp(42)).apply { topMargin = dp(8) })
+    /** The app's name, then the sections in groups, a row each: icon, name and summary. */
+    private fun renderDrawer() {
+        rows.removeAllViews()
+        rows.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(24), dp(12), dp(24), dp(12))
+            addView(text(getString(R.string.app_name), 22f, bold = true))
+            addView(text(getString(R.string.version, BuildConfig.VERSION_NAME), 13f, secondary = true), gap(2))
+        }, Ui.lp())
+        val groups = listOf(
+            null to listOf(Section.GENERAL, Section.TIPS),
+            R.string.settings_group_features to listOf(Section.PANEL, Section.HANDLE, Section.SWIPE, Section.LOCK, Section.SEARCH),
+            R.string.settings_group_app to listOf(Section.UPDATES, Section.ABOUT),
+        )
+        for ((title, sections) in groups) {
+            rows.addView(View(this).apply { setBackgroundColor(palette.chip) },
+                LinearLayout.LayoutParams(-1, maxOf(1, dp(1) / 2)).apply { topMargin = dp(8); bottomMargin = dp(8) })
+            if (title != null) {
+                rows.addView(text(getString(title), 14f, bold = true, secondary = true).apply {
+                    setPadding(dp(24), dp(6), dp(24), dp(6))
+                }, Ui.lp())
+            }
+            for (s in sections) rows.addView(drawerRow(s), Ui.lp().apply {
+                marginStart = dp(8)
+                marginEnd = dp(8)
+            })
         }
-        cards.removeAllViews()
-        cards.addView(LinearLayout(this).apply {
+    }
+
+    private fun drawerRow(s: Section): View {
+        val (summary, warn) = summary(s)
+        val on = s == current
+        val tint = when {
+            warn -> WARN
+            on -> palette.accent
+            else -> palette.text
+        }
+        return LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            addView(menuButton(), LinearLayout.LayoutParams(dp(44), dp(44)))
-            addView(text(getString(R.string.app_name), 22f, bold = true), LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(6) })
-        }, Ui.lp().apply { bottomMargin = dp(8) })
-        for (s in Section.entries) {
-            val (summary, warn) = summary(s)
-            cards.addView(LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-                setPadding(dp(10), dp(9), dp(10), dp(9))
-                background = outlined(if (s == current) selectedBg else cardBg, dp(14), s == current)
-                addView(iconTile(s, outlineCurrent = false), LinearLayout.LayoutParams(dp(40), dp(40)))
-                addView(LinearLayout(context).apply {
-                    orientation = LinearLayout.VERTICAL
-                    addView(text(getString(s.title), 15f, bold = true).apply { if (warn) setTextColor(WARN) })
-                    addView(text(summary, 12f, secondary = true).apply { maxLines = 2 })
-                }, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(12) })
-                setOnClickListener { select(s) }
-            }, Ui.lp().apply { topMargin = dp(7) })
+            minimumHeight = dp(60)
+            setPadding(dp(16), dp(8), dp(16), dp(8))
+            background = Ui.pressable(if (on) selectedBg else 0, dp(30).toFloat(), palette.ripple)
+            addView(ImageView(context).apply {
+                setImageResource(s.icon)
+                imageTintList = android.content.res.ColorStateList.valueOf(tint)
+                scaleType = ImageView.ScaleType.CENTER
+            }, LinearLayout.LayoutParams(dp(28), dp(28)))
+            addView(LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                addView(text(getString(s.title), 16f, bold = on).apply {
+                    maxLines = 1
+                    if (warn) setTextColor(WARN)
+                })
+                addView(text(summary, 13f, secondary = true).apply {
+                    maxLines = 1
+                    ellipsize = android.text.TextUtils.TruncateAt.END
+                })
+            }, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(20) })
+            isSelected = on
+            setOnClickListener { select(s) }
         }
     }
 
@@ -274,23 +336,9 @@ class SetupActivity : Activity() {
         setImageResource(R.drawable.ic_menu)
         imageTintList = android.content.res.ColorStateList.valueOf(palette.text)
         scaleType = ImageView.ScaleType.CENTER
-        background = Ui.pressable(0, dp(22).toFloat(), palette.ripple)
+        background = Ui.pressable(0, dp(24).toFloat(), palette.ripple)
         contentDescription = getString(R.string.settings_sections)
         setOnClickListener { expand(!expanded) }
-    }
-
-    /** A section's icon on a rounded tile; General gets an orange dot while a permission is missing. */
-    private fun iconTile(s: Section, outlineCurrent: Boolean): View = FrameLayout(this).apply {
-        background = outlined(tileBg, dp(12), outlineCurrent && s == current)
-        addView(ImageView(context).apply {
-            setImageResource(s.icon)
-            imageTintList = android.content.res.ColorStateList.valueOf(palette.text)
-            scaleType = ImageView.ScaleType.CENTER
-        }, FrameLayout.LayoutParams(-1, -1))
-        if (s == Section.GENERAL && missingPermission()) {
-            addView(View(context).apply { background = Ui.rounded(WARN, dp(5).toFloat()) },
-                FrameLayout.LayoutParams(dp(10), dp(10), Gravity.TOP or Gravity.END))
-        }
     }
 
     private fun outlined(color: Int, radius: Int, selected: Boolean) = GradientDrawable().apply {
@@ -338,7 +386,7 @@ class SetupActivity : Activity() {
         body.removeAllViews()
         refreshers.clear()
         pendingPermission.clear()
-        body.addView(text(getString(s.title), 24f, bold = true), Ui.lp().apply { bottomMargin = dp(4) })
+        pageTitle.text = getString(s.title)
         when (s) {
             Section.GENERAL -> general()
             Section.TIPS -> tips()
@@ -359,7 +407,7 @@ class SetupActivity : Activity() {
         val y = page.scrollY
         show(current)
         page.post { page.scrollTo(0, y) }
-        renderSidebar()
+        renderDrawer()
     }
 
     private fun general() {
@@ -409,7 +457,7 @@ class SetupActivity : Activity() {
         }
     }
 
-    /** The gestures nobody can see: a line each, always a tap away in the sidebar. */
+    /** The gestures nobody can see: a line each, always a tap away in the drawer. */
     private fun tips() {
         listOf(
             R.string.tip_open_title to R.string.tip_open_body,
@@ -551,6 +599,22 @@ class SetupActivity : Activity() {
     }
 
     private fun search() {
+        toggle(R.string.search_pull_down, R.string.search_pull_down_desc, { Prefs.pullDownSearch }) {
+            Prefs.pullDownSearch = it
+        }
+        label(R.string.search_engine)
+        tiles(engines.map { getString(it) to null }, columns = 2, selected = Prefs.searchEngine) { Prefs.searchEngine = it }
+        body.addView(text(getString(R.string.search_engine_desc), 13f, secondary = true), gap(6))
+        permissionToggle(R.string.search_find_contacts, R.string.search_find_contacts_desc,
+            android.Manifest.permission.READ_CONTACTS, { Prefs.searchContacts }) { Prefs.searchContacts = it }
+        permissionToggle(R.string.search_calls, R.string.search_calls_desc,
+            android.Manifest.permission.CALL_PHONE, { Prefs.searchCalls }) { Prefs.searchCalls = it }
+        toggle(R.string.search_currency_rates, R.string.search_currency_rates_desc, { Prefs.currencyRates }) {
+            Prefs.currencyRates = it
+        }
+        permissionToggle(R.string.search_find_calendar, R.string.search_find_calendar_desc,
+            android.Manifest.permission.READ_CALENDAR, { Prefs.searchCalendar }) { Prefs.searchCalendar = it }
+        // The settings first; what Search can do is reference, below them.
         label(R.string.search_can_do)
         body.addView(LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -572,21 +636,6 @@ class SetupActivity : Activity() {
             }
         }, gap(6))
         body.addView(text(getString(R.string.search_can_private), 13f, secondary = true), gap(8))
-        toggle(R.string.search_pull_down, R.string.search_pull_down_desc, { Prefs.pullDownSearch }) {
-            Prefs.pullDownSearch = it
-        }
-        label(R.string.search_engine)
-        tiles(engines.map { getString(it) to null }, columns = 2, selected = Prefs.searchEngine) { Prefs.searchEngine = it }
-        body.addView(text(getString(R.string.search_engine_desc), 13f, secondary = true), gap(6))
-        permissionToggle(R.string.search_find_contacts, R.string.search_find_contacts_desc,
-            android.Manifest.permission.READ_CONTACTS, { Prefs.searchContacts }) { Prefs.searchContacts = it }
-        permissionToggle(R.string.search_calls, R.string.search_calls_desc,
-            android.Manifest.permission.CALL_PHONE, { Prefs.searchCalls }) { Prefs.searchCalls = it }
-        toggle(R.string.search_currency_rates, R.string.search_currency_rates_desc, { Prefs.currencyRates }) {
-            Prefs.currencyRates = it
-        }
-        permissionToggle(R.string.search_find_calendar, R.string.search_find_calendar_desc,
-            android.Manifest.permission.READ_CALENDAR, { Prefs.searchCalendar }) { Prefs.searchCalendar = it }
     }
 
     private fun updates() {
@@ -778,7 +827,7 @@ class SetupActivity : Activity() {
             isChecked = value()
             setOnCheckedChangeListener { _, v ->
                 onChange(v)
-                renderSidebar()
+                renderDrawer()
             }
         }
         body.addView(s, gap(12))
@@ -820,14 +869,14 @@ class SetupActivity : Activity() {
         into.addView(text(getString(title), 13f, secondary = true), gap(18))
     }
 
-    /** A pick of one, picked by tapping it. Notifies [onPick] and updates the sidebar's summary. */
+    /** A pick of one, picked by tapping it. Notifies [onPick] and updates the drawer's summary. */
     private fun choose(views: List<View>, selected: Int, style: (View, Boolean) -> Unit, onPick: (Int) -> Unit) {
         views.forEachIndexed { i, v ->
             style(v, i == selected)
             v.setOnClickListener {
                 views.forEachIndexed { j, w -> style(w, j == i) }
                 onPick(i)
-                renderSidebar()
+                renderDrawer()
             }
         }
     }
@@ -933,8 +982,8 @@ class SetupActivity : Activity() {
     }
 
     /**
-     * Holds part of the sidebar and notices a sideways swipe across it ([onRight] expands, [onLeft]
-     * collapses) without getting in the way of taps and scrolling.
+     * Holds the drawer and notices a sideways swipe across it ([onLeft] closes it) without getting
+     * in the way of taps and scrolling.
      */
     private class Swipes(context: Context, private val onRight: () -> Unit, private val onLeft: () -> Unit) : FrameLayout(context) {
         private var downX = 0f

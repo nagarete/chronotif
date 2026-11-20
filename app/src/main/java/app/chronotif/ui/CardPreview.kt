@@ -70,8 +70,8 @@ class CardPreview private constructor(
         fun open()
         /** A button other than an inline reply; the Preview closes after it. */
         fun action(index: Int)
-        /** Replying needs the keyboard, which the lock screen can't offer: it may continue elsewhere. */
-        fun canReplyHere(): Boolean
+        /** Whether the reply types right here; on the lock screen an app may want it unlocked first. */
+        fun canReplyHere(index: Int): Boolean
         fun replyElsewhere(index: Int)
         fun sendReply(index: Int, text: CharSequence)
         fun viewImages(anchor: View, items: List<Viewable>, start: Int)
@@ -219,7 +219,7 @@ class CardPreview private constructor(
                         actions.action(i)
                         close()
                     }
-                    actions.canReplyHere() -> startReply(i, a)
+                    actions.canReplyHere(i) -> startReply(i, a)
                     else -> {
                         actions.replyElsewhere(i)
                         close()

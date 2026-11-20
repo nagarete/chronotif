@@ -47,7 +47,7 @@ class NotifList(
         fun guarded(action: () -> Unit)
         /** Still showing once [guarded] has unlocked, so Search can stay open rather than reopen. */
         val keepsSearchAfterUnlock: Boolean get() = false
-        /** Lock screen only: replying needs the keyboard, so continue in the panel. */
+        /** Lock screen only: a reply the app wants unlocked first continues in the panel. */
         fun replyElsewhere(e: Entry, actionIndex: Int) {}
     }
 
@@ -176,8 +176,7 @@ class NotifList(
         }
         val lastCheck = Prefs.lastCheck
         val s = Attention.sections(all, lastCheck)
-        // The lock-screen view is about what needs attention; background work stays out of it.
-        val running = if (onLock) emptyList() else s.running
+        val running = s.running
         val rows = ArrayList<Row>()
         shownUpTo = 0L
 
@@ -470,13 +469,22 @@ class NotifList(
     override fun onAction(e: Entry, id: String, index: Int) {
         val a = e.n.actions?.getOrNull(index) ?: return
         if (Act.replyInput(a) != null) {
-            if (onLock) {
+            if (onLock && Act.needsUnlock(a)) {
                 host.guarded { host.replyElsewhere(e, index) }
             } else {
                 expanded += id
                 replying = id to index
                 render()
             }
+            return
+        }
+        runAction(a)
+    }
+
+    /** On the lock screen, a button that works in the background runs without unlocking. */
+    private fun runAction(a: android.app.Notification.Action) {
+        if (onLock && !Act.needsUnlock(a)) {
+            Act.action(host.context, a)
             return
         }
         host.guarded { if (Act.action(host.context, a)) host.launched() }
@@ -539,10 +547,10 @@ class NotifList(
 
             override fun action(index: Int) {
                 val a = live(e).n.actions?.getOrNull(index) ?: return
-                host.guarded { if (Act.action(host.context, a)) host.launched() }
+                runAction(a)
             }
 
-            override fun canReplyHere() = !onLock
+            override fun canReplyHere(index: Int) = !onLock || live(e).n.actions?.getOrNull(index)?.let(Act::needsUnlock) == false
 
             override fun replyElsewhere(index: Int) = host.guarded { host.replyElsewhere(live(e), index) }
 
