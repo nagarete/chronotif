@@ -215,6 +215,8 @@ To open Chronotif in fullscreen, use the Quick Settings tile, or turn off the ed
   to copy it. On the lock screen, opening anything asks you to unlock first, and contacts and
   events stay hidden until you do. *Settings → Search* turns the pull-down off, picks the web
   search engine, turns currency rates off (on for new installs, off for installs from before 0.2.7 until turned on), and turns on contacts, calendar events and calling from Search, each off until you allow it.
+  It opens with a checklist of those steps and the Search widget, each with *Not now*, and offers
+  the Search tile as an optional extra.
 - **Header**: the clock and date at the top of the panel, with a settings gear at the end. Tap the
   clock to open your alarms, the date to open your calendar, or the gear to open Android's
   Settings; tapping elsewhere in the header closes the panel.
