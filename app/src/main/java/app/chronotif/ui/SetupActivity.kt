@@ -757,6 +757,13 @@ class SetupActivity : Activity() {
         }
     }
 
+    /**
+     * A setting changed. The panel can open over settings (edge handle, Open panel) while this
+     * screen stays resumed, so the kept panel goes now, not only in [onPause]: the next open
+     * builds one that shows the change.
+     */
+    private fun changed() = Panel.drop()
+
     private fun applyHandle() {
         ListenerService.instance?.refreshHandle()
     }
@@ -876,6 +883,7 @@ class SetupActivity : Activity() {
         row.setOnClickListener {
             sw.setChecked(!sw.isChecked, animate = true)
             onChange(sw.isChecked)
+            changed()
             renderDrawer()
         }
         return sw
@@ -1007,6 +1015,7 @@ class SetupActivity : Activity() {
             v.setOnClickListener {
                 views.forEachIndexed { j, w -> style(w, j == i) }
                 onPick(i)
+                changed()
                 renderDrawer()
             }
         }
@@ -1141,6 +1150,7 @@ class SetupActivity : Activity() {
                 if (!fromUser) return
                 if (label != null) titleView.text = label(p)
                 onChange(p)
+                changed()
             }
             override fun onStartTrackingTouch(s: SeekBar) {}
             override fun onStopTrackingTouch(s: SeekBar) {}
