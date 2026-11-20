@@ -393,7 +393,7 @@ class PanelView(
 }
 
 /**
- * The column of cards, drawing only those within a screen of what's visible. A long list (a
+ * The column of cards, drawing only those within half a screen of what's visible. A long list (a
  * hundred cards in Earlier) would otherwise draw every card each time the panel comes back,
  * though only a screenful can be seen; the rest are drawn as scrolling brings them near.
  */
@@ -402,7 +402,7 @@ private class NearColumn(context: Context) : LinearLayout(context) {
         val scroll = parent?.parent as? ScrollView ?: return super.drawChild(canvas, child, drawingTime)
         val column = parent as View
         val visibleTop = scroll.scrollY - column.top - top
-        val margin = scroll.height
+        val margin = scroll.height / 2
         if (scroll.height > 0 && (child.bottom + child.translationY < visibleTop - margin ||
                 child.top + child.translationY > visibleTop + scroll.height + margin)) {
             return false

@@ -319,6 +319,8 @@ class StatusBarSwipe : AccessibilityService() {
         /** Starting the pull shows the panel, which asks the strip to step aside: not yet. */
         private var starting = false
         private var velocity: VelocityTracker? = null
+        private var lastY = 0f
+        private var lastTime = 0L
 
         val pulling get() = pull != null || starting
 
@@ -333,6 +335,8 @@ class StatusBarSwipe : AccessibilityService() {
                 MotionEvent.ACTION_DOWN -> {
                     downX = e.rawX
                     downY = e.rawY
+                    lastY = e.rawY
+                    lastTime = e.eventTime
                     tracking = true
                     velocity?.recycle()
                     velocity = VelocityTracker.obtain().also { it.addMovement(e) }
@@ -344,6 +348,8 @@ class StatusBarSwipe : AccessibilityService() {
                 MotionEvent.ACTION_MOVE -> {
                     val dx = e.rawX - downX
                     val dy = e.rawY - downY
+                    lastY = e.rawY
+                    lastTime = e.eventTime
                     pull?.move(dy)
                     if (tracking && (abs(dx) > slop || abs(dy) > slop)) {
                         tracking = false
@@ -370,10 +376,14 @@ class StatusBarSwipe : AccessibilityService() {
         private fun letGo(e: MotionEvent, cancelled: Boolean) {
             val p = pull ?: return
             pull = null
-            val vy = velocity?.let {
+            val tracked = velocity?.let {
                 it.computeCurrentVelocity(1000)
                 it.yVelocity
             } ?: 0f
+            // Android reads a finger as stopped when its last move is over 40 ms old, though it may
+            // only have been held up while the panel came in. The ground covered since counts too.
+            val sinceLast = (e.rawY - lastY) * 1000f / (e.eventTime - lastTime).coerceAtLeast(8L)
+            val vy = maxOf(tracked, sinceLast)
             if (p.release(if (cancelled) 0f else e.rawY - downY, if (cancelled) 0f else vy)) {
                 performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
             }
