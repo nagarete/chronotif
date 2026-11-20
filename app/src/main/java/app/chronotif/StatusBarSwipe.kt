@@ -22,6 +22,7 @@ import android.view.Gravity
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
+import android.view.VelocityTracker
 import android.view.ViewConfiguration
 import android.view.WindowInsets
 import android.view.WindowManager
@@ -165,11 +166,22 @@ class StatusBarSwipe : AccessibilityService() {
 
     /** Re-evaluates whether the strip should be shown. Called again from setup when settings change. */
     fun refresh() {
-        if (eligible()) show() else hide()
+        // A pull keeps its strip until the finger lifts, though the panel it brings in is showing.
+        if (view?.pulling == true) return
+        when {
+            !allowed() -> hide()
+            // The probe stays, so the strip takes touches again the moment the panel closes:
+            // a new probe would leave it untouchable, and a swipe would open the system shade.
+            ownUiShown > 0 -> removeStrip()
+            else -> show()
+        }
     }
 
-    private fun eligible(): Boolean {
-        if (!Prefs.enabled || !Prefs.statusSwipeEnabled || ownUiShown > 0) return false
+    private fun eligible(): Boolean = ownUiShown == 0 && allowed()
+
+    /** Everything but Chronotif's own screens being open. */
+    private fun allowed(): Boolean {
+        if (!Prefs.enabled || !Prefs.statusSwipeEnabled) return false
         // The probe needs it; see probeParams.
         if (!Settings.canDrawOverlays(this)) return false
         if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) return false
@@ -233,7 +245,7 @@ class StatusBarSwipe : AccessibilityService() {
                 view = null
             }
         }
-        val v = SwipeView(this, ::open)
+        val v = SwipeView(this, ::open, ::pull, ::refresh)
         try {
             wm.addView(v, params)
             view = v
@@ -242,9 +254,13 @@ class StatusBarSwipe : AccessibilityService() {
         }
     }
 
-    private fun hide() {
+    private fun removeStrip() {
         view?.let { runCatching { wm.removeViewImmediate(it) } }
         view = null
+    }
+
+    private fun hide() {
+        removeStrip()
         probe?.let { runCatching { probeWm.removeViewImmediate(it) } }
         probe = null
     }
@@ -261,7 +277,7 @@ class StatusBarSwipe : AccessibilityService() {
     /** The haptic comes first, so the swipe is felt before the panel has drawn anything. */
     private fun open(v: View) {
         if (!eligible()) {
-            hide()
+            refresh()
             return
         }
         v.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
@@ -272,41 +288,97 @@ class StatusBarSwipe : AccessibilityService() {
         }
     }
 
-    /** A tap, or a mostly downward single-finger swipe, opens the panel. Anything else does nothing. */
+    /** Starts a pull the panel follows; null if it can't, and the swipe then just opens it. */
+    private fun pull(): Panel.Pull? {
+        if (!eligible()) return null
+        return try {
+            Panel.pull(this)
+        } catch (e: RuntimeException) {
+            Log.w(TAG, "Couldn't start the panel", e)
+            null
+        }
+    }
+
+    /**
+     * A tap opens the panel. A mostly downward single-finger swipe pulls it in under the finger,
+     * like the system shade; letting go opens it or lets it slide back. Anything else does nothing.
+     * The window keeps the whole gesture, even once the panel is over it.
+     */
     @SuppressLint("ViewConstructor")
-    private class SwipeView(context: Context, private val onOpen: (View) -> Unit) : View(context) {
+    private class SwipeView(
+        context: Context,
+        private val onOpen: (View) -> Unit,
+        private val onPull: () -> Panel.Pull?,
+        private val onPullEnd: () -> Unit,
+    ) : View(context) {
         private val slop = ViewConfiguration.get(context).scaledTouchSlop.toFloat()
         private var downX = 0f
         private var downY = 0f
         private var tracking = false
+        private var pull: Panel.Pull? = null
+        /** Starting the pull shows the panel, which asks the strip to step aside: not yet. */
+        private var starting = false
+        private var velocity: VelocityTracker? = null
 
-        @SuppressLint("ClickableViewAccessibility")
+        val pulling get() = pull != null || starting
+
+        private companion object {
+            const val SETTLE_MS = 300L
+        }
+
+        @SuppressLint("ClickableViewAccessibility", "Recycle")
         override fun onTouchEvent(e: MotionEvent): Boolean {
+            velocity?.addMovement(e)
             when (e.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     downX = e.rawX
                     downY = e.rawY
                     tracking = true
+                    velocity?.recycle()
+                    velocity = VelocityTracker.obtain().also { it.addMovement(e) }
                 }
-                MotionEvent.ACTION_POINTER_DOWN, MotionEvent.ACTION_CANCEL -> tracking = false
-                MotionEvent.ACTION_MOVE -> if (tracking) {
+                MotionEvent.ACTION_POINTER_DOWN, MotionEvent.ACTION_CANCEL -> {
+                    tracking = false
+                    letGo(e, cancelled = true)
+                }
+                MotionEvent.ACTION_MOVE -> {
                     val dx = e.rawX - downX
                     val dy = e.rawY - downY
-                    if (abs(dx) > slop || abs(dy) > slop) {
+                    pull?.move(dy)
+                    if (tracking && (abs(dx) > slop || abs(dy) > slop)) {
                         tracking = false
-                        if (dy > abs(dx)) fire()
+                        if (dy > abs(dx)) {
+                            starting = true
+                            pull = onPull()?.also { it.move(dy) }
+                            starting = false
+                            if (pull == null) onOpen(this)
+                        }
                     }
                 }
-                MotionEvent.ACTION_UP -> if (tracking) {
-                    tracking = false
-                    fire()
+                MotionEvent.ACTION_UP -> {
+                    if (tracking) {
+                        tracking = false
+                        onOpen(this)
+                    }
+                    letGo(e, cancelled = false)
                 }
             }
             return true
         }
 
-        private fun fire() {
-            onOpen(this)
+        /** Ends a pull; the haptic marks the panel committing to open. A cancelled pull slides back. */
+        private fun letGo(e: MotionEvent, cancelled: Boolean) {
+            val p = pull ?: return
+            pull = null
+            val vy = velocity?.let {
+                it.computeCurrentVelocity(1000)
+                it.yVelocity
+            } ?: 0f
+            if (p.release(if (cancelled) 0f else e.rawY - downY, if (cancelled) 0f else vy)) {
+                performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+            }
+            // Once the panel has settled: stepping aside lays windows out, which would stutter it.
+            postDelayed(onPullEnd, SETTLE_MS)
         }
     }
 }

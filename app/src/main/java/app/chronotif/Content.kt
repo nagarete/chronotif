@@ -319,6 +319,10 @@ object Apps {
     private val large = LruCache<String, Drawable>(48)
     private val main = android.os.Handler(android.os.Looper.getMainLooper())
 
+    /** Goes up whenever a load lands, so a card bound without its icon or name is bound again. */
+    var generation = 0
+        private set
+
     /**
      * One background thread whose results land on the main thread. Everything here is touched on
      * the main thread only. The list redraws once the lane runs dry, so a burst of loads (the
@@ -336,6 +340,7 @@ object Apps {
                 main.post {
                     keys.remove(key)
                     done(v)
+                    generation++
                     if (keys.isEmpty()) NotifStore.changed()
                 }
             }

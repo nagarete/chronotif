@@ -9,7 +9,10 @@
       "Convert currencies with the European Central Bank's daily rates. It's off until you turn it on, and the download carries nothing you type.",
       "Open Search without accessibility: hold the edge handle, or use the Search tile, home-screen widget or app shortcut.",
       "A gear in the panel header opens Android's Settings.",
-      "The panel opens faster, most of all the first time after an update: the header is there at once and your notifications follow right after."
+      "The panel opens faster, most of all the first time after an update: the header is there at once and your notifications follow right after.",
+      "Swipe down on the status bar and the panel follows your finger, like the system shade. Let go early and it slides back, without counting as a check.",
+      "Reopening the panel is quicker: it keeps your cards ready instead of building them again.",
+      "Swiping the status bar again right after closing the panel no longer opens the system shade."
     ],
     "video": {
       "src": "/video/release-0.2.6.mp4",
