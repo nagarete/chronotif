@@ -360,7 +360,7 @@
     <string name="search_engine_duckduckgo">DuckDuckGo</string>
     <string name="search_engine_bing">Bing</string>
     <string name="search_engine_brave">Brave</string>
-    <string name="search_engine_desc">Anything Search can\'t answer goes to your default browser with this engine. Chronotif itself sends nothing.</string>
+    <string name="search_engine_desc">Anything Search can\'t answer goes to your default browser with this engine. Chronotif itself sends nothing you type.</string>
     <string name="settings_wifi">Wi-Fi</string>
     <string name="settings_bluetooth">Bluetooth</string>
     <string name="settings_mobile">Mobile network</string>

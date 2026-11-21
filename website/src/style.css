@@ -598,6 +598,37 @@ q {
 .release__video {
   margin: 0;
 }
+.parts {
+  display: grid;
+  gap: 0.25rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.parts__item {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: 0.6rem;
+  color: var(--text-2);
+  font-size: 0.9375rem;
+  text-decoration: none;
+}
+.parts__item:hover {
+  color: var(--text);
+}
+.parts__item.is-current {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+}
+.parts__n {
+  flex: none;
+  width: 1.4rem;
+  color: var(--accent-soft);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
 .release__video figcaption {
   margin-top: 1rem;
 }

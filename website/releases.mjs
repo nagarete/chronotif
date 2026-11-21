@@ -14,23 +14,43 @@ const date = (iso) =>
     day: "numeric", month: "long", year: "numeric", timeZone: "UTC",
   });
 
-function video(v) {
-  if (!v || !existsSync(new URL(`public${v.src}`, root))) return "";
-  const m = v.music;
-  const credit = m
+function credit(m) {
+  return m
     ? `<figcaption class="note">Music: “${esc(m.title)}” by ${esc(m.artist)}, from
         <a href="${esc(m.url)}">${esc(m.album)}</a>
         (<a href="${esc(m.licenseUrl)}">${esc(m.license)}</a>).</figcaption>`
     : "";
-  return `
-        <figure class="release__video">
+}
+
+const player = (v) => `
           <div class="trailer__video">
             <video controls playsinline preload="none" poster="${esc(v.poster)}" width="720" height="1280" aria-label="${esc(v.label)}">
               <source src="${esc(v.src)}" type="video/mp4" />
               <a href="${esc(v.src)}">Download the video (MP4)</a>
             </video>
-          </div>
-          ${credit}
+          </div>`;
+
+const exists = (v) => existsSync(new URL(`public${v.src}`, root));
+
+// One video, or a release told in parts: one player and a list that switches it (src/main.js).
+// Without JavaScript the list links to each part's file.
+function video(r) {
+  const parts = (r.videos ?? []).filter(exists);
+  if (parts.length) {
+    const list = parts.map((p, i) => `
+            <li><a class="parts__item${i === 0 ? " is-current" : ""}" href="${esc(p.src)}" data-poster="${esc(p.poster)}" data-label="${esc(p.label)}"${i === 0 ? ' aria-current="true"' : ""}>
+              <span class="parts__n">${i + 1}</span> ${esc(p.title)}</a></li>`).join("");
+    return `
+        <figure class="release__video">${player(parts[0])}
+          <ol class="parts" aria-label="Parts of the video">${list}
+          </ol>
+        </figure>`;
+  }
+  const v = r.video;
+  if (!v || !exists(v)) return "";
+  return `
+        <figure class="release__video">${player(v)}
+          ${credit(v.music)}
         </figure>`;
 }
 
@@ -41,7 +61,7 @@ function entry(r, { next, nightlyReleaseUrl }) {
        <a href="${esc(nightlyReleaseUrl)}">Nightly builds</a>`
     : `<time datetime="${r.date}">${date(r.date)}</time> ·
        <a href="${RELEASES}/tag/${id}">APK &amp; checksum</a>`;
-  const media = video(r.video);
+  const media = video(r);
   return `
       <article class="release${next ? " release--next" : ""}${media ? " release--video" : ""}" id="${id}" aria-labelledby="${id}-title">
         <div class="release__copy">

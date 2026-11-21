@@ -5,6 +5,26 @@ document.documentElement.classList.add("js");
 const demo = document.querySelector(".demo");
 if (demo) initDemo(demo);
 
+// A release video in parts: a part in the list plays in the one player.
+for (const list of document.querySelectorAll(".parts")) {
+  const video = list.parentElement.querySelector("video");
+  list.addEventListener("click", (e) => {
+    const item = e.target.closest(".parts__item");
+    if (!item || !video) return;
+    e.preventDefault();
+    for (const other of list.querySelectorAll(".parts__item")) {
+      other.classList.toggle("is-current", other === item);
+      if (other === item) other.setAttribute("aria-current", "true");
+      else other.removeAttribute("aria-current");
+    }
+    video.poster = item.dataset.poster;
+    video.setAttribute("aria-label", item.dataset.label);
+    video.querySelector("source").src = item.getAttribute("href");
+    video.load();
+    video.play().catch(() => {});
+  });
+}
+
 // Hairline under the masthead once the page scrolls.
 const masthead = document.querySelector(".masthead");
 const onScroll = () => masthead.classList.toggle("is-scrolled", window.scrollY > 8);

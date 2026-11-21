@@ -7,7 +7,9 @@ Android. It shows notifications newest first, keeps what arrived since your last
 under New, and folds what you've already checked into Earlier. Those notifications
 stay accessible without competing for the same attention.
 
-**Android 11 or newer.** No accounts or ads. Your notifications stay on your phone.
+**Android 11 or newer.** No accounts or ads. Your notifications stay on your phone. From 0.2.7,
+Chronotif sends anonymous [Usage data](docs/usage-data.md), never anything from your notifications,
+and you can turn it off under *Settings → Privacy and about*.
 
 [Download stable](https://github.com/nagarete/chronotif/releases/latest) ·
 [Nightly builds](https://github.com/nagarete/chronotif/releases?q=nightly&expanded=true) ·
@@ -123,12 +125,21 @@ If your installed version has no channel setting, install a nightly APK once to 
 
 ## Privacy and battery use
 
+**What leaves your phone.** Only anonymous Usage data, from 0.2.7, on unless you turn it off
+under *Settings → Privacy and about*: counts of what you use, Panel speeds, your settings, the
+phone's model, Android version and country, and crash reports, sent to PostHog's servers in the EU
+with a random install ID. Never your notifications or which apps sent them, your contacts,
+calendar or Search, your phone's identifiers or your IP address. Turning it off sends one last
+note that it was turned off, deletes the install ID and sends nothing more. [What Chronotif
+sends](docs/usage-data.md) lists every field, and ADR 0016 explains why.
+
 Notifications stay in memory on your device. Chronotif saves your settings, the time
 of your last check, and when each of the last few apps notified (for Search's
 suggestions, never what they said), and Usage data waiting to be sent, with backups disabled. The lock-screen view follows Android's
-notification privacy settings and requires unlocking before opening notifications,
-using actions, or replying. If you turn them on for Search, contacts and calendar events are read
-on the device when you search, never stored, and hidden while the phone is locked. Calling
+notification privacy settings. Replies and buttons that work in the background run while locked,
+unless the app asks for an unlock; opening an app always asks to unlock first. If you turn them on
+for Search, contacts and calendar events are read on the device when you search and never stored.
+They show while locked unless the lock screen hides sensitive content. Calling
 from Search, also off by default, uses the phone-call permission only when you tap a call button.
 
 The optional status-bar swipe uses an accessibility service to place a touch area over the left
@@ -140,10 +151,7 @@ The app has no third-party dependencies and responds to system events without po
 a foreground service, or wakelocks. It goes online for three things. The GitHub updater, off by
 default, and Search's currency rates from the European Central Bank, on by default and switched off
 under *Settings → Search*, are download-only, and the rates download only when you type a currency.
-**Usage data**, on unless you turn it off under *Settings → Privacy and about*, sends anonymous
-counts, Panel speeds, settings and crash reports to PostHog's EU servers, never anything from your
-notifications, contacts, calendar or Search. [What Chronotif sends](docs/usage-data.md) lists every
-field (ADR 0016).
+The third is Usage data, described above.
 
 ## Build from source
 

@@ -320,8 +320,8 @@ the same pull request as a user-visible change that lands on main. Before taggin
 `next` into the top of `stable` with that day's date (`YYYY-MM-DD`, UTC) and remove `next` until
 there's something new to say. The website redeploys after each published release, so the notes
 must be on main when the tag is pushed. A release video goes in `website/public/video/` as
-`release-<version>.mp4` with a `-poster.webp` beside it (see `website/video/README.md`); the
-entry shows it only once the file exists.
+`release-<version>.mp4` with a `-poster.webp` beside it, or as numbered parts listed under the
+entry's `videos` (see `website/video/README.md`); the entry shows a video only once its file exists.
 
 The app bundles the same file and shows its notes as What's new after an update, one line at a
 time: a line added since the last build shows as new, and so does a reworded one. Reword a line
@@ -336,7 +336,7 @@ git push origin v0.2.7
 
 Stable releases are marked as GitHub's latest release, including 0.x versions. Nightlies are
 prereleases and never replace that link. After publishing stable, bump `versionName` to the
-next patch version before publishing more nightlies. v0.2.6 is the current stable release.
+next patch version before publishing more nightlies. v0.2.7 is the current stable release.
 
 ## Code map
 
