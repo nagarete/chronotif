@@ -97,9 +97,16 @@ Any static host works. Configure it with:
 The existing Cloudflare Worker and custom domains are configured in `wrangler.jsonc`.
 With Cloudflare credentials available, `npm run deploy` builds and publishes the site.
 
-The `website` job in `.github/workflows/build.yml` runs `npm run deploy` from `main` after the
-build job publishes a release, so the download buttons follow GitHub. It needs two repository
-secrets and is skipped until both are set:
+`.github/workflows/website.yml` builds and deploys the site on its own:
+
+- A pull request that touches `website/` gets a build check. The Android build in `build.yml`
+  skips pull requests and pushes that only touch `website/`.
+- Merging such a change to `main` runs `npm run deploy`. Changes to `src/releases.json` don't
+  deploy on merge, because the app bundles that file and its `next` notes go live with a release.
+- `build.yml` calls it after every published release, so the download buttons follow GitHub.
+- *Actions → website → Run workflow* deploys `main` by hand.
+
+Deploying needs two repository secrets. Until both are set, the workflow only builds:
 
 - `CLOUDFLARE_API_TOKEN`: a token from the *Edit Cloudflare Workers* template.
 - `CLOUDFLARE_ACCOUNT_ID`: the account that owns the `chronotif-website` Worker.

@@ -1,0 +1,58 @@
+name: website
+
+# chronotif.com on its own: pull requests that touch website/ get a build check, and merging them
+# deploys. build.yml also calls this after each published release, because the download buttons
+# are baked in at build time. Release notes (src/releases.json) are left out of the push trigger,
+# so new `next` lines go live with a release, not when their pull request merges.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "website/**"
+      - "!website/src/releases.json"
+      - ".github/workflows/website.yml"
+  pull_request:
+    paths:
+      - "website/**"
+      - ".github/workflows/website.yml"
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  website:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: website-${{ github.event_name == 'pull_request' && github.ref || 'deploy' }}
+      cancel-in-progress: false
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      # The build reads the newest stable and nightly from GitHub's API; the token avoids its rate limit.
+      GITHUB_TOKEN: ${{ github.token }}
+    defaults:
+      run:
+        working-directory: website
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # A release tag can be older than main; the site always deploys from main.
+          ref: ${{ github.event_name != 'pull_request' && 'main' || '' }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+
+      - run: npm ci
+
+      - name: Build
+        if: github.event_name == 'pull_request' || env.CLOUDFLARE_API_TOKEN == ''
+        run: npm run build
+
+      - name: Deploy chronotif.com
+        if: github.event_name != 'pull_request' && env.CLOUDFLARE_API_TOKEN != ''
+        run: npm run deploy
