@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Chronotif 0.2.7 lock screen</title>
+<!-- Part 2 of the 0.2.7 video: the lock screen. Drawn frame by frame like whatsnew.html: render(t)
+     sets everything from the time t in seconds. The phone screen is laid out in dp (412x883),
+     matching LockActivity.kt (date 18sp, clock 76sp, Tap to unlock), LockPile.kt (slivers inset 14
+     and 30 dp, 7 dp apart, the count 10 dp under them) and MediaPlayerView.kt (the 64 dp thumbnail
+     the artwork shrinks into). Settings → Lock screen is a Robolectric render of the real page
+     (shots/settings-lock.png). Apps, people and notifications are
+     the same made-up ones as the other videos. -->
+<style>
+  :root {
+    --card: rgba(44,44,46,.92); --text-2: rgba(235,235,245,.6); --accent: #a8c7fa;
+    --serif: "Newsreader", Georgia, serif; --sans: "Noto Sans", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; width: 1080px; height: 1920px; overflow: hidden; background: #0b0c10; }
+  body { font-family: var(--sans); color: #f4f1ea; }
+  #bg { position: absolute; inset: 0; background: radial-gradient(1080px 1920px at 50% 0%, #1b2236 0%, #0b0c10 100%); }
+  #bezel { position: absolute; left: 192px; top: 428px; width: 696px; height: 1464px; border-radius: 60px; background: #2a2d36; }
+  #bezel::after { content: ""; position: absolute; inset: 4px; border-radius: 57px; background: #08090c; }
+  #screen { position: absolute; left: 204px; top: 440px; width: 672px; height: 1440px; border-radius: 48px; overflow: hidden; background: #000; }
+  #ui { position: absolute; left: 0; top: 0; width: 412px; height: 883px; transform: scale(1.6311); transform-origin: 0 0; }
+  .lay { position: absolute; inset: 0; overflow: hidden; }
+
+  /* captions, as captions.mjs draws them */
+  .cap { position: absolute; left: 90px; right: 90px; top: 100px; height: 340px; display: grid; place-items: center;
+         text-align: center; font: 500 56px/1.22 var(--serif); letter-spacing: -0.01em; text-wrap: balance; }
+  .cap b { font-weight: 700; color: #9db8ff; }
+  .kicker { font: 600 30px/1 var(--sans); letter-spacing: .16em; text-transform: uppercase; color: #9db8ff; margin-bottom: 26px; }
+  .full { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; gap: 28px;
+          background: radial-gradient(120% 70% at 50% 35%, #1b2236 0%, #0b0c10 60%); }
+  .big { font: 600 150px/1 var(--serif); letter-spacing: -0.03em; }
+  .small { font: 400 52px/1.3 var(--serif); color: #c9c6bf; max-width: 820px; margin: 0 auto; text-wrap: balance; }
+  .small b { color: #9db8ff; font-weight: 600; }
+  .url { margin-top: 30px; font: 600 46px/1 var(--sans); color: #9db8ff; letter-spacing: 0.02em; }
+  .url2 { font: 500 36px/1.3 "Noto Sans Mono", monospace; color: #c9c6bf; }
+
+  /* --- inside the phone, in dp --- */
+  .fill { position: absolute; inset: 0; }
+  .wall { position: absolute; inset: 0; background: linear-gradient(160deg, #3a4a78 0%, #1d2440 45%, #121522 100%); }
+  .status { position: absolute; left: 0; right: 0; top: 0; height: 32px; padding: 8px 22px 0; display: flex; justify-content: space-between;
+            font: 500 13px var(--sans); color: #fff; z-index: 5; }
+  .batt { width: 22px; height: 11px; border: 1.5px solid #fff; border-radius: 3px; position: relative; margin-top: 3px; }
+  .batt::after { content: ""; position: absolute; left: 1.5px; top: 1.5px; bottom: 1.5px; width: 13px; background: #fff; border-radius: 1px; }
+  .sec { position: absolute; left: 26px; font: 700 13px var(--sans); color: rgba(255,255,255,.75); text-shadow: 0 1px 3px rgba(0,0,0,.5); }
+  .ncard { position: absolute; left: 12px; width: 388px; height: 64px; padding: 12px 14px; border-radius: 22px; background: #2c2c2e;
+           display: grid; grid-template-columns: 40px 1fr; column-gap: 12px; align-items: center; }
+  .ncard.dim { background: #2a2a2d; }
+  .ncard .t { display: flex; justify-content: space-between; font: 600 15px/1.3 var(--sans); color: #fff; }
+  .ncard .t span:last-child { font: 400 13px var(--sans); color: var(--text-2); }
+  .ncard .b { font: 400 14px/1.35 var(--sans); color: rgba(235,235,245,.78); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ic { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; position: relative; flex: none; }
+  .ic svg { width: 22px; height: 22px; fill: #fff; }
+  .ic.round { border-radius: 50%; font: 600 15px var(--sans); color: #fff; }
+  .ic .badge { position: absolute; right: -4px; bottom: -4px; width: 18px; height: 18px; border-radius: 6px; display: grid; place-items: center; border: 2px solid #2c2c2e; }
+  .ic .badge svg { width: 10px; height: 10px; }
+  .sliver { position: absolute; height: 7px; border-radius: 0 0 12px 12px; }
+  .count { position: absolute; left: 0; right: 0; text-align: center; }
+  .count span { display: inline-block; padding: 7px 12px; border-radius: 15px; background: rgba(255,255,255,.16); font: 700 13px/1.25 var(--sans); color: #fff; }
+
+  .ldate { position: absolute; left: 0; right: 0; top: 60px; text-align: center; font: 400 18px/1.3 var(--sans); color: #fff; text-shadow: 0 0 6px rgba(0,0,0,.25); }
+  .lclock { position: absolute; left: 0; right: 0; top: 90px; text-align: center; font: 500 76px/1 var(--sans); color: #fff; text-shadow: 0 0 8px rgba(0,0,0,.25); }
+  .hint { position: absolute; left: 0; right: 0; bottom: 14px; text-align: center; font: 400 13px var(--sans); color: rgba(255,255,255,.7); }
+  .hint svg { display: block; width: 26px; height: 26px; margin: 0 auto 4px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; }
+
+  /* media player (MediaPlayerView) */
+  .player { position: absolute; left: 12px; width: 388px; padding: 16px 16px 12px; border-radius: 22px; background: var(--card); }
+  .player .pt { font: 600 16px/1.3 var(--sans); color: #fff; }
+  .player .pa { margin-top: 4px; font: 400 14px/1.3 var(--sans); color: var(--text-2); }
+  .ctl { margin-top: 10px; display: flex; justify-content: center; align-items: center; }
+  .ctl div { display: grid; place-items: center; border-radius: 50%; }
+  .ctl svg { fill: #fff; }
+  .seek { margin-top: 4px; display: flex; align-items: center; font: 400 12px var(--sans); color: var(--text-2); }
+  .seek .bar { flex: 1; height: 4px; border-radius: 2px; background: rgba(255,255,255,.2); position: relative; }
+  .seek .bar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 2px; background: #fff; }
+  .seek .bar b { position: absolute; top: -4px; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: #fff; }
+
+  /* Clock app */
+  .app { position: absolute; inset: 0; background: #111214; padding: 52px 20px 0; }
+  .app h1 { margin: 0 0 14px; font: 400 30px var(--sans); color: #fff; }
+  .alarm { margin-top: 10px; padding: 16px 18px; border-radius: 22px; background: #23252b; display: flex; align-items: center; justify-content: space-between; }
+  .alarm b { display: block; font: 400 40px/1 var(--sans); color: #fff; }
+  .alarm span { display: block; margin-top: 6px; font: 400 13px var(--sans); color: var(--text-2); }
+  .sw { width: 52px; height: 32px; border-radius: 16px; position: relative; flex: none; background: var(--accent); }
+  .sw::after { content: ""; position: absolute; left: 22px; top: 4px; width: 24px; height: 24px; border-radius: 50%; background: #0b305f; }
+  .sw.off { background: #44464f; }
+  .sw.off::after { left: 6px; background: #8e9099; }
+
+  .finger { position: absolute; width: 44px; height: 44px; margin: -22px 0 0 -22px; border-radius: 50%; z-index: 20;
+            background: rgba(255,255,255,.35); border: 2px solid rgba(255,255,255,.8); box-shadow: 0 2px 10px rgba(0,0,0,.4); }
+  .ripple { position: absolute; inset: 0; background: rgba(255,255,255,.18); border-radius: inherit; }
+</style>
+<body>
+<div id="bg"></div>
+<div id="bezel"></div>
+<div id="screen"><div id="ui"><div class="lay" id="layA"></div><div class="lay" id="layB"></div></div></div>
+<div id="capA"></div><div id="capB"></div>
+<div id="full"></div>
+
+<script>
+const W = 412, H = 883;
+// --- glyphs (24x24) and the made-up apps ---
+const P = {
+  chat: "M4,3h16a2,2 0,0 1,2 2v10a2,2 0,0 1,-2 2H9l-5,4v-4a2,2 0,0 1,-2 -2V5a2,2 0,0 1,2 -2z",
+  parcel: "M12,2l9,4.5v11L12,22l-9,-4.5v-11L12,2zM12,4.2L6.2,7.1 12,10l5.8,-2.9L12,4.2zM5,8.7v7.6l6,3v-7.6l-6,-3zM19,8.7l-6,3v7.6l6,-3V8.7z",
+  calendar: "M7,2h2v2h6V2h2v2h2a2,2 0,0 1,2 2v14a2,2 0,0 1,-2 2H5a2,2 0,0 1,-2 -2V6a2,2 0,0 1,2 -2h2V2zM5,9v11h14V9H5zM7,11h4v4H7v-4z",
+  bank: "M12,2L21,7v2H3V7l9,-5zM5,10h2v7H5v-7zM9,10h2v7H9v-7zM13,10h2v7h-2v-7zM17,10h2v7h-2v-7zM3,18h18v3H3v-3z",
+  music: "M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z",
+  send: "M2.01 21 23 12 2.01 3 2 10l15 2-15 2z",
+  prev: "M6 6h2v12H6zm3.5 6 8.5 6V6z",
+  next: "M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z",
+  pause: "M6 19h4V5H6v14zm8-14v14h4V5h-4z",
+  back: "M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z",
+};
+const svg = (g, s = "") => `<svg viewBox="0 0 24 24" ${s}><path d="${P[g]}"/></svg>`;
+const FINGERPRINT = `<svg viewBox="0 0 24 24"><path d="M6.5 6.2A7.5 7.5 0 0 1 19.5 11"/><path d="M4.6 9.2A7.6 7.6 0 0 0 4.5 13"/><path d="M8 18.6c-.9-1.6-1.4-3.3-1.4-5.1a5.4 5.4 0 0 1 10.8 0v.6"/><path d="M11 21c-1.2-2.2-1.9-4.6-1.9-7a2.9 2.9 0 0 1 5.8 0c0 1.8 1.2 2.8 2.6 2.8"/><path d="M12 13.6c0 3 1.3 5.4 3.4 7"/></svg>`;
+const APPS = [
+  ["Murmur", "chat", "#2EAD6B"], ["Daybook", "calendar", "#4C6FE0"], ["Fernbank", "bank", "#14806F"], ["Parcelly", "parcel", "#E8813A"],
+  ["Hum Music", "music", "#7E57C2"],
+].map(([name, g, c]) => ({ name, g, c }));
+const app = (n) => APPS.find((a) => a.name === n);
+const icon = (a) => `<div class="ic" style="background:${a.c}">${svg(a.g)}</div>`;
+
+// --- timing helpers ---
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const ease = (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+const out = (x) => 1 - Math.pow(1 - x, 3);
+const k = (t, t0, t1) => ease(clamp((t - t0) / (t1 - t0)));
+const ko = (t, t0, t1) => out(clamp((t - t0) / (t1 - t0)));
+const mix = (a, b, x) => a + (b - a) * x;
+// A tap: finger shows 0.35 s before, presses at t0, lifts 0.25 s after.
+const tapAt = (t, t0) => ({ o: k(t, t0 - 0.35, t0 - 0.15) * (1 - k(t, t0 + 0.25, t0 + 0.45)), press: k(t, t0 - 0.05, t0) * (1 - k(t, t0 + 0.12, t0 + 0.2)), rip: clamp(1 - Math.abs(t - t0 - 0.08) / 0.2) });
+const finger = (x, y, o, press = 0) => (o > 0 ? `<div class="finger" style="left:${x}px;top:${y}px;opacity:${o};transform:scale(${1 - press * 0.15})"></div>` : "");
+const ripple = (on) => (on > 0 ? `<div class="ripple" style="opacity:${on}"></div>` : "");
+const status = (o = 1) => `<div class="status" style="opacity:${o}"><span></span><span style="display:flex;gap:6px">▂▄▆ <span class="batt"></span></span></div>`;
+
+// --- the lock-screen view ---
+// New, then Earlier, newest first: what the Pile folds away (Earlier only shows once it's open).
+const NEW = [
+  { a: "Murmur", person: ["MC", "#F06292"], title: "Maya Chen", body: "Look at this view", time: "now" },
+  { a: "Daybook", title: "Design review in 15 min", body: "11:00 · Room 4", time: "2m" },
+  { a: "Fernbank", title: "You paid Corner Café", body: "€4.20 · Main account", time: "6m" },
+];
+const EARLIER = [
+  { a: "Parcelly", title: "Out for delivery", body: "Arriving today, 2–4 PM", time: "31m", dim: 1 },
+  { a: "Murmur", person: ["H", "#64B5F6"], title: "Hiking crew", body: "Emma Wilson: I’ll drive, room for three", time: "1h", dim: 1 },
+];
+// o fades the card; inner fades only what's on it, so a card sliding out from under another stays solid.
+function ncard(c, y, o = 1, extra = "", inner = 1) {
+  const a = app(c.a);
+  const ic = c.person
+    ? `<div class="ic round" style="background:${c.person[1]}">${c.person[0]}<span class="badge" style="background:${a.c}">${svg(a.g)}</span></div>`
+    : icon(a);
+  return `<div class="ncard ${c.dim ? "dim" : ""}" style="top:${y}px;opacity:${o};${extra}"><div style="opacity:${inner}">${ic}</div><div style="min-width:0;opacity:${inner}"><div class="t"><span>${c.title}</span><span>${c.time}</span></div><div class="b">${c.body}</div></div></div>`;
+}
+const wall = (blurArt = 0) => `<div class="wall"></div>` + (blurArt > 0
+  ? `<div class="fill" style="opacity:${blurArt};filter:blur(34px) saturate(1.3);transform:scale(1.35)">${ALBUM}</div>`
+  : "") + `<div class="fill" style="background:rgba(0,0,0,${0.3 + 0.12 * blurArt})"></div>`;
+const hint = (glow = 0) => `<div class="hint" style="${glow ? `color:${glow > 0.5 ? "#fff" : ""}` : ""}">
+  <div style="transform:scale(${1 + 0.25 * glow});${glow ? `filter:drop-shadow(0 0 ${10 * glow}px ${"#a8c7fa"})` : ""}">${FINGERPRINT}</div>Tap to unlock</div>`;
+
+// The open list: New's label and cards from the top, then Earlier.
+const OPEN = (() => {
+  const ys = [];
+  let y = 68;
+  NEW.forEach(() => { ys.push(y); y += 74; });
+  y += 38;
+  EARLIER.forEach(() => { ys.push(y); y += 74; });
+  return ys;
+})();
+const CLOCK_BOTTOM = 170;
+// p: how far the Pile has unfolded (0 resting, 1 open). opts.top: the Pile's top card (for a
+// different resting place, as with the player); opts.press: the top card held.
+function lockView(p, opts = {}) {
+  const n = opts.cards ?? NEW.length;
+  const all = [...NEW.slice(0, n), ...(opts.earlier === false ? [] : EARLIER)];
+  const pileY = opts.pileY ?? (n > 1 ? 679 : 735);
+  const ys = all.map((c, i) => mix(pileY, OPEN[i < n ? i : NEW.length + (i - n)] - (i < n ? 0 : (NEW.length - n) * 74), p));
+  let h = "";
+  // Slivers and the count, fading as it unfolds, under the cards that slide out over them.
+  if (n > 1 && p < 0.34) {
+    const base = ys[0] + 64, fadeP = p * 3;
+    h += `<div class="sliver" style="left:${12 + 14}px;right:${12 + 14}px;top:${base}px;background:#3a3a3e;opacity:${1 - fadeP}"></div>`;
+    if (n > 2) h += `<div class="sliver" style="left:${12 + 30}px;right:${12 + 30}px;top:${base + 7}px;background:#323236;opacity:${1 - fadeP}"></div>`;
+    h += `<div class="count" style="top:${base + (n > 2 ? 14 : 7) + 10}px;opacity:${1 - fadeP}"><span>${n - 1} more</span></div>`;
+  }
+  // Folded cards first, so the top card covers them while they're still behind it.
+  // Each comes into view as it slides clear of the card above it.
+  for (let i = all.length - 1; i >= 1; i--) h += ncard(all[i], ys[i], p > 0 ? 1 : 0, "", clamp((ys[i] - ys[i - 1] - 30) / 34));
+  h += ncard(all[0], ys[0], opts.hideTop ? 0 : 1, opts.press ? `transform:scale(${1 - 0.03 * opts.press})` : "");
+  // Section labels come in with the list.
+  if (p > 0) {
+    h += `<div class="sec" style="top:${ys[0] - 22}px;opacity:${p}">New</div>`;
+    h += `<div class="sec" style="top:${ys[n] - 22}px;opacity:${clamp((p - 0.6) / 0.4)}">Earlier</div>`;
+  }
+  // The clock stays until the list reaches it, then is pushed up and fades.
+  const edge = p > 0 ? ys[0] - 24 : H;
+  return wall(opts.blurArt ?? 0) + (opts.extra ?? "") + h + clockLayer(edge, opts) + hint(opts.glow ?? 0) + status();
+}
+// The date and clock; edge: where the list's top is, which pushes them up once it reaches them.
+function clockLayer(edge, opts = {}) {
+  const push = Math.min(0, edge - CLOCK_BOTTOM);
+  return `<div class="fill" style="transform:translateY(${push}px);opacity:${clamp(1 + push / 140)}">
+    <div class="ldate" id="date" style="${opts.datePress ? `opacity:${1 - 0.3 * opts.datePress}` : ""}">Friday, 20 November</div><div class="lclock" id="clock" style="${opts.clockPress ? `opacity:${1 - 0.3 * opts.clockPress}` : ""}">9:41</div></div>`;
+}
+
+// --- a made-up album cover ---
+const ALBUM = `<svg viewBox="0 0 300 300" preserveAspectRatio="xMidYMid slice" style="width:100%;height:100%;display:block">
+  <defs><linearGradient id="ask" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1a0b3d"/><stop offset=".55" stop-color="#7b2a8c"/><stop offset="1" stop-color="#ff6f61"/></linearGradient>
+  <linearGradient id="asun" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe066"/><stop offset="1" stop-color="#ff4f8b"/></linearGradient>
+  <clipPath id="acut"><rect x="0" y="0" width="300" height="200"/></clipPath></defs>
+  <rect width="300" height="300" fill="url(#ask)"/>
+  <g clip-path="url(#acut)"><circle cx="150" cy="170" r="78" fill="url(#asun)"/>
+  ${[0, 1, 2, 3, 4].map((i) => `<rect x="60" y="${158 + i * 9}" width="180" height="${2 + i}" fill="#7b2a8c"/>`).join("")}</g>
+  <rect x="0" y="200" width="300" height="100" fill="#14082c"/>
+  ${[0, 1, 2, 3, 4, 5].map((i) => `<line x1="0" y1="${206 + i * i * 3}" x2="300" y2="${206 + i * i * 3}" stroke="#ff4f8b" stroke-opacity=".6" stroke-width="1.2"/>`).join("")}
+  ${[-4, -3, -2, -1, 0, 1, 2, 3, 4].map((i) => `<line x1="${150 + i * 14}" y1="200" x2="${150 + i * 70}" y2="300" stroke="#ff4f8b" stroke-opacity=".6" stroke-width="1.2"/>`).join("")}
+</svg>`;
+function player(y, prog, thumb = 0) {
+  const ctl = (g, s, chip) => `<div style="width:${s}px;height:${s}px;${chip ? "background:rgba(255,255,255,.14);" : ""}">${svg(g, `style="width:${s > 44 ? 28 : 24}px;height:${s > 44 ? 28 : 24}px"`)}</div>`;
+  const el = Math.round(72 + prog), total = 204;
+  const time = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+  // The thumbnail's room; the artwork itself is drawn over it by musicView as it shrinks.
+  const thumbBox = thumb > 0 ? `<div style="width:${64 * thumb}px;height:64px;margin-right:${14 * thumb}px;flex:none"></div>` : "";
+  return `<div class="player" style="top:${y}px"><div style="display:flex;align-items:center;min-height:${thumb > 0 ? 64 : 0}px">${thumbBox}<div><div class="pt">Night Drive</div><div class="pa">Lumen Coast · Hum Music</div></div></div>
+    <div class="ctl">${ctl("prev", 44)}<div style="width:28px"></div>${ctl("pause", 56, true)}<div style="width:28px"></div>${ctl("next", 44)}</div>
+    <div class="seek"><span style="width:44px">${time(el)}</span><div class="bar"><i style="width:${(el / total) * 100}%"></i><b style="left:${(el / total) * 100}%"></b></div><span style="width:44px;text-align:right;margin-left:4px">${time(total)}</span></div></div>`;
+}
+// With music playing and one message New: the artwork, the player under it, the Pile under that.
+// s: how far the list has opened (0 resting, 1 open); the artwork shrinks into the player's
+// thumbnail as the player rises to the top, and Maya's card follows under it.
+function musicView(t, a = 1, s = 0) {
+  const py = mix(540, 52, s);
+  const ax = mix(36, 28, s), ay = mix(188, py + 16, s), as = mix(340, 64, s), ar = mix(24, 14, s);
+  const art = `<div style="position:absolute;left:${ax}px;top:${ay}px;width:${as}px;height:${as}px;border-radius:${ar}px;overflow:hidden;opacity:${a};transform:scale(${0.92 + 0.08 * a});transform-origin:0 0;box-shadow:0 12px 40px rgba(0,0,0,${0.45 * (1 - s)});z-index:2">${ALBUM}</div>`;
+  const cy = mix(735, 270, s);
+  const label = s > 0 ? `<div class="sec" style="top:${cy - 22}px;opacity:${s}">New</div>` : "";
+  return wall(a) + `<div class="fill" style="opacity:${a}">` + player(py, (t - 14) * 1.0, s) + art + label + ncard(NEW[0], cy) + `</div>` +
+    clockLayer(s > 0 ? ay - 8 : H) + hint() + status();
+}
+
+// The Clock app's alarms, after the unlock.
+const clockApp = (up) => `<div class="app" style="transform:translateY(${(1 - up) * 60}px);opacity:${up}"><h1>Alarms</h1>
+  <div class="alarm"><div><b>6:45</b><span>Weekdays</span></div><span class="sw"></span></div>
+  <div class="alarm"><div><b>7:30</b><span>Every day</span></div><span class="sw off"></span></div>
+  <div class="alarm"><div><b>9:00</b><span>Sat, Sun</span></div><span class="sw off"></span></div></div>`;
+// A made-up calendar app, opened at today (Friday 20 November 2026; the 1st is a Sunday).
+const calendarApp = (up) => {
+  const days = Array.from({ length: 35 }, (_, i) => i + 1).map((d) => d <= 30
+    ? `<div style="height:38px;display:grid;place-items:center;font:400 15px var(--sans);color:#fff"><span style="width:32px;height:32px;border-radius:16px;display:grid;place-items:center;${d === 20 ? "background:#a8c7fa;color:#0b305f;font-weight:600" : ""}">${d}</span></div>`
+    : "<div></div>").join("");
+  return `<div class="app" style="transform:translateY(${(1 - up) * 60}px);opacity:${up}"><h1>November 2026</h1>
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);font:600 12px var(--sans);color:var(--text-2);text-align:center;margin-bottom:6px">${"SMTWTFS".split("").map((d) => `<div>${d}</div>`).join("")}</div>
+    <div style="display:grid;grid-template-columns:repeat(7,1fr)">${days}</div>
+    <div style="margin-top:18px;font:600 14px var(--sans);color:#a8c7fa">Today · Friday, 20 November</div>
+    <div class="alarm" style="margin-top:10px;border-left:4px solid #4C6FE0"><div><b style="font-size:17px">Design review</b><span>11:00 – 12:00 · Room 4</span></div></div>
+    <div class="alarm"><div><b style="font-size:17px">Lunch with Emma</b><span>13:00 – 14:00</span></div></div></div>`;
+};
+
+// Settings → Lock screen, from a render of the real page (shots/settings-lock.png, 2x), with the
+// Double-tap to sleep switch drawn over it so it can be flipped.
+function m3Switch(on) {
+  const track = on ? "#b0c6ff" : "#2f3036", edge = on ? "#b0c6ff" : "#8f9099";
+  const d = mix(16, 24, on), x = mix(7, 50 - 3 - 24, on) + (on ? 0 : 0);
+  return `<div style="position:absolute;left:324px;top:537px;width:56px;height:36px;background:#1f2025">
+    <div id="dtsw" style="position:absolute;left:3px;top:3px;width:50px;height:30px;border-radius:15px;background:${track};box-shadow:inset 0 0 0 2px ${edge}">
+      <div style="position:absolute;left:${x + (24 - d) / 2 * (1 - on)}px;top:${(30 - d) / 2}px;width:${d}px;height:${d}px;border-radius:50%;background:${on ? "#0f2c66" : "#8f9099"};display:grid;place-items:center">
+        ${on > 0.5 ? `<svg viewBox="0 0 24 24" style="width:16px;height:16px"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z" fill="#b0c6ff"/></svg>` : ""}</div></div></div>`;
+}
+const lockSettings = (on, rip = 0) => `<div class="fill" style="background:#0f1013"></div>
+  <img src="shots/settings-lock.png" style="position:absolute;left:0;top:24px;width:412px">${m3Switch(on)}
+  ${rip > 0 ? `<div style="position:absolute;left:310px;top:${500}px;width:84px;height:110px;border-radius:42px;background:rgba(255,255,255,${0.12 * rip})"></div>` : ""}${status()}`;
+// An annotation outside the app: how long until the display really sleeps.
+const note = (text, o) => o > 0 ? `<div style="position:absolute;left:0;right:0;top:330px;text-align:center;opacity:${o}"><span style="display:inline-block;padding:8px 16px;border-radius:18px;border:1.5px dashed rgba(168,199,250,.7);font:500 18px var(--serif);color:#c9d8fb;letter-spacing:.01em">${text}</span></div>` : "";
+const black = (lit = 1) => `<div class="fill" style="background:${lit ? "#050506" : "#000"}"></div>`;
+
+// --- scenes: [start, end, kicker, caption, draw(t)] ---
+const SCENES = [
+  [2.25, 7.4, "Room for the time", "The clock stays big. New waits at the bottom, <b>as a pile</b>.", (t) => {
+    // The phone wakes: black, then the view.
+    const on = k(t, 2.7, 3.0);
+    return black(0) + `<div class="fill" style="opacity:${on}">${lockView(0)}</div>`;
+  }],
+  [7.4, 15.4, "See everything", "<b>Tap</b> the pile or drag it up. <b>Back</b> puts it away again.", (t) => {
+    // Tap: it unfolds and scrolls New to the top. Back folds it. Then the same by dragging.
+    const tp = tapAt(t, 8.1), open1 = k(t, 8.2, 8.75), back1 = k(t, 9.9, 10.4);
+    const drag = k(t, 11.3, 12.7), back2 = k(t, 14.0, 14.5);
+    const p = t < 11 ? open1 * (1 - back1) : drag * (1 - back2);
+    const fy = mix(712, 260, drag), fo = k(t, 11.0, 11.25) * (1 - k(t, 12.7, 12.9));
+    const backSwipe = (t0) => {
+      const bx = mix(0, 70, k(t, t0, t0 + 0.45)), bo = k(t, t0 - 0.15, t0) * (1 - k(t, t0 + 0.45, t0 + 0.65));
+      return (bo > 0 ? `<div style="position:absolute;left:${bx - 26}px;top:420px;width:36px;height:36px;border-radius:18px;background:rgba(255,255,255,.85);display:grid;place-items:center;opacity:${bo}">${svg("back", `style="width:20px;height:20px;fill:#000"`)}</div>` : "") + finger(bx, 438, bo);
+    };
+    return lockView(p) + finger(206, 711, tp.o, tp.press) + finger(206, fy, fo) + backSwipe(9.5) + backSwipe(13.6);
+  }],
+  [15.4, 20.8, "Music wakes it", "Press play and the lock screen comes up <b>on its own</b>: the art large, over a blur of it.", (t) => {
+    // The screen is off while music plays; Chronotif's lock screen comes up with the artwork.
+    const wake = k(t, 16.3, 16.6), a = k(t, 16.4, 17.2);
+    return black(0) + `<div class="fill" style="opacity:${wake}">${musicView(t, a)}</div>`;
+  }],
+  [20.8, 26.0, "Into the player", "Drag up and the art <b>shrinks into the player</b> as the list opens.", (t) => {
+    const d = k(t, 21.6, 23.2), back = k(t, 24.6, 25.1);
+    const s = d * (1 - back);
+    const fy = mix(712, 300, d), fo = k(t, 21.3, 21.55) * (1 - k(t, 23.2, 23.4));
+    return musicView(t, 1, s) + finger(300, fy, fo);
+  }],
+  [26.0, 33.4, "Clock and date", "Tap the clock for your <b>alarms</b>, the date for your <b>calendar</b>. Both ask you to unlock first.", (t) => {
+    const c = tapAt(t, 26.7), d = tapAt(t, 30.1);
+    let h;
+    if (t < 29.5) {
+      const ask = k(t, 26.85, 27.05) * (1 - k(t, 28.0, 28.2)), up = k(t, 28.1, 28.5);
+      h = (up < 1 ? lockView(0, { glow: ask, clockPress: c.press }) : "") + (up > 0 ? clockApp(up) + status() : "");
+    } else {
+      const back = k(t, 29.5, 29.8);
+      const ask = k(t, 30.25, 30.45) * (1 - k(t, 31.4, 31.6)), up = k(t, 31.5, 31.9);
+      h = (up < 1 ? `<div class="fill" style="opacity:${back}">${lockView(0, { glow: ask, datePress: d.press })}</div>` : "") + (up > 0 ? calendarApp(up) + status() : "");
+    }
+    return h + finger(206, 128, c.o, c.press) + finger(206, 76, d.o, d.press);
+  }],
+  [33.4, 39.4, "Double-tap to sleep", "Double-tap empty space and the screen goes <b>black at once</b>. The phone sleeps a few seconds later.", (t) => {
+    const a = tapAt(t, 34.3), b = tapAt(t, 34.55);
+    const dark = t >= 34.62;
+    // Black at the lowest brightness right away; the display itself goes off when Android's
+    // shortest timeout runs out (6 s on HyperOS), shown here shortened.
+    const left = Math.ceil(clamp(38.4 - t, 0, 4));
+    const asleep = t >= 38.4;
+    const n = dark ? note(asleep ? "Display off" : `Display sleeps in ${left} s`, k(t, 34.9, 35.2) * (1 - k(t, 39.0, 39.3))) : "";
+    return (dark ? black(asleep ? 0 : 1) : lockView(0)) + finger(206, 420, Math.max(a.o, b.o) * (dark ? 0 : 1), Math.max(a.press, b.press)) + n;
+  }],
+  [39.4, 44.4, "Changed your mind?", "Double-tap the black screen <b>before it sleeps</b>, and it’s all back.", (t) => {
+    const a0 = tapAt(t, 40.0), a1 = tapAt(t, 40.25), b0 = tapAt(t, 42.0), b1 = tapAt(t, 42.25);
+    const dark = t >= 40.32 && t < 42.32;
+    const n = dark ? note("Display sleeps in " + Math.ceil(clamp(46.3 - t, 0, 6)) + " s", k(t, 40.4, 40.6) * (1 - k(t, 42.2, 42.35))) : "";
+    const tapO = Math.max(a0.o, a1.o) * (t < 40.32 ? 1 : 0) + Math.max(b0.o, b1.o);
+    return (dark ? black(1) : lockView(0)) + n + finger(206, 420, Math.min(1, tapO), Math.max(a0.press, a1.press, b0.press, b1.press));
+  }],
+  [44.4, 49.6, "Your call", "Turn it off under Settings → Lock screen → <b>Double-tap to sleep</b>.", (t) => {
+    const tp = tapAt(t, 45.6);
+    const on = 1 - k(t, 45.65, 45.85);
+    return { html: lockSettings(on, tp.rip), tap: tp.o > 0 ? { id: "dtsw", o: tp.o, press: tp.press } : null };
+  }],
+];
+const FULL = [
+  [0, 2.6, `<div class="big">Chronotif</div><div class="small">What’s new in <b>0.2.7</b>, part 2: the <b>lock screen</b>.</div>`],
+  [49.25, 54.6, `<div class="big">Help shape it</div><div class="small">Ideas or bugs? Tell us. Chronotif gets better from what you report.</div>
+    <div class="url">github.com/nagarete/chronotif/issues</div><div class="url2">chronotif.com</div>`],
+];
+const XF = 0.35;
+const $ = (id) => document.getElementById(id);
+const capHTML = (kick, text) => `<div class="cap"><div><div class="kicker">${kick}</div>${text}</div></div>`;
+const S = 1.6311;
+
+// Puts a scene into a layer; a scene may return { html, tap: { id, o, press } } to put the finger on
+// an element by id, measured after layout.
+function paint(el, r) {
+  const { html, tap } = typeof r === "string" ? { html: r, tap: null } : r;
+  el.innerHTML = html;
+  if (tap) {
+    const target = el.querySelector(`#${tap.id}`);
+    if (target) {
+      const b = target.getBoundingClientRect(), s = $("screen").getBoundingClientRect();
+      el.insertAdjacentHTML("beforeend", finger((b.left + b.width / 2 - s.left) / S, (b.top + b.height / 2 - s.top) / S, tap.o, tap.press));
+    }
+  }
+}
+
+function render(t) {
+  let i = SCENES.findIndex(([t0, t1]) => t >= t0 && t < t1);
+  if (i < 0) i = t < SCENES[0][0] ? 0 : SCENES.length - 1;
+  const [t0, , kick, text, draw] = SCENES[i];
+  const prev = SCENES[i - 1];
+  const fade = prev ? k(t, t0, t0 + XF) : 1;
+  paint($("layA"), prev && fade < 1 ? prev[4](prev[1]) : "");
+  paint($("layB"), draw(t));
+  $("layB").style.opacity = fade;
+  $("capA").innerHTML = prev && fade < 1 ? capHTML(prev[2], prev[3]) : "";
+  $("capA").style.opacity = 1 - fade;
+  $("capB").innerHTML = capHTML(kick, text);
+  $("capB").style.opacity = clamp((t - t0 - 0.15) / 0.3);
+  $("full").innerHTML = FULL.filter(([f0, f1]) => t >= f0 && t < f1).map(([f0, f1, html]) =>
+    `<div class="full" style="opacity:${f0 === 0 ? 1 - k(t, f1 - XF, f1) : k(t, f0, f0 + XF)}">${html}</div>`).join("");
+}
+window.render = render;
+window.DURATION = 54.6;
+render(Number(new URLSearchParams(location.search).get("t") ?? 0));
+</script>

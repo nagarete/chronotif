@@ -1,0 +1,501 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Chronotif 0.2.7 without unlocking</title>
+<!-- Part 3 of the 0.2.7 video: what works on the lock screen without unlocking. Drawn frame by
+     frame like lock.html, whose lock-screen view, Preview and keyboard it copies: render(t) sets
+     everything from the time t in seconds, in dp (412x883). Search follows search.html
+     (SearchOverlay.kt), and Settings → Lock screen follows SetupActivity's Material 3 page. Apps,
+     people and notifications are the same made-up ones as the other videos. -->
+<style>
+  :root {
+    --card: rgba(44,44,46,.92); --text-2: rgba(235,235,245,.6); --accent: #a8c7fa;
+    --serif: "Newsreader", Georgia, serif; --sans: "Noto Sans", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; width: 1080px; height: 1920px; overflow: hidden; background: #0b0c10; }
+  body { font-family: var(--sans); color: #f4f1ea; }
+  #bg { position: absolute; inset: 0; background: radial-gradient(1080px 1920px at 50% 0%, #1b2236 0%, #0b0c10 100%); }
+  #bezel { position: absolute; left: 192px; top: 428px; width: 696px; height: 1464px; border-radius: 60px; background: #2a2d36; }
+  #bezel::after { content: ""; position: absolute; inset: 4px; border-radius: 57px; background: #08090c; }
+  #screen { position: absolute; left: 204px; top: 440px; width: 672px; height: 1440px; border-radius: 48px; overflow: hidden; background: #000; }
+  #ui { position: absolute; left: 0; top: 0; width: 412px; height: 883px; transform: scale(1.6311); transform-origin: 0 0; }
+  .lay { position: absolute; inset: 0; overflow: hidden; }
+
+  /* captions, as captions.mjs draws them */
+  .cap { position: absolute; left: 90px; right: 90px; top: 100px; height: 340px; display: grid; place-items: center;
+         text-align: center; font: 500 56px/1.22 var(--serif); letter-spacing: -0.01em; text-wrap: balance; }
+  .cap b { font-weight: 700; color: #9db8ff; }
+  .kicker { font: 600 30px/1 var(--sans); letter-spacing: .16em; text-transform: uppercase; color: #9db8ff; margin-bottom: 26px; }
+  .full { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; gap: 28px;
+          background: radial-gradient(120% 70% at 50% 35%, #1b2236 0%, #0b0c10 60%); }
+  .big { font: 600 150px/1 var(--serif); letter-spacing: -0.03em; }
+  .small { font: 400 52px/1.3 var(--serif); color: #c9c6bf; max-width: 820px; margin: 0 auto; text-wrap: balance; }
+  .small b { color: #9db8ff; font-weight: 600; }
+  .url { margin-top: 30px; font: 600 46px/1 var(--sans); color: #9db8ff; letter-spacing: 0.02em; }
+  .url2 { font: 500 36px/1.3 "Noto Sans Mono", monospace; color: #c9c6bf; }
+
+  /* --- inside the phone, in dp --- */
+  .fill { position: absolute; inset: 0; }
+  .wall { position: absolute; inset: 0; background: linear-gradient(160deg, #3a4a78 0%, #1d2440 45%, #121522 100%); }
+  .status { position: absolute; left: 0; right: 0; top: 0; height: 32px; padding: 8px 22px 0; display: flex; justify-content: space-between;
+            font: 500 13px var(--sans); color: #fff; z-index: 5; }
+  .batt { width: 22px; height: 11px; border: 1.5px solid #fff; border-radius: 3px; position: relative; margin-top: 3px; }
+  .batt::after { content: ""; position: absolute; left: 1.5px; top: 1.5px; bottom: 1.5px; width: 13px; background: #fff; border-radius: 1px; }
+  .sec { position: absolute; left: 26px; font: 700 13px var(--sans); color: rgba(255,255,255,.75); text-shadow: 0 1px 3px rgba(0,0,0,.5); }
+  .ncard { position: absolute; left: 12px; width: 388px; height: 64px; padding: 12px 14px; border-radius: 22px; background: #2c2c2e;
+           display: grid; grid-template-columns: 40px 1fr; column-gap: 12px; align-items: center; }
+  .ncard.dim { background: #2a2a2d; }
+  .ncard .t { display: flex; justify-content: space-between; font: 600 15px/1.3 var(--sans); color: #fff; }
+  .ncard .t span:last-child { font: 400 13px var(--sans); color: var(--text-2); }
+  .ncard .b { font: 400 14px/1.35 var(--sans); color: rgba(235,235,245,.78); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ic { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; position: relative; flex: none; }
+  .ic svg { width: 22px; height: 22px; fill: #fff; }
+  .ic.round { border-radius: 50%; font: 600 15px var(--sans); color: #fff; }
+  .ic .badge { position: absolute; right: -4px; bottom: -4px; width: 18px; height: 18px; border-radius: 6px; display: grid; place-items: center; border: 2px solid #2c2c2e; }
+  .ic .badge svg { width: 10px; height: 10px; }
+  .sliver { position: absolute; height: 7px; border-radius: 0 0 12px 12px; }
+  .count { position: absolute; left: 0; right: 0; text-align: center; }
+  .count span { display: inline-block; padding: 7px 12px; border-radius: 15px; background: rgba(255,255,255,.16); font: 700 13px/1.25 var(--sans); color: #fff; }
+
+  .ldate { position: absolute; left: 0; right: 0; top: 60px; text-align: center; font: 400 18px/1.3 var(--sans); color: #fff; text-shadow: 0 0 6px rgba(0,0,0,.25); }
+  .lclock { position: absolute; left: 0; right: 0; top: 90px; text-align: center; font: 500 76px/1 var(--sans); color: #fff; text-shadow: 0 0 8px rgba(0,0,0,.25); }
+  .hint { position: absolute; left: 0; right: 0; bottom: 14px; text-align: center; font: 400 13px var(--sans); color: rgba(255,255,255,.7); }
+  .hint svg { display: block; width: 26px; height: 26px; margin: 0 auto 4px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; }
+
+  /* media player (MediaPlayerView) */
+  .player { position: absolute; left: 12px; width: 388px; padding: 16px 16px 12px; border-radius: 22px; background: var(--card); }
+  .player .pt { font: 600 16px/1.3 var(--sans); color: #fff; }
+  .player .pa { margin-top: 4px; font: 400 14px/1.3 var(--sans); color: var(--text-2); }
+  .ctl { margin-top: 10px; display: flex; justify-content: center; align-items: center; }
+  .ctl div { display: grid; place-items: center; border-radius: 50%; }
+  .ctl svg { fill: #fff; }
+  .seek { margin-top: 4px; display: flex; align-items: center; font: 400 12px var(--sans); color: var(--text-2); }
+  .seek .bar { flex: 1; height: 4px; border-radius: 2px; background: rgba(255,255,255,.2); position: relative; }
+  .seek .bar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 2px; background: #fff; }
+  .seek .bar b { position: absolute; top: -4px; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: #fff; }
+
+  /* Preview (CardPreview) */
+  .pcard { border-radius: 22px; background: #2c2c2e; overflow: hidden; }
+  .phead { display: grid; grid-template-columns: 40px 1fr; column-gap: 12px; padding: 12px 14px; align-items: center; }
+  .phead .t { display: flex; justify-content: space-between; font: 600 16px/1.3 var(--sans); color: #fff; }
+  .phead .t span:last-child { font: 400 13px var(--sans); color: var(--text-2); }
+  .phead .b { margin-top: 2px; font: 400 15px/1.35 var(--sans); color: #fff; }
+  .pbtn { display: flex; align-items: center; width: fit-content; position: relative; overflow: hidden; margin-top: 8px; min-width: 180px; height: 52px; padding: 0 28px 0 22px;
+          border-radius: 26px; background: #2c2c2e; font: 600 16px var(--sans); color: #fff; }
+  .reply { display: flex; align-items: flex-end; margin-top: 10px; }
+  .reply .in { flex: 1; min-height: 44px; padding: 11px 16px; border-radius: 22px; background: #2c2c2e; font: 400 16px/22px var(--sans); color: #fff; }
+  .reply .in.empty { color: var(--text-2); }
+  .reply .send { width: 44px; height: 44px; margin-left: 8px; border-radius: 22px; background: var(--accent); display: grid; place-items: center; position: relative; overflow: hidden; }
+  .reply .send svg { width: 22px; height: 22px; fill: #fff; }
+  .caret { display: inline-block; width: 2px; height: 19px; margin-left: 1px; vertical-align: -3px; background: var(--accent); }
+  .kb { position: absolute; left: 0; right: 0; bottom: 0; height: 268px; background: #1b1c20; padding: 10px 4px 0; }
+  .kr { display: flex; justify-content: center; gap: 5px; margin-top: 9px; }
+  .kr div { width: 35px; height: 46px; border-radius: 7px; background: #3a3b40; display: grid; place-items: center; font: 400 20px var(--sans); color: #fff; }
+  .kr div.w { width: 54px; background: #2b2c31; font-size: 14px; }
+  .kr div.sp { width: 190px; }
+
+  /* Clock app */
+  .app { position: absolute; inset: 0; background: #111214; padding: 52px 20px 0; }
+  .app h1 { margin: 0 0 14px; font: 400 30px var(--sans); color: #fff; }
+  .alarm { margin-top: 10px; padding: 16px 18px; border-radius: 22px; background: #23252b; display: flex; align-items: center; justify-content: space-between; }
+  .alarm b { display: block; font: 400 40px/1 var(--sans); color: #fff; }
+  .alarm span { display: block; margin-top: 6px; font: 400 13px var(--sans); color: var(--text-2); }
+  .sw { width: 52px; height: 32px; border-radius: 16px; position: relative; flex: none; background: var(--accent); }
+  .sw::after { content: ""; position: absolute; left: 22px; top: 4px; width: 24px; height: 24px; border-radius: 50%; background: #0b305f; }
+  .sw.off { background: #44464f; }
+  .sw.off::after { left: 6px; background: #8e9099; }
+
+  .finger { position: absolute; width: 44px; height: 44px; margin: -22px 0 0 -22px; border-radius: 50%; z-index: 20;
+            background: rgba(255,255,255,.35); border: 2px solid rgba(255,255,255,.8); box-shadow: 0 2px 10px rgba(0,0,0,.4); }
+  .ripple { position: absolute; inset: 0; background: rgba(255,255,255,.18); border-radius: inherit; }
+  /* Search over the lock-screen view (SearchOverlay, as in search.html) */
+  .search { position: absolute; inset: 0; background: rgba(0,0,0,.5); }
+  .field { position: absolute; left: 12px; width: 388px; height: 44px; border-radius: 14px; background: var(--card);
+           display: flex; align-items: center; padding: 0 12px; font: 400 17px var(--sans); color: #fff; white-space: pre; }
+  .field svg { width: 18px; height: 18px; fill: var(--text-2); margin-right: 8px; flex: none; }
+  .field .fhint { color: var(--text-2); }
+  .results { position: absolute; left: 12px; width: 388px; top: 48px; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; }
+  .scard { border-radius: 22px; background: var(--card); margin-top: 10px; overflow: hidden; position: relative; flex: none; }
+  .stitle { padding: 12px 16px 2px; font: 700 13px var(--sans); color: var(--text-2); }
+  .srow { display: flex; align-items: center; padding: 8px 14px; min-height: 56px; position: relative; }
+  .srow .lead { width: 40px; height: 40px; margin-right: 14px; display: grid; place-items: center; flex: none; }
+  .srow .lead > svg { width: 24px; height: 24px; fill: var(--text-2); }
+  .srow .tx { flex: 1; min-width: 0; font: 400 16px/1.3 var(--sans); color: #fff; }
+  .srow .tx small { display: block; font: 400 13px/1.35 var(--sans); color: var(--text-2); }
+  .act { width: 44px; height: 44px; display: grid; place-items: center; position: relative; border-radius: 22px; overflow: hidden; }
+  .act svg { width: 22px; height: 22px; fill: var(--accent); }
+  .avatar { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font: 700 17px var(--sans); color: #fff; }
+  .answer { padding: 14px 18px; }
+  .answer .s { font: 400 13px var(--sans); color: var(--text-2); }
+  .answer .v { margin-top: 4px; font: 700 30px/1.2 var(--sans); color: #fff; }
+  .answer .n { margin-top: 6px; font: 400 12px/1.4 var(--sans); color: var(--text-2); }
+  .pill { position: absolute; left: 24px; padding: 7px 14px; border-radius: 15px; background: rgba(255,255,255,.16); font: 700 13px/1.25 var(--sans); color: #fff; overflow: hidden; }
+
+  /* Settings → Lock screen, as SetupActivity draws it (Material 3, dark) */
+  .m3 { position: absolute; inset: 0; background: #0f1013; }
+  .m3 .bar { position: absolute; left: 12px; right: 12px; top: 10px; height: 52px; border-radius: 26px; background: #26272d; display: flex; align-items: center; padding: 0 16px; font: 400 16px var(--sans); color: #c5c6d0; }
+  .m3 .bar svg { width: 22px; height: 22px; fill: #e3e2e9; margin-right: 18px; }
+  .m3 h1 { position: absolute; left: 20px; top: 80px; margin: 0; font: 400 31px var(--sans); color: #e3e2e9; }
+  .m3 .grp { position: absolute; left: 16px; right: 16px; background: #1f2025; padding: 14px 18px; }
+  .m3 .grp b { display: block; font: 500 16px/1.3 var(--sans); color: #e3e2e9; }
+  .m3 .grp p { margin: 4px 0 0; font: 400 13.5px/1.42 var(--sans); color: #c5c6d0; }
+  .m3 .segs { display: flex; gap: 6px; margin-top: 10px; }
+  .m3 .segs div { flex: 1; height: 58px; border-radius: 20px; background: #26272d; display: grid; place-items: center; text-align: center; padding: 0 6px;
+                  font: 500 13px/1.3 var(--sans); color: #e3e2e9; position: relative; overflow: hidden; }
+  .m3 .segs div.on { background: #2f4578; color: #dbe1ff; }
+  .m3 .msw { position: absolute; right: 18px; width: 52px; height: 32px; border-radius: 16px; border: 2px solid #8e9099; }
+  .m3 .msw i { position: absolute; top: 6px; left: 6px; width: 16px; height: 16px; border-radius: 50%; background: #8e9099; }
+  .m3 .msw.on { background: #a8c7fa; border-color: #a8c7fa; }
+  .m3 .msw.on i { top: 2px; left: 22px; width: 24px; height: 24px; background: #0b305f; }
+
+  /* the unlock the system asks for */
+  .ask { position: absolute; inset: 0; background: rgba(0,0,0,.75); }
+  .ask .fp { position: absolute; left: 50%; top: 200px; width: 72px; height: 72px; margin-left: -36px; border-radius: 50%; background: rgba(168,199,250,.16); display: grid; place-items: center; color: #a8c7fa; }
+  .ask .fp svg { width: 40px; height: 40px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; }
+  .ask .msg { position: absolute; left: 0; right: 0; top: 290px; text-align: center; font: 400 15px var(--sans); color: #fff; }
+</style>
+<body>
+<div id="bg"></div>
+<div id="bezel"></div>
+<div id="screen"><div id="ui"><div class="lay" id="layA"></div><div class="lay" id="layB"></div></div></div>
+<div id="capA"></div><div id="capB"></div>
+<div id="full"></div>
+
+<script>
+const W = 412, H = 883;
+// --- glyphs (24x24) and the made-up apps ---
+const P = {
+  chat: "M4,3h16a2,2 0,0 1,2 2v10a2,2 0,0 1,-2 2H9l-5,4v-4a2,2 0,0 1,-2 -2V5a2,2 0,0 1,2 -2z",
+  parcel: "M12,2l9,4.5v11L12,22l-9,-4.5v-11L12,2zM12,4.2L6.2,7.1 12,10l5.8,-2.9L12,4.2zM5,8.7v7.6l6,3v-7.6l-6,-3zM19,8.7l-6,3v7.6l6,-3V8.7z",
+  calendar: "M7,2h2v2h6V2h2v2h2a2,2 0,0 1,2 2v14a2,2 0,0 1,-2 2H5a2,2 0,0 1,-2 -2V6a2,2 0,0 1,2 -2h2V2zM5,9v11h14V9H5zM7,11h4v4H7v-4z",
+  bank: "M12,2L21,7v2H3V7l9,-5zM5,10h2v7H5v-7zM9,10h2v7H9v-7zM13,10h2v7h-2v-7zM17,10h2v7h-2v-7zM3,18h18v3H3v-3z",
+  music: "M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z",
+  send: "M2.01 21 23 12 2.01 3 2 10l15 2-15 2z",
+  prev: "M6 6h2v12H6zm3.5 6 8.5 6V6z",
+  next: "M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z",
+  pause: "M6 19h4V5H6v14zm8-14v14h4V5h-4z",
+  back: "M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z",
+};
+const svg = (g, s = "") => `<svg viewBox="0 0 24 24" ${s}><path d="${P[g]}"/></svg>`;
+const FINGERPRINT = `<svg viewBox="0 0 24 24"><path d="M6.5 6.2A7.5 7.5 0 0 1 19.5 11"/><path d="M4.6 9.2A7.6 7.6 0 0 0 4.5 13"/><path d="M8 18.6c-.9-1.6-1.4-3.3-1.4-5.1a5.4 5.4 0 0 1 10.8 0v.6"/><path d="M11 21c-1.2-2.2-1.9-4.6-1.9-7a2.9 2.9 0 0 1 5.8 0c0 1.8 1.2 2.8 2.6 2.8"/><path d="M12 13.6c0 3 1.3 5.4 3.4 7"/></svg>`;
+const APPS = [
+  ["Murmur", "chat", "#2EAD6B"], ["Daybook", "calendar", "#4C6FE0"], ["Fernbank", "bank", "#14806F"], ["Parcelly", "parcel", "#E8813A"],
+  ["Hum Music", "music", "#7E57C2"],
+].map(([name, g, c]) => ({ name, g, c }));
+const app = (n) => APPS.find((a) => a.name === n);
+const icon = (a) => `<div class="ic" style="background:${a.c}">${svg(a.g)}</div>`;
+
+// --- timing helpers ---
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const ease = (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+const out = (x) => 1 - Math.pow(1 - x, 3);
+const k = (t, t0, t1) => ease(clamp((t - t0) / (t1 - t0)));
+const ko = (t, t0, t1) => out(clamp((t - t0) / (t1 - t0)));
+const mix = (a, b, x) => a + (b - a) * x;
+// A tap: finger shows 0.35 s before, presses at t0, lifts 0.25 s after.
+const tapAt = (t, t0) => ({ o: k(t, t0 - 0.35, t0 - 0.15) * (1 - k(t, t0 + 0.25, t0 + 0.45)), press: k(t, t0 - 0.05, t0) * (1 - k(t, t0 + 0.12, t0 + 0.2)), rip: clamp(1 - Math.abs(t - t0 - 0.08) / 0.2) });
+const finger = (x, y, o, press = 0) => (o > 0 ? `<div class="finger" style="left:${x}px;top:${y}px;opacity:${o};transform:scale(${1 - press * 0.15})"></div>` : "");
+const ripple = (on) => (on > 0 ? `<div class="ripple" style="opacity:${on}"></div>` : "");
+const status = (o = 1) => `<div class="status" style="opacity:${o}"><span></span><span style="display:flex;gap:6px">▂▄▆ <span class="batt"></span></span></div>`;
+
+// --- the lock-screen view ---
+// New, then Earlier, newest first: what the Pile folds away (Earlier only shows once it's open).
+const NEW = [
+  { a: "Murmur", person: ["MC", "#F06292"], title: "Maya Chen", body: "Look at this view", time: "now" },
+  { a: "Daybook", title: "Design review in 15 min", body: "11:00 · Room 4", time: "2m" },
+  { a: "Fernbank", title: "You paid Corner Café", body: "€4.20 · Main account", time: "6m" },
+];
+const EARLIER = [
+  { a: "Parcelly", title: "Out for delivery", body: "Arriving today, 2–4 PM", time: "31m", dim: 1 },
+  { a: "Murmur", person: ["H", "#64B5F6"], title: "Hiking crew", body: "Emma Wilson: I’ll drive, room for three", time: "1h", dim: 1 },
+];
+// o fades the card; inner fades only what's on it, so a card sliding out from under another stays solid.
+function ncard(c, y, o = 1, extra = "", inner = 1) {
+  const a = app(c.a);
+  const ic = c.person
+    ? `<div class="ic round" style="background:${c.person[1]}">${c.person[0]}<span class="badge" style="background:${a.c}">${svg(a.g)}</span></div>`
+    : icon(a);
+  return `<div class="ncard ${c.dim ? "dim" : ""}" style="top:${y}px;opacity:${o};${extra}"><div style="opacity:${inner}">${ic}</div><div style="min-width:0;opacity:${inner}"><div class="t"><span>${c.title}</span><span>${c.time}</span></div><div class="b">${c.body}</div></div></div>`;
+}
+const wall = (blurArt = 0) => `<div class="wall"></div>` + (blurArt > 0
+  ? `<div class="fill" style="opacity:${blurArt};filter:blur(34px) saturate(1.3);transform:scale(1.35)">${ALBUM}</div>`
+  : "") + `<div class="fill" style="background:rgba(0,0,0,${0.3 + 0.12 * blurArt})"></div>`;
+const hint = (glow = 0) => `<div class="hint" style="${glow ? `color:${glow > 0.5 ? "#fff" : ""}` : ""}">
+  <div style="transform:scale(${1 + 0.25 * glow});${glow ? `filter:drop-shadow(0 0 ${10 * glow}px ${"#a8c7fa"})` : ""}">${FINGERPRINT}</div>Tap to unlock</div>`;
+
+Object.assign(P, {
+  search: "M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z",
+  call: "M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z",
+  message: "M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z",
+  event: "M17 12h-5v5h5v-5zM16 1v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2h-1V1h-2zm3 18H5V8h14v11z",
+  lockg: "M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z",
+  steps: "M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9 7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7",
+  menu: "M3,18h18v-2H3v2zM3,13h18v-2H3v2zM3,6v2h18V6H3z",
+});
+APPS.push({ name: "Stride", g: "steps", c: "#EF6C3A" });
+// A new message from Emeka, for the buttons scene.
+const EMEKA = { a: "Murmur", person: ["EO", "#E07A5F"], title: "Emeka Obi", body: "Still on for Saturday? I booked the court", time: "now" };
+
+// --- the lock-screen view ---
+const CLOCK_BOTTOM = 170;
+// p: how far the list is open (0 resting as the Pile, 1 open). opts: newList, earlierList, press (the
+// top card held), running (show "1 running" below Earlier), runOpen (0..1, its card shown), extra.
+// With nothing New it rests as the clock and an "N earlier" line; p then opens Earlier.
+function lockView(p, opts = {}) {
+  const nl = opts.newList ?? NEW, el = opts.earlierList ?? EARLIER, n = nl.length, all = [...nl, ...el];
+  const open = [];
+  let y = n ? 68 : 44 + 24;
+  nl.forEach(() => { open.push(y); y += 74; });
+  if (n && el.length) y += 38;
+  el.forEach(() => { open.push(y); y += 74; });
+  const pileY = n > 1 ? 679 : 735;
+  const ys = all.map((c, i) => n ? mix(pileY, open[i], p) : open[i] + (1 - p) * 300);
+  let h = "";
+  if (n > 1 && p < 0.34) {
+    const base = ys[0] + 64, f = p * 3;
+    h += `<div class="sliver" style="left:26px;right:26px;top:${base}px;background:#3a3a3e;opacity:${1 - f}"></div>`;
+    if (n > 2) h += `<div class="sliver" style="left:42px;right:42px;top:${base + 7}px;background:#323236;opacity:${1 - f}"></div>`;
+    h += `<div class="count" style="top:${base + (n > 2 ? 14 : 7) + 10}px;opacity:${1 - f}"><span>${n - 1} more</span></div>`;
+  }
+  if (n) {
+    for (let i = all.length - 1; i >= 1; i--) h += ncard(all[i], ys[i], p > 0 ? 1 : 0, "", clamp((ys[i] - ys[i - 1] - 30) / 34));
+    h += ncard(all[0], ys[0], 1, opts.press ? `transform:scale(${1 - 0.03 * opts.press})` : "");
+  } else {
+    // Nothing New: the "N earlier" line at the bottom; opening it shows Earlier from the top.
+    const lineO = 1 - clamp(p * 3);
+    if (lineO > 0) h += `<div class="count" id="earlier-line" style="top:770px;opacity:${lineO}"><span style="position:relative;overflow:hidden">${ripple(opts.lineTap ?? 0)}${el.length} earlier</span></div>`;
+    if (p > 0) all.forEach((c, i) => { h += ncard(c, ys[i], p); });
+  }
+  if (p > 0) {
+    if (n) h += `<div class="sec" style="top:${ys[0] - 22}px;opacity:${p}">New</div>`;
+    if (el.length) h += `<div class="sec" style="top:${ys[n] - 22}px;opacity:${n ? clamp((p - 0.6) / 0.4) : p}">Earlier</div>`;
+  }
+  if (opts.running && p > 0) {
+    const ry = ys[all.length - 1] + 64 + 14;
+    h += `<div class="pill" id="running" style="top:${ry}px;opacity:${p}">${ripple(opts.runTap ?? 0)}1 running</div>`;
+    const ro = opts.runOpen ?? 0;
+    if (ro > 0) h += `<div class="sec" style="top:${ry + 42}px;opacity:${ro}">Running</div>` +
+      ncard({ a: "Stride", title: "Morning walk", body: "4,218 steps · 3.1 km · 38 min", time: "38m" }, ry + 64 + (1 - ro) * 16, ro);
+  }
+  const edge = n ? (p > 0 ? ys[0] - 24 : H) : (p > 0 ? ys[0] - 24 : H);
+  const push = Math.min(0, edge - CLOCK_BOTTOM);
+  const clock = `<div class="fill" style="transform:translateY(${push}px);opacity:${clamp(1 + push / 90)}">
+    <div class="ldate">Friday, 20 November</div><div class="lclock">9:41</div></div>`;
+  return wall() + h + clock + hint(opts.glow ?? 0) + status();
+}
+
+// The Preview of a card, over the dimmed lock-screen view.
+const PHOTO = `<svg viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice" style="width:100%;height:100%;display:block">
+  <defs><linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3B2A6B"/><stop offset=".75" stop-color="#F2995E"/></linearGradient>
+  <radialGradient id="sun"><stop offset="0" stop-color="#FFD27A"/><stop offset="1" stop-color="#FFD27A" stop-opacity="0"/></radialGradient></defs>
+  <rect width="400" height="300" fill="url(#sky)"/><circle cx="280" cy="96" r="54" fill="url(#sun)"/><circle cx="280" cy="96" r="24" fill="#FFD27A"/>
+  <path d="M0 175 Q60 130 120 160 T240 150 T400 165 V300 H0Z" fill="#5B6E8C"/><path d="M0 205 Q70 180 140 200 T280 190 T400 205 V300 H0Z" fill="#3E5470"/>
+  <path d="M0 240 Q90 220 180 238 T400 236 V300 H0Z" fill="#253A52"/></svg>`;
+const KEYS = ["qwertyuiop", "asdfghjkl", "zxcvbnm"];
+const keyboard = (up, hot) => `<div class="kb" style="transform:translateY(${(1 - up) * 280}px)">
+  ${KEYS.map((r, i) => `<div class="kr">${i === 2 ? `<div class="w">⇧</div>` : ""}${[...r].map((c) => `<div style="${c === hot ? "background:#5a5c63" : ""}">${c}</div>`).join("")}${i === 2 ? `<div class="w">⌫</div>` : ""}</div>`).join("")}
+  <div class="kr"><div class="w">?123</div><div>,</div><div class="sp"></div><div>.</div><div class="w">⏎</div></div></div>`;
+const MAYA = { person: ["MC", "#F06292"], title: "Maya Chen", body: "Look at this view", photo: true };
+// st: { o, who, btn: { id: ripple }, typed (text or null), kb, hot, caret, sendRip }
+function preview(st) {
+  const w = st.who ?? MAYA;
+  const head = `<div class="phead"><div class="ic round" style="background:${w.person[1]}">${w.person[0]}<span class="badge" style="background:#2EAD6B">${svg("chat")}</span></div>
+    <div><div class="t"><span>${w.title}</span><span>now</span></div><div class="b">${w.body}</div></div></div>`;
+  const ph = w.photo ? (st.typed != null ? 150 : 210) : 0;
+  const card = `<div class="pcard">${head}${ph ? `<div style="height:${ph}px">${PHOTO}</div>` : ""}</div>`;
+  const btns = st.typed == null
+    ? [["reply", "Reply"], ["read", "Mark as read"], ["snooze", "Snooze"], ["clear", "Clear"]].map(([id, l]) => `<div class="pbtn" id="b-${id}">${ripple(st.btn?.[id] ?? 0)}${l}</div>`).join("")
+    : `<div class="reply"><div class="in ${st.typed ? "" : "empty"}">${st.typed || "Reply"}<span class="caret" style="opacity:${st.caret ?? 1}"></span></div><div class="send" id="send">${ripple(st.sendRip ?? 0)}${svg("send")}</div></div>`;
+  const headH = w.photo ? 64 : 84;
+  const colH = st.typed == null ? headH + ph + 4 * 60 : headH + ph + 54;
+  const top = st.typed == null ? (H - colH) / 2 : mix((H - colH) / 2, H - 268 - colH - 16, st.kb ?? 0);
+  return `<div class="fill" style="opacity:${st.o}">
+    <div class="fill" style="background:rgba(0,0,0,.55);backdrop-filter:blur(${16 * st.o}px)"></div>
+    <div style="position:absolute;left:12px;right:12px;top:${top}px">${card}${btns}</div>
+    ${st.typed != null ? keyboard(st.kb ?? 0, st.hot) : ""}</div>`;
+}
+const toast = (text, o) => o > 0 ? `<div style="position:absolute;left:0;right:0;top:600px;text-align:center;opacity:${o};z-index:8"><span style="display:inline-block;padding:9px 16px;border-radius:18px;background:rgba(32,33,36,.95);font:400 14px var(--sans);color:#fff">${text}</span></div>` : "";
+
+// --- Search over the lock-screen view (as search.html, with contacts and events on) ---
+const CONTACTS = [
+  { name: "Emma Wilson", num: "+44 7700 900123", wa: true, c: "#8E6CEF" },
+  { name: "Emeka Obi", num: "+44 7700 900456", c: "#E07A5F" },
+];
+const EVENTS = [
+  { title: "Design review", when: "Thu, 26 Nov, 11:00 – 12:00" },
+  { title: "Design sprint demo", when: "Tue, 1 Dec, 15:00 – 16:00" },
+];
+const fold = (s) => s.toLowerCase().trim();
+const wordStart = (s, q) => { const f = fold(q); return f && s.toLowerCase().split(/\W+/).some((w) => w.startsWith(f)); };
+const SUGGESTED = ["Murmur", "Daybook", "Fernbank", "Parcelly"];
+// s: { t, q, kb, hidden (Hide sensitive content), taps: { id: ripple } }
+function search(s) {
+  const tp = s.taps ?? {};
+  const kbH = 268 * (s.kb ?? 1), fieldTop = H - Math.max(24, kbH) - 10 - 44;
+  const caret = `<span class="caret" style="opacity:${Math.floor(s.t * 2.2) % 2 ? 0.15 : 1}"></span>`;
+  let h = `<div class="search">`;
+  const q = s.q ?? "";
+  if (!fold(q)) {
+    const rowTop = fieldTop - 12 - 98;
+    h += `<div class="sec" style="left:20px;top:${rowTop - 26}px">Suggestions</div><div class="scard" style="position:absolute;left:12px;width:388px;top:${rowTop}px;height:98px;margin:0;display:flex;padding:12px 6px 10px">` +
+      SUGGESTED.map((nm) => `<div style="flex:1;display:flex;flex-direction:column;align-items:center">${icon(app(nm)).replace('class="ic"', 'class="ic" style="width:52px;height:52px;border-radius:15px;background:' + app(nm).c + '"')}<span style="margin-top:6px;font:400 12px var(--sans);color:#fff">${nm}</span></div>`).join("") + `</div>`;
+  } else {
+    let r = "";
+    if (q === "100 usd") r += `<div class="scard answer"><div class="s">100.00 USD =</div><div class="v">86.12 EUR</div><div class="n">European Central Bank rate, 20 Nov 2026 · Tap to copy</div></div>`;
+    const people = s.hidden ? [] : CONTACTS.filter((c) => wordStart(c.name, q));
+    if (people.length) r += `<div class="scard"><div class="stitle">Contacts</div>${people.map((c, i) =>
+      `<div class="srow" style="padding-right:6px"><div class="lead"><div class="avatar" style="background:${c.c}">${c.name[0]}</div></div>
+        <div class="tx">${c.name}<small>${c.num}${c.wa ? " · WhatsApp" : ""}</small></div>
+        <div class="act" id="msg-${i}">${ripple(tp[`msg-${i}`] ?? 0)}${svg("message")}</div><div class="act">${svg("call")}</div></div>`).join("")}</div>`;
+    const evs = s.hidden ? [] : EVENTS.filter((e) => wordStart(e.title, q));
+    if (evs.length) r += `<div class="scard"><div class="stitle">Calendar</div>${evs.map((e) => `<div class="srow"><div class="lead">${svg("event")}</div><div class="tx">${e.title}<small>${e.when}</small></div></div>`).join("")}</div>`;
+    if (s.hidden) r += `<div class="scard"><div class="srow"><div class="lead">${svg("lockg")}</div><div class="tx">Unlock to see all results</div></div></div>`;
+    r += `<div class="scard"><div class="srow"><div class="lead">${svg("search")}</div><div class="tx">Search the web for “${q.trim()}”</div></div></div>`;
+    h += `<div class="results" style="height:${fieldTop - 48}px">${r}</div>`;
+  }
+  h += `<div class="field" style="top:${fieldTop}px">${svg("search")}${q}${caret}${q ? "" : `<span class="fhint">Search</span>`}</div>`;
+  if ((s.kb ?? 1) > 0) h += keyboard(s.kb ?? 1, s.hot);
+  return h + `</div>`;
+}
+const typed = (t, t0, str, cps = 8) => t < t0 ? "" : str.slice(0, clamp(Math.floor((t - t0) * cps) + 1, 0, str.length));
+const hotKey = (t, t0, str, cps = 8) => { if (t < t0) return null; const i = Math.floor((t - t0) * cps); return i < str.length && (t - t0) * cps - i < 0.5 ? str[i].toLowerCase() : null; };
+// Pulling down on the resting lock-screen view opens Search over it, blurred.
+function pullToSearch(t, t0, inner, s) {
+  const drag = k(t, t0, t0 + 0.6), open = k(t, t0 + 0.65, t0 + 0.8), kb = k(t, t0 + 0.7, t0 + 1.0);
+  const dy = 80 * drag * (1 - open);
+  const f = k(t, t0 - 0.3, t0 - 0.1) * (1 - k(t, t0 + 0.6, t0 + 0.75));
+  let h = `<div class="fill" style="transform:translateY(${dy}px);filter:${open > 0 ? `blur(${12 * open}px)` : "none"}">${inner}</div>` + finger(206, 300 + 160 * drag, f);
+  if (open > 0) h += `<div class="fill" style="opacity:${open}">${search({ ...s, t, kb })}</div>`;
+  return h;
+}
+// The unlock the system asks for, over whatever asked.
+const askUnlock = (o, msg = "Unlock to continue") => o > 0 ? `<div class="ask" style="opacity:${o}"><div class="fp" style="transform:scale(${0.9 + 0.1 * o})">${FINGERPRINT}</div><div class="msg">${msg}</div></div>` : "";
+
+// Settings → Lock screen, drawn after SetupActivity's dark Material 3 page.
+function lockSettings(st) {
+  const tp = st.taps ?? {};
+  const seg = (id, l) => `<div class="${st.mode === id ? "on" : ""}" id="mode-${id}">${ripple(tp[`mode-${id}`] ?? 0)}${l}</div>`;
+  return `<div class="m3"><div class="bar">${svg("menu")}Search settings</div><h1>Lock screen</h1>
+    <div class="grp" style="top:138px;height:116px;border-radius:24px 24px 6px 6px"><b>Show on lock screen</b>
+      <div class="segs">${seg("off", "Off")}${seg("new", "When something is new")}${seg("any", "Whenever there are notifications")}</div></div>
+    <div class="grp" style="top:256px;height:194px;border-radius:6px"><div style="margin-right:70px"><b>Hide sensitive content</b>
+      <p>Always hide content on the lock screen. When off, Chronotif follows the system setting and each app’s privacy choice. Replies and buttons that don’t open an app work without unlocking, unless the app asks for it. Opening an app always requires unlocking. Hiding content also hides contacts and events in Search while locked.</p></div>
+      <div class="msw ${st.hide ? "on" : ""}" id="hide-sw" style="top:81px">${st.hide ? "<i></i>" : "<i></i>"}</div></div>
+    <div class="grp" style="top:452px;height:158px;border-radius:6px 6px 24px 24px"><div style="margin-right:70px"><b>Double-tap to sleep</b>
+      <p>Double-tap empty space to turn the screen off, as on your phone’s own lock screen. It goes black at once, and the phone sleeps a few seconds later.</p></div>
+      <div class="msw on" style="top:62px"><i></i></div></div></div>`;
+}
+
+// --- scenes: [start, end, kicker, caption, draw(t)] ---
+const REPLY = "So jealous! Save me a seat";
+const SCENES = [
+  [2.25, 11.4, "Reply, still locked", "Hold a card and reply from its Preview, <b>without unlocking</b>.", (t) => {
+    const hold0 = 2.95, press = k(t, hold0, hold0 + 0.4) * (1 - k(t, 3.5, 3.6));
+    const open = k(t, 3.5, 3.7), hf = k(t, hold0 - 0.35, hold0 - 0.15) * (1 - k(t, 3.5, 3.7));
+    const rTap = tapAt(t, 4.75), replying = t >= 4.9, kb = k(t, 4.9, 5.2);
+    const n = Math.floor(clamp((t - 5.4) / 2.5) * REPLY.length);
+    const typedTxt = replying ? REPLY.slice(0, n) : null;
+    const hot = replying && n > 0 && n < REPLY.length && (t - 5.4) % (2.5 / REPLY.length) < 0.06 ? REPLY[n - 1].toLowerCase() : null;
+    const sTap = tapAt(t, 8.4), close = 1 - k(t, 8.55, 8.75);
+    let h = lockView(0, { press });
+    if (open > 0 && close > 0) h += preview({ o: open * close, btn: { reply: rTap.rip }, typed: typedTxt, kb: kb * close, hot, caret: Math.floor(t * 2.2) % 2 ? 0.2 : 1, sendRip: sTap.rip });
+    h += toast("Sent to Maya Chen", k(t, 8.8, 9.0) * (1 - k(t, 10.6, 10.9)));
+    const tap = t < 5.1 && rTap.o > 0 ? { id: "b-reply", o: rTap.o, press: rTap.press } : sTap.o > 0 && t < 8.7 ? { id: "send", o: sTap.o, press: sTap.press } : null;
+    return { html: h + finger(206, 711, hf, press * 0.6), tap };
+  }],
+  [11.4, 17.4, "Its buttons too", "An app’s buttons that don’t open it, like <b>Mark as read</b>, just work.", (t) => {
+    // Emeka's message on top of the Pile; Mark as read clears it, and Maya's card is on top again.
+    const read = t >= 14.65;
+    const newList = read ? NEW : [EMEKA, ...NEW];
+    const hold0 = 12.1, press = k(t, hold0, hold0 + 0.4) * (1 - k(t, 12.65, 12.75));
+    const open = k(t, 12.65, 12.85), close = 1 - k(t, 14.6, 14.8);
+    const hf = k(t, hold0 - 0.35, hold0 - 0.15) * (1 - k(t, 12.65, 12.85));
+    const rTap = tapAt(t, 14.4);
+    let h = lockView(0, { newList, press: read ? 0 : press });
+    if (open > 0 && close > 0) h += preview({ o: open * close, who: { person: EMEKA.person, title: "Emeka Obi", body: "Still on for Saturday? I booked the court" }, btn: { read: rTap.rip } });
+    h += toast("Marked as read", k(t, 14.8, 15.0) * (1 - k(t, 16.6, 16.9)));
+    const tap = rTap.o > 0 && t < 14.7 ? { id: "b-read", o: rTap.o, press: rTap.press } : null;
+    return { html: h + finger(206, 711, hf, press * 0.6), tap };
+  }],
+  [17.4, 23.2, "Running", "What’s running sits <b>below Earlier</b>, as in the panel.", (t) => {
+    // Drag the list open, then tap "1 running".
+    const drag = k(t, 17.9, 18.9), fy = mix(712, 300, drag), fo = k(t, 17.6, 17.8) * (1 - k(t, 18.9, 19.1));
+    const rTap = tapAt(t, 20.4), runOpen = k(t, 20.5, 20.85);
+    const html = lockView(drag, { running: true, runTap: rTap.rip, runOpen }) + finger(206, fy, fo);
+    return { html, tap: rTap.o > 0 ? { id: "running", o: rTap.o, press: rTap.press } : null };
+  }],
+  [23.2, 31.6, "Search, still locked", "Pull down to find <b>contacts</b> and <b>events</b>. Opening an app still asks you to unlock.", (t) => {
+    const q = t < 27.3 ? typed(t, 24.6, "em", 5) : typed(t, 27.3, "design", 8);
+    const hot = t < 27.3 ? hotKey(t, 24.6, "em", 5) : hotKey(t, 27.3, "design", 8);
+    // Tapping Emma's message button opens Murmur, so it asks to unlock first.
+    const mTap = tapAt(t, 26.4), ask = k(t, 26.55, 26.75) * (1 - k(t, 27.1, 27.25));
+    const s = { q, hot, taps: { "msg-0": mTap.rip } };
+    const html = pullToSearch(t, 23.7, lockView(0), s) + askUnlock(ask, "Unlock to open Murmur");
+    return { html, tap: mTap.o > 0 && t < 26.6 ? { id: "msg-0", o: mTap.o, press: mTap.press } : null };
+  }],
+  [31.6, 38.6, "Hide sensitive content", "Turn it on and contacts and events wait <b>behind the unlock</b>.", (t) => {
+    const swTap = tapAt(t, 32.5), on = t >= 32.55;
+    const toSearch = k(t, 34.0, 34.3);
+    let html = "";
+    if (toSearch < 1) html += `<div class="fill" style="opacity:${1 - toSearch}">${lockSettings({ mode: "new", hide: on })}</div>`;
+    if (toSearch > 0) html += `<div class="fill" style="opacity:${toSearch}"><div class="fill" style="filter:blur(12px)">${lockView(0)}</div>${search({ t, q: typed(t, 34.6, "em", 5), hot: hotKey(t, 34.6, "em", 5), hidden: true })}</div>`;
+    return { html, tap: swTap.o > 0 ? { id: "hide-sw", o: swTap.o, press: swTap.press } : null };
+  }],
+  [38.6, 45.8, "New installs", "Chronotif shows <b>whenever there are notifications</b>. Updating keeps your settings.", (t) => {
+    // Settings shows the new default, then a wake with nothing New: the clock and "2 earlier".
+    const toLock = k(t, 40.6, 40.9);
+    const lTap = tapAt(t, 42.8), p = k(t, 42.9, 43.5);
+    let html = "";
+    if (toLock < 1) html += `<div class="fill" style="opacity:${1 - toLock}">${lockSettings({ mode: "any", hide: false })}</div>`;
+    if (toLock > 0) html += `<div class="fill" style="opacity:${toLock}">${lockView(p, { newList: [], lineTap: lTap.rip })}</div>`;
+    return { html, tap: lTap.o > 0 && t < 43 ? { id: "earlier-line", o: lTap.o, press: lTap.press } : null };
+  }],
+  [45.8, 51.0, "Currencies, at once", "New installs convert currencies <b>without asking first</b>.", (t) => {
+    return pullToSearch(t, 46.2, lockView(0), { q: typed(t, 47.6, "100 usd", 8), hot: hotKey(t, 47.6, "100 usd", 8) });
+  }],
+];
+const FULL = [
+  [0, 2.6, `<div class="big">Chronotif</div><div class="small">What’s new in <b>0.2.7</b>, part 3: <b>without unlocking</b>.</div>`],
+  [50.65, 56.0, `<div class="big">Help shape it</div><div class="small">Ideas or bugs? Tell us. Chronotif gets better from what you report.</div>
+    <div class="url">github.com/nagarete/chronotif/issues</div><div class="url2">chronotif.com</div>`],
+];
+const XF = 0.35;
+const $ = (id) => document.getElementById(id);
+const capHTML = (kick, text) => `<div class="cap"><div><div class="kicker">${kick}</div>${text}</div></div>`;
+const S = 1.6311;
+
+// Puts a scene into a layer; a scene may return { html, tap: { id, o, press } } to put the finger on
+// an element by id, measured after layout.
+function paint(el, r) {
+  const { html, tap } = typeof r === "string" ? { html: r, tap: null } : r;
+  el.innerHTML = html;
+  if (tap) {
+    const target = el.querySelector(`#${tap.id}`);
+    if (target) {
+      const b = target.getBoundingClientRect(), s = $("screen").getBoundingClientRect();
+      el.insertAdjacentHTML("beforeend", finger((b.left + b.width / 2 - s.left) / S, (b.top + b.height / 2 - s.top) / S, tap.o, tap.press));
+    }
+  }
+}
+
+function render(t) {
+  let i = SCENES.findIndex(([t0, t1]) => t >= t0 && t < t1);
+  if (i < 0) i = t < SCENES[0][0] ? 0 : SCENES.length - 1;
+  const [t0, , kick, text, draw] = SCENES[i];
+  const prev = SCENES[i - 1];
+  const fade = prev ? k(t, t0, t0 + XF) : 1;
+  paint($("layA"), prev && fade < 1 ? prev[4](prev[1]) : "");
+  paint($("layB"), draw(t));
+  $("layB").style.opacity = fade;
+  $("capA").innerHTML = prev && fade < 1 ? capHTML(prev[2], prev[3]) : "";
+  $("capA").style.opacity = 1 - fade;
+  $("capB").innerHTML = capHTML(kick, text);
+  $("capB").style.opacity = clamp((t - t0 - 0.15) / 0.3);
+  $("full").innerHTML = FULL.filter(([f0, f1]) => t >= f0 && t < f1).map(([f0, f1, html]) =>
+    `<div class="full" style="opacity:${f0 === 0 ? 1 - k(t, f1 - XF, f1) : k(t, f0, f0 + XF)}">${html}</div>`).join("");
+}
+window.render = render;
+window.DURATION = 56.0;
+render(Number(new URLSearchParams(location.search).get("t") ?? 0));
+</script>
