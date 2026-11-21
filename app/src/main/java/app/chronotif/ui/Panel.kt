@@ -21,13 +21,15 @@ import android.view.ContextThemeWrapper
 import android.view.Display
 import android.view.KeyEvent
 import android.view.View
-import android.view.animation.DecelerateInterpolator
 import android.view.WindowManager
+import android.view.animation.DecelerateInterpolator
 import android.widget.FrameLayout
 import android.window.OnBackInvokedCallback
 import android.window.OnBackInvokedDispatcher
+import app.chronotif.CardSource
 import app.chronotif.R
 import app.chronotif.StatusBarSwipe
+import app.chronotif.Tutorial
 
 /**
  * Opens the panel. It's an overlay window, like the system shade, so the app underneath keeps
@@ -73,7 +75,10 @@ object Panel {
         // Opening while it animates out replaces it, rather than losing the request.
         current?.takeIf { it.closing }?.remove()
         if (!Settings.canDrawOverlays(app) || locked) return null
-        val panel = kept ?: OverlayPanel(app)
+        // A panel kept from before the Tutorial started, or ended, shows the wrong notifications.
+        val source = Tutorial.source ?: CardSource.Real
+        if (kept?.source !== source) drop()
+        val panel = kept ?: OverlayPanel(app, source)
         kept = null
         if (!panel.show(pulling)) return null
         current = panel
@@ -110,7 +115,7 @@ object Panel {
 }
 
 /** The panel as a focusable, full-screen overlay window. Gone as soon as it loses focus. */
-internal class OverlayPanel(app: Context) : NotifList.Host, Panel.Pull {
+internal class OverlayPanel(app: Context, val source: CardSource = CardSource.Real) : NotifList.Host, Panel.Pull {
     private companion object {
         const val FOCUS_TIMEOUT_MS = 3000L
         /** The pull that brings the panel fully in, as a share of the screen's height. */
@@ -135,7 +140,7 @@ internal class OverlayPanel(app: Context) : NotifList.Host, Panel.Pull {
     // The window dims instead of the view: Android then gives the status and navigation bars
     // light icons over it, as for the shade. A view scrim leaves them to the app underneath, so
     // the view only dims while a pull is moving (see dimWindow).
-    private val view = PanelView(ctx, this, blur, windowDims = true) { remove() }
+    private val view = PanelView(ctx, this, blur, windowDims = true, source = source) { remove() }
     /** Open: shown, or brought in by a pull. */
     private var attached = false
     /** The window exists, open or hidden between opens. */

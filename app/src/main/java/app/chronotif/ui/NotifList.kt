@@ -347,6 +347,7 @@ class NotifList(
                     openStacks -= stackId
                     if (replyingHere) replying = null
                     render()
+                    source.noticed(CardSource.Noticed.STACK_CLOSED)
                 }) {
                 openStacks -= stackId
                 dismissAll(entries)
@@ -362,6 +363,7 @@ class NotifList(
             v.card.tapOverride = {
                 openStacks += stackId
                 render()
+                source.noticed(CardSource.Noticed.STACK_OPENED)
             }
             v.card.swipeAllowed = { entries.any { it.clearable } }
             v.card.onSwiped = { dismissAll(entries) }
@@ -398,6 +400,7 @@ class NotifList(
                     openStacks -= stackId
                     if (replyingHere) replying = null
                     render()
+                    source.noticed(CardSource.Noticed.STACK_CLOSED)
                 }
                 rows += stackHeader("sh:$stackId", c.title, e.clearable, close) {
                     openStacks -= stackId
@@ -412,6 +415,7 @@ class NotifList(
                 v.card.tapOverride = {
                     openStacks += stackId
                     render()
+                    source.noticed(CardSource.Noticed.STACK_OPENED)
                 }
                 // The whole conversation is one notification: swiping the stack clears it.
                 v.card.swipeAllowed = { e.clearable }
@@ -576,6 +580,7 @@ class NotifList(
             override fun snooze(until: Long) = source.snooze(live(e), until)
         }) ?: return
         overlays += Open(e.key, preview, stillShows)
+        source.noticed(CardSource.Noticed.PREVIEW)
     }
 
     private fun dismissAll(entries: List<Entry>) {

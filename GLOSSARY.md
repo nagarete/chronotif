@@ -87,6 +87,10 @@ _Avoid_: Beta, preview, dev build
 The plain-language account of what a Stable changed for the people using it, plus one entry for the next Stable while it is in Nightly. Changes that don't reach the app, such as website or build work, are left out.
 _Avoid_: Changelog, What's Changed (GitHub's generated list of pull requests)
 
+**Tutorial**:
+A hands-on run through Chronotif in the real Panel, with its own place in Settings above Tips, which says the same in writing. It comes in parts by topic, each taken on its own. Each step asks you to try one thing for real on sample cards from made-up people and apps, and shows when it worked. While a part runs, your own notifications are hidden, nothing reaches Android or another app, and nothing counts as a check.
+_Avoid_: Tour, Onboarding, Demo (demo mode is the debug build's setup for recording the promo video)
+
 **What's new**:
 The sheet over the Panel's cards on its first open after an update, listing the Release notes not shown before. While it shows, the Panel isn't seen, so it counts toward no check.
 _Avoid_: Changelog, update dialog

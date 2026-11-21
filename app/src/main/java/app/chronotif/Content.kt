@@ -366,6 +366,7 @@ object Apps {
 
     /** The app's name, or an empty one while it loads. */
     fun label(context: Context, pkg: String): CharSequence {
+        Samples.label(pkg)?.let { return it }
         labels[pkg]?.let { return it }
         val app = context.applicationContext
         apps.load("l:$pkg", {
@@ -384,6 +385,7 @@ object Apps {
 
     /** The app's icon, badged for a work profile, or null while it loads. */
     fun icon(context: Context, e: Entry): Drawable? {
+        if (e.isSample) return Samples.icon(context, e.pkg)
         icons.get(e.appId)?.let { return it }
         if (e.appId in noIcon) return null
         val app = context.applicationContext
