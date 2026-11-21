@@ -476,6 +476,28 @@ class NotificationBehaviorTest {
     }
 
     @Test
+    fun aKeptPanelRetitlesAMessageCardWhenOnlyItsShortcutChanges() {
+        fun named(label: String): Ranking {
+            val shortcut = android.content.pm.ShortcutInfo.Builder(context, "chat").setShortLabel(label).build()
+            return object : Ranking() {
+                override fun getConversationShortcutInfo() = shortcut
+            }
+        }
+        val e = post(notification("hi"))
+        e.ranking = named("Old name")
+        withPanelList { list, container ->
+            list.render()
+            assertTrue(shownTexts(container).contains("Old name"))
+            // A ranking update changes the entry in place; the notification itself is the same.
+            e.ranking = named("New name")
+            list.render()
+            val shown = shownTexts(container)
+            assertTrue(shown.contains("New name"))
+            assertFalse(shown.contains("Old name"))
+        }
+    }
+
+    @Test
     fun expansionRetainsAllSuppliedMessages() {
         val messages = (1..9).map { "message $it" }
         val entry = post(notification(*messages.toTypedArray()))

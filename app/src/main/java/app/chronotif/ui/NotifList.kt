@@ -436,7 +436,7 @@ class NotifList(
         val id = "${e.key}#${m.id}"
         val sig = {
             listOf(e, c.redacted, m.id, m.time, latest, style, id in expanded, e.key in expanded, replying,
-                Ui.relTime(ctx, m.time, now), Apps.generation)
+                Ui.relTime(ctx, m.time, now), conversationName(e), Apps.generation)
         }
         return Row("m:$stackId#${m.id}", { CardView(ctx, this) }, sig) { v ->
             v as CardView
