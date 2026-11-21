@@ -35,8 +35,12 @@ in seconds, so `trailer/render.mjs` steps through it frame by frame into `out/ch
 `node trailer/render.mjs out/x.mp4 --stills 2,8.5` writes stills next to the output to check a
 change. `trailer/vs.html` is a second trailer (`--page vs.html`) that sets the stock Android shade
 beside Chronotif; see `trailer-vs.md`. `trailer/search.html` is the Search video (`--page search.html`,
-see `search.md`). `trailer/whatsnew.html` is the 0.2.7 video (`--page whatsnew.html`, see
-`whatsnew.md`). They show the same made-up apps and people as the phone takes, and must follow the same
+see `search.md`). The 0.2.7 video comes in six parts, each with its page and notes: `whatsnew.html`
+(the panel and the edge handle, `whatsnew.md`), `lock.html` (the lock screen, `lock.md`), `unlocked.html`
+(without unlocking, `unlocked.md`), `preview.html` (the Preview and the panel, `preview.md`), and
+`settings.html` and `tutorial.html` (settings, then the Tutorial and Usage data, `settings.md`). Parts 5
+and 6 show real screens rendered with Robolectric, kept in `trailer/shots/`. Each part renders to
+`out/chronotif-0.2.7-N-silent.mp4`; parts 1 and 2 also have a music version, `out/chronotif-0.2.7-N.mp4`. They show the same made-up apps and people as the phone takes, and must follow the same
 ordering rules as the app (`docs/notification-behavior.md`): newest first, Conversation stacks,
 and App stacks only in Earlier.
 
@@ -75,11 +79,12 @@ Instrumental. The files are kept in `raw/music/`, not in git. Each video uses a 
 | Trailer | Tranquil Mindscape | freemusicarchive.org/music/holiznacc0/public-domain-lofi/tranquil-mindscape-lofi-happy-reflection/ |
 | Features | Phonk Remix | freemusicarchive.org/music/holiznacc0/phonk-aura-farming/phonk-remix/ |
 | Search | Pantheon | freemusicarchive.org/music/holiznacc0/phonk-aura-farming/pantheon/ |
-| 0.2.7 | Re Adusjtment (FMA's spelling) | freemusicarchive.org/music/holiznacc0/phonk-aura-farming/re-adusjtment/ |
+| 0.2.7, part 1 | Re Adusjtment (FMA's spelling) | freemusicarchive.org/music/holiznacc0/phonk-aura-farming/re-adusjtment/ |
+| 0.2.7, part 2 | Phonk ish | freemusicarchive.org/music/holiznacc0/phonk-aura-farming/phonk-ish/ |
 
 Trailer: `node trailer/render.mjs raw/trailer-silent.mp4 && ./mux.sh raw/trailer-silent.mp4 raw/music/tranquil.mp3 out/chronotif-trailer.mp4`.
 Features: `MUSIC=raw/music/phonk-remix.mp3 MUSIC_START=28.75 ./edit.sh features`.
-Search: see `search.md`. 0.2.7: see `whatsnew.md`.
+Search: see `search.md`. 0.2.7: see `whatsnew.md` and `lock.md`; parts 3 to 6 have no music.
 
 ## On the website
 
@@ -91,10 +96,11 @@ The site plays smaller copies (720×1280, about 1.5–2.5 MB each) kept in git a
 | `vs-stock.mp4` | `out/chronotif-vs-stock-br-drift.mp4` ([trailer-vs.md](trailer-vs.md)) | 17 s | Homepage |
 | `release-0.2.5.mp4` | `out/chronotif-features.mp4` | 12 s | /releases, 0.2.5 |
 | `release-0.2.6.mp4` | `out/chronotif-search.mp4` | 4 s | /releases, 0.2.6 |
-| `release-0.2.7.mp4` | `out/chronotif-0.2.7.mp4` | 6.5 s | /releases, 0.2.7 |
+| `release-0.2.7-1.mp4` to `-6.mp4` | `out/chronotif-0.2.7-N-silent.mp4` | 1 s (title card) | /releases, 0.2.7 (one player, a list of parts) |
 
 A release's video is named after its version, and its entry in `../src/releases.json` gives the
-music credit shown under it. The release copies carry the same CC0 tracks as `out/`; rebuild
+music credit shown under it. A release told in parts lists them under `videos` (`release-<version>-<n>.mp4`),
+which the page plays in one player with a list to switch parts; 0.2.7's parts are silent. The release copies carry the same CC0 tracks as `out/`; rebuild
 them whenever a video is re-scored, so the site and its credits never fall behind. After re-rendering a video, rebuild its copy and poster:
 
 ```sh

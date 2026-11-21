@@ -1,51 +1,77 @@
 {
-  "next": {
-    "version": "0.2.7",
-    "headline": "The panel comes down under your finger, and the edge handle is yours to shape.",
-    "notes": [
-      "The panel opens faster, most of all the first time after an update: the header is there at once and your notifications follow right after.",
-      "Swipe down on the status bar and the panel follows your finger, like the system shade. Let go early and it slides back, without counting as a check.",
-      "Reopening the panel is quicker: it keeps your cards ready instead of building them again.",
-      "Swiping the status bar again right after closing the panel no longer opens the system shade.",
-      "The edge handle is easier to hit: a half-circle outline the size of a fingertip, and all of it responds. Pick another shape, style or colour under Settings → Edge handle, including one that doesn't light up for new notifications.",
-      "Hold the edge handle and drag it to move it, to either side and any height. Holding it without moving still opens Search, when you let go.",
-      "The edge handle steps aside in fullscreen apps.",
-      "Settings are split into sections, each with the whole screen to itself, and a menu button slides out a drawer that lists them. Settings reopen where you left them.",
-      "Settings have a new look, light or dark as your phone is or as you pick under General, in your wallpaper's colours: settings sit in rounded groups, and choices sit side by side instead of in long lists. General has its on switch at the top, then a checklist of what Chronotif still needs, with a button for each step.",
-      "Search settings from the bar at the top: results change with each letter, show where a setting lives and what it's set to, and open its page right at it. The microphone hands the search to your phone's voice input.",
-      "After an update, the first time you open the panel it shows what's new since the version you had, and only that: a nightly shows just the lines it added. Your notifications stay New until the sheet is closed.",
-      "A Tips page in settings lists the gestures: pulling the panel down, holding a card for its Preview, moving the edge handle, and more.",
-      "Tap an open stack's name to close it, as well as Show less.",
-      "Snooze a notification from its Preview (press and hold the card) for 15 minutes, an hour, three hours, until tomorrow morning, or until a time you pick. It comes back as new.",
-      "The Preview has a Clear button, and Settings → Panel → Swipe to clear lets you stop cards clearing when swiped by accident.",
-      "Settings → Search lists what Search can do, with examples to try, below its settings, and the Search tip on the Tips page sums it up.",
-      "The lock screen leaves room for the time: the clock stays big, and new notifications wait at the bottom as a pile. Tap it or drag it up to see everything, and press Back to put it away.",
-      "While music plays, the lock screen shows the album art large with the player under it, over a blur of the art. Drag up and the art shrinks into the player. Playing music now brings up Chronotif's lock screen on its own.",
-      "More works on the lock screen without unlocking: reply right there, use a notification's buttons that don't open the app, see Running, and find contacts and events in Search. Turn on Hide sensitive content to keep contacts and events behind the unlock. Opening an app still asks to unlock.",
-      "Double-tap an empty part of the lock screen to turn the screen off, as on your phone's own lock screen. It goes black at once and the phone sleeps a few seconds later. Settings → Lock screen → Double-tap to sleep switches the double tap off.",
-      "On the lock screen, tap the clock to open your alarms or the date to open your calendar, as in the panel. Both ask you to unlock first.",
-      "On phones with the fingerprint sensor under the screen, Tap to unlock sits on the sensor and the pile above it, so your finger no longer lands on a notification. Settings → Lock screen → Fit to your fingerprint sensor fits it exactly with one touch.",
-      "New installs show Chronotif on the lock screen whenever there are notifications, and Search converts currencies without asking first. If you're updating, your settings stay as they were.",
-      "Settings → Search starts with a checklist, like General: let Search find contacts and calendar events, place calls and convert currencies, and add its widget to your home screen. Say Not now to any of them; the Search tile is there too if you want it.",
-      "Try Chronotif hands-on under Settings → Tutorial: the real panel with made-up notifications, one step at a time. Open it, watch New move to Earlier, open a stack, preview, reply and clear, then open Search every way there is and ask it things, and try the lock screen: the pile, replying while locked, double-tap to sleep. Your own notifications stay hidden and untouched while you practise.",
-      "A conversation renamed by its app shows its new name the next time you open the panel, instead of the old one.",
-      "Chronotif now sends anonymous Usage data: counts, panel speeds, settings and crash reports, never anything from your notifications, so it can be improved from how it’s really used. Turn it off under Settings → Privacy and about, where What’s sent lists every field."
-    ],
-    "video": {
-      "src": "/video/release-0.2.7.mp4",
-      "poster": "/video/release-0.2.7-poster.webp",
-      "label": "What's new in Chronotif 0.2.7",
-      "music": {
-        "title": "Re Adusjtment",
-        "artist": "HoliznaCC0",
-        "album": "PHONK - AURA FARMING",
-        "url": "https://freemusicarchive.org/music/holiznacc0/phonk-aura-farming/re-adusjtment/",
-        "license": "CC0 1.0",
-        "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
-      }
-    }
-  },
   "stable": [
+    {
+      "version": "0.2.7",
+      "date": "2026-11-21",
+      "headline": "The panel comes down under your finger, and the edge handle is yours to shape.",
+      "notes": [
+        "Chronotif now sends anonymous Usage data: counts, panel speeds, settings and crash reports, never anything from your notifications, so it can be improved from how it’s really used. Turn it off under Settings → Privacy and about, where What’s sent lists every field.",
+        "The panel opens faster, most of all the first time after an update: the header is there at once and your notifications follow right after.",
+        "Swipe down on the status bar and the panel follows your finger, like the system shade. Let go early and it slides back, without counting as a check.",
+        "Reopening the panel is quicker: it keeps your cards ready instead of building them again.",
+        "Swiping the status bar again right after closing the panel no longer opens the system shade.",
+        "The edge handle is easier to hit: a half-circle outline the size of a fingertip, and all of it responds. Pick another shape, style or colour under Settings → Edge handle, including one that doesn't light up for new notifications.",
+        "Hold the edge handle and drag it to move it, to either side and any height. Holding it without moving still opens Search, when you let go.",
+        "The edge handle steps aside in fullscreen apps.",
+        "Settings are split into sections, each with the whole screen to itself, and a menu button slides out a drawer that lists them. Settings reopen where you left them.",
+        "Settings have a new look, light or dark as your phone is or as you pick under General, in your wallpaper's colours: settings sit in rounded groups, and choices sit side by side instead of in long lists. General has its on switch at the top, then a checklist of what Chronotif still needs, with a button for each step.",
+        "Search settings from the bar at the top: results change with each letter, show where a setting lives and what it's set to, and open its page right at it. The microphone hands the search to your phone's voice input.",
+        "After an update, the first time you open the panel it shows what's new since the version you had, and only that: a nightly shows just the lines it added. Your notifications stay New until the sheet is closed.",
+        "A Tips page in settings lists the gestures: pulling the panel down, holding a card for its Preview, moving the edge handle, and more.",
+        "Tap an open stack's name to close it, as well as Show less.",
+        "Snooze a notification from its Preview (press and hold the card) for 15 minutes, an hour, three hours, until tomorrow morning, or until a time you pick. It comes back as new.",
+        "The Preview has a Clear button, and Settings → Panel → Swipe to clear lets you stop cards clearing when swiped by accident.",
+        "Settings → Search lists what Search can do, with examples to try, below its settings, and the Search tip on the Tips page sums it up.",
+        "The lock screen leaves room for the time: the clock stays big, and new notifications wait at the bottom as a pile. Tap it or drag it up to see everything, and press Back to put it away.",
+        "While music plays, the lock screen shows the album art large with the player under it, over a blur of the art. Drag up and the art shrinks into the player. Playing music now brings up Chronotif's lock screen on its own.",
+        "More works on the lock screen without unlocking: reply right there, use a notification's buttons that don't open the app, see Running, and find contacts and events in Search. Turn on Hide sensitive content to keep contacts and events behind the unlock. Opening an app still asks to unlock.",
+        "Double-tap an empty part of the lock screen to turn the screen off, as on your phone's own lock screen. It goes black at once and the phone sleeps a few seconds later. Settings → Lock screen → Double-tap to sleep switches the double tap off.",
+        "On the lock screen, tap the clock to open your alarms or the date to open your calendar, as in the panel. Both ask you to unlock first.",
+        "On phones with the fingerprint sensor under the screen, Tap to unlock sits on the sensor and the pile above it, so your finger no longer lands on a notification. Settings → Lock screen → Fit to your fingerprint sensor fits it exactly with one touch.",
+        "New installs show Chronotif on the lock screen whenever there are notifications, and Search converts currencies without asking first. If you're updating, your settings stay as they were.",
+        "Settings → Search starts with a checklist, like General: let Search find contacts and calendar events, place calls and convert currencies, and add its widget to your home screen. Say Not now to any of them; the Search tile is there too if you want it.",
+        "Try Chronotif hands-on under Settings → Tutorial: the real panel with made-up notifications, one step at a time. Open it, watch New move to Earlier, open a stack, preview, reply and clear, then open Search every way there is and ask it things, and try the lock screen: the pile, replying while locked, double-tap to sleep. Your own notifications stay hidden and untouched while you practise.",
+        "A conversation renamed by its app shows its new name the next time you open the panel, instead of the old one."
+      ],
+      "videos": [
+        {
+          "src": "/video/release-0.2.7-1.mp4",
+          "poster": "/video/release-0.2.7-1-poster.webp",
+          "title": "The panel and the edge handle",
+          "label": "What's new in Chronotif 0.2.7, part 1: the panel and the edge handle"
+        },
+        {
+          "src": "/video/release-0.2.7-2.mp4",
+          "poster": "/video/release-0.2.7-2-poster.webp",
+          "title": "The lock screen",
+          "label": "What's new in Chronotif 0.2.7, part 2: the lock screen"
+        },
+        {
+          "src": "/video/release-0.2.7-3.mp4",
+          "poster": "/video/release-0.2.7-3-poster.webp",
+          "title": "Without unlocking",
+          "label": "What's new in Chronotif 0.2.7, part 3: without unlocking"
+        },
+        {
+          "src": "/video/release-0.2.7-4.mp4",
+          "poster": "/video/release-0.2.7-4-poster.webp",
+          "title": "The Preview and the panel",
+          "label": "What's new in Chronotif 0.2.7, part 4: the Preview and the panel"
+        },
+        {
+          "src": "/video/release-0.2.7-5.mp4",
+          "poster": "/video/release-0.2.7-5-poster.webp",
+          "title": "Settings",
+          "label": "What's new in Chronotif 0.2.7, part 5: settings"
+        },
+        {
+          "src": "/video/release-0.2.7-6.mp4",
+          "poster": "/video/release-0.2.7-6-poster.webp",
+          "title": "The Tutorial and Usage data",
+          "label": "What's new in Chronotif 0.2.7, part 6: the Tutorial and Usage data"
+        }
+      ]
+    },
     {
       "version": "0.2.6",
       "date": "2026-11-20",

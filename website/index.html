@@ -6,7 +6,7 @@
     <title>Chronotif: calm, chronological notifications for Android</title>
     <meta
       name="description"
-      content="Chronotif is a free, open-source Android app that shows what arrived since you last checked under New, and dims what you've already seen under Earlier, still in the order it arrived. No accounts, and your notifications never leave your phone."
+      content="Chronotif is a free, open-source Android app that shows what arrived since you last checked under New, and dims what you've already seen under Earlier, still in the order it arrived. No accounts, and your notifications never leave your phone. It sends only anonymous usage data, which you can turn off."
     />
     <link rel="canonical" href="https://chronotif.com/" />
     <meta name="theme-color" content="#0b0c0e" />
@@ -22,7 +22,7 @@
     <meta property="og:title" content="Chronotif: calm, chronological notifications for Android" />
     <meta
       property="og:description"
-      content="What's new stays in front. What you've already seen steps back. A free, open-source notification panel and lock-screen view for Android that keeps your notifications on your phone."
+      content="What's new stays in front. What you've already seen steps back. A free, open-source notification panel and lock-screen view for Android that keeps your notifications on your phone. It sends only anonymous usage data, which you can turn off."
     />
     <meta property="og:image" content="https://chronotif.com/og.png" />
     <meta property="og:image:width" content="1200" />
@@ -417,7 +417,9 @@
             <h2 id="privacy-title">Your notifications never leave your phone.</h2>
             <p class="lede">
               Chronotif reads some of the most private things on your device, so it’s built to keep
-              them there. You don’t have to take our word for it: the source is on GitHub.
+              them there. From 0.2.7 it sends one thing: anonymous <strong>Usage data</strong>, so we
+              can see what to fix and improve. None of it comes from your notifications, and you can
+              turn it off. You don’t have to take our word for it: the source is on GitHub.
             </p>
           </header>
           <ul class="pillars">
@@ -426,6 +428,20 @@
               <p>
                 No accounts. Your notifications, contacts, calendar, what you type in Search and your
                 phone’s identifiers are never sent anywhere.
+              </p>
+            </li>
+            <li>
+              <h3>Usage data, anonymous and yours to turn off</h3>
+              <p>
+                Once a day Chronotif sends counts (how often the panel opened, never what was in it),
+                how fast the panel opened, your settings, and your phone’s model, Android version and
+                country to PostHog’s servers in the EU, and after a crash, where in Chronotif’s code it
+                happened. It carries a random ID made for this
+                install, not your name, account or phone’s identifiers, and PostHog discards your IP
+                address. Turn it off under <em>Settings → Privacy and about → Usage data</em>: it
+                sends one last note that it was turned off, deletes the ID and stays silent.
+                <a href="https://github.com/nagarete/chronotif/blob/main/docs/usage-data.md">What Chronotif sends</a>
+                lists every field.
               </p>
             </li>
             <li>
@@ -462,12 +478,8 @@
                 nothing you type. The update check, off until you turn it on, is the other. Once a day, or when
                 you tap <em>Check for updates</em>, it reads the public release list on GitHub and
                 downloads the new APK. The request includes only the app’s version, though like any
-                download, GitHub sees your IP address. <strong>Usage data</strong>, on unless you
-                turn it off, sends anonymous counts, panel speeds, settings and crash reports to
-                PostHog’s EU servers, so Chronotif can be improved from how it’s really used. Never
-                anything from your notifications.
-                <a href="https://github.com/nagarete/chronotif/blob/main/docs/usage-data.md">What’s sent</a>
-                lists every field.
+                download, GitHub sees your IP address. Usage data, on unless you turn it off, is the
+                third.
               </p>
             </li>
           </ul>
@@ -723,6 +735,19 @@
               <p>
                 A few apps, mostly banking apps, refuse input while any overlay is on screen. Turn off
                 the edge handle in Chronotif and use the Quick Settings tile instead.
+              </p>
+            </details>
+            <details>
+              <summary>Does Chronotif collect any data?</summary>
+              <p>
+                Only anonymous Usage data, from version 0.2.7: counts of what you use, how fast the
+                panel opens, your settings, your phone’s model, Android version and country, and crash reports.
+                Never your notifications, which apps notify you, your contacts, calendar or anything you
+                type in Search, and nothing that identifies you or your phone. It helps us see which
+                features people use and what breaks on which phones. It’s on unless you turn it off
+                under <em>Settings → Privacy and about</em>, and
+                <a href="https://github.com/nagarete/chronotif/blob/main/docs/usage-data.md">What Chronotif sends</a>
+                lists every field.
               </p>
             </details>
             <details>
