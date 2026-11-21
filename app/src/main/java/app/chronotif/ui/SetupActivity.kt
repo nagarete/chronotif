@@ -44,6 +44,7 @@ import app.chronotif.SearchSetup
 import app.chronotif.Tutorial
 import app.chronotif.StatusBarSwipe
 import app.chronotif.Updater
+import app.chronotif.UsageData
 import app.chronotif.core.SettingMatch
 import kotlin.math.abs
 
@@ -97,6 +98,8 @@ class SetupActivity : Activity() {
         const val REQUEST_SPEECH = 1
         /** Results shown at most; more means the query is too short to be useful. */
         const val RESULTS = 30
+        /** Every field Usage data sends, for people using the app. */
+        const val USAGE_DATA_DOC = "https://github.com/nagarete/chronotif/blob/main/docs/usage-data.md"
     }
 
     private var settled = false
@@ -470,6 +473,7 @@ class SetupActivity : Activity() {
         }
         footnote(getString(R.string.setup_intro))
         progressCard()
+        usageNotice()
         group(R.string.setup_permissions) {
             step(R.string.perm_listener, R.string.perm_listener_desc,
                 done = { ListenerService.isEnabled(this) }, broken = { disconnected() },
@@ -511,6 +515,34 @@ class SetupActivity : Activity() {
             }
         }
     }
+
+    /** Says once that Usage data is on (ADR 0016), with the switch a tap away. Gone once answered. */
+    private fun usageNotice() {
+        if (Prefs.usageNoticed) return
+        group {
+            val buttons = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                addView(button(getString(R.string.usage_notice_off), filled = false) {
+                    UsageData.set(false)
+                    Prefs.usageNoticed = true
+                    reshow()
+                }, Ui.lp(-2))
+                addView(button(getString(R.string.usage_notice_ok), filled = true) {
+                    Prefs.usageNoticed = true
+                    reshow()
+                }, Ui.lp(-2).apply { marginStart = dp(8) })
+            }
+            val content = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                addView(buttons, Ui.lp(-2))
+                addView(button(getString(R.string.usage_data_whats_sent), filled = false) { openWhatsSent() },
+                    Ui.lp(-2).apply { topMargin = dp(8) })
+            }
+            item(R.string.usage_notice_title, getString(R.string.usage_notice_body), content = content)
+        }
+    }
+
+    private fun openWhatsSent() = open(Intent(Intent.ACTION_VIEW, Uri.parse(USAGE_DATA_DOC)))
 
     /** How much of setup is left, in words, with a ring; "All set" once nothing is. */
     private fun progressCard() = progressCard({ stepsDone() }, setupSteps) {
@@ -805,7 +837,14 @@ class SetupActivity : Activity() {
     }
 
     private fun about() {
-        group(R.string.setup_privacy) { item(null, getString(R.string.privacy_body)) }
+        group(R.string.setup_privacy) {
+            item(null, getString(R.string.privacy_body))
+            toggle(R.string.usage_data, R.string.usage_data_desc, { Prefs.usageData }) {
+                UsageData.set(it)
+                Prefs.usageNoticed = true
+            }
+            item(R.string.usage_data_whats_sent, getString(R.string.usage_data_whats_sent_desc)) { openWhatsSent() }
+        }
         footnote(getString(R.string.version, BuildConfig.VERSION_NAME))
     }
 

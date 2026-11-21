@@ -9,7 +9,7 @@
 ## Checklist
 
 - [ ] `./gradlew testDebugUnitTest lintDebug assembleDebug` passes
-- [ ] No new network access (beyond the opt-in updater and Search's currency rates), analytics, background services, wakelocks or new dependencies added
+- [ ] No new network access (beyond the opt-in updater, Search's currency rates and Usage data), background services, wakelocks or new dependencies added; any new Usage data field is listed in `docs/usage-data.md`
 - [ ] Lock-screen behaviour still respects privacy rules (if touched)
 - [ ] User-visible changes are described in the `next` entry of `website/src/releases.json`
 - [ ] I'm happy for this to be released under GPL-3.0-or-later

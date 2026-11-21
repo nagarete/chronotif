@@ -111,8 +111,9 @@ changes, check the page:
 
 - Minimum Android version: `minSdk` in `app/build.gradle.kts` (currently 30 = Android 11).
 - Permissions and install steps: `AndroidManifest.xml` and the README's *Install* section.
-- Network and updates: `Updater.kt` (the only network code) and the README's *Updates*
-  section. The privacy section describes exactly what the update check sends.
+- Network and updates: `Updater.kt`, `ExchangeRates.kt` and `UsageData.kt` (the network code),
+  the README's *Updates* section and `docs/usage-data.md`. The privacy section describes exactly
+  what the update check and Usage data send.
 - "What counts as a check": `CHECK_DWELL_MS` in `ui/PanelActivity.kt` and `LockSession` in
   `LockPolicy.kt`.
 - Stable APK size and tag come from GitHub's latest stable release. Nightly downloads are

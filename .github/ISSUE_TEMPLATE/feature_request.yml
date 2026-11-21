@@ -5,7 +5,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Chronotif is intentionally small and private (no accounts, no analytics, no network use beyond the opt-in updater and Search's currency rates).
+        Chronotif is intentionally small and private (no accounts, and no network use beyond the opt-in updater, Search's currency rates and anonymous Usage data that never includes notifications).
         Ideas that serve NEW / EARLIER, the lock screen, or interacting with real notifications fit best.
   - type: textarea
     id: idea

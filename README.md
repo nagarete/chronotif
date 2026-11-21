@@ -7,7 +7,7 @@ Android. It shows notifications newest first, keeps what arrived since your last
 under New, and folds what you've already checked into Earlier. Those notifications
 stay accessible without competing for the same attention.
 
-**Android 11 or newer.** No accounts, ads, or analytics. Your notifications stay on your phone.
+**Android 11 or newer.** No accounts or ads. Your notifications stay on your phone.
 
 [Download stable](https://github.com/nagarete/chronotif/releases/latest) ·
 [Nightly builds](https://github.com/nagarete/chronotif/releases?q=nightly&expanded=true) ·
@@ -125,7 +125,7 @@ If your installed version has no channel setting, install a nightly APK once to 
 
 Notifications stay in memory on your device. Chronotif saves your settings, the time
 of your last check, and when each of the last few apps notified (for Search's
-suggestions, never what they said), with backups disabled. The lock-screen view follows Android's
+suggestions, never what they said), and Usage data waiting to be sent, with backups disabled. The lock-screen view follows Android's
 notification privacy settings and requires unlocking before opening notifications,
 using actions, or replying. If you turn them on for Search, contacts and calendar events are read
 on the device when you search, never stored, and hidden while the phone is locked. Calling
@@ -137,9 +137,13 @@ Settings tile. The service subscribes to no accessibility events and can't retri
 other apps' screen content; notification content comes separately through notification access.
 
 The app has no third-party dependencies and responds to system events without polling,
-a foreground service, or wakelocks. Its only network use is the GitHub updater, off by default,
-and Search's currency rates from the European Central Bank, on by default and switched off under
-*Settings → Search*. Both are download-only, and the rates download only when you type a currency.
+a foreground service, or wakelocks. It goes online for three things. The GitHub updater, off by
+default, and Search's currency rates from the European Central Bank, on by default and switched off
+under *Settings → Search*, are download-only, and the rates download only when you type a currency.
+**Usage data**, on unless you turn it off under *Settings → Privacy and about*, sends anonymous
+counts, Panel speeds, settings and crash reports to PostHog's EU servers, never anything from your
+notifications, contacts, calendar or Search. [What Chronotif sends](docs/usage-data.md) lists every
+field (ADR 0016).
 
 ## Build from source
 

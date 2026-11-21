@@ -94,3 +94,7 @@ _Avoid_: Tour, Onboarding, Demo (demo mode is the debug build's setup for record
 **What's new**:
 The sheet over the Panel's cards on its first open after an update, listing the Release notes not shown before. While it shows, the Panel isn't seen, so it counts toward no check.
 _Avoid_: Changelog, update dialog
+
+**Usage data**:
+Anonymous counts, speeds, settings and crash reports Chronotif sends to improve the app, tied to a random install ID and the country, never to anything from notifications, contacts, calendar or Search. On unless turned off; turning it off sends one last note that it was turned off, then nothing.
+_Avoid_: Telemetry, Analytics, Tracking

@@ -6,7 +6,10 @@ import android.content.Context
 import android.content.SharedPreferences
 import app.chronotif.core.Attention
 
-/** The only persisted state: the last-check watermark, when apps last notified, and a handful of settings. */
+/**
+ * The only persisted state: the last-check watermark, when apps last notified, a handful of
+ * settings, and Usage data waiting to be sent.
+ */
 object Prefs {
     const val SHAPE_TAB = 0
     const val SHAPE_HALF_SMALL = 1
@@ -329,6 +332,63 @@ object Prefs {
     var nightlyUpdates: Boolean
         get() = sp.getBoolean("nightly_updates", BuildConfig.NIGHTLY)
         set(v) = sp.edit().putBoolean("nightly_updates", v).apply()
+
+    // --- Usage data (ADR 0016) ---
+
+    /** Usage data is sent; on unless turned off. */
+    var usageData: Boolean
+        get() = sp.getBoolean("usage_data", true)
+        set(v) = sp.edit().putBoolean("usage_data", v).apply()
+
+    /** The notice that Usage data is on has been answered in settings. */
+    var usageNoticed: Boolean
+        get() = sp.getBoolean("usage_noticed", false)
+        set(v) = sp.edit().putBoolean("usage_noticed", v).apply()
+
+    /** The random install ID events carry; null while Usage data is off. */
+    var usageId: String?
+        get() = sp.getString("usage_id", null)
+        set(v) = sp.edit().putString("usage_id", v).apply()
+
+    /** The day (epoch day) the waiting counts began. */
+    var usageDay: Long
+        get() = sp.getLong("usage_day", 0L)
+        set(v) = sp.edit().putLong("usage_day", v).apply()
+
+    /** The day's counts, in [app.chronotif.core.Usage.encodeCounts]'s form. */
+    var usageCounts: String?
+        get() = sp.getString("usage_counts", null)
+        set(v) = sp.edit().putString("usage_counts", v).apply()
+
+    /** The day's timed Panel opens, in [app.chronotif.core.Usage.encodeSpeeds]'s form. */
+    var usageSpeeds: String?
+        get() = sp.getString("usage_speeds", null)
+        set(v) = sp.edit().putString("usage_speeds", v).apply()
+
+    /** Crashes waiting to be sent. */
+    val usageCrashes: String? get() = sp.getString("usage_crashes", null)
+
+    /** Written at once: it's called as the process ends. */
+    @android.annotation.SuppressLint("ApplySharedPref")
+    fun keepUsageCrashes(v: String) {
+        sp.edit().putString("usage_crashes", v).commit()
+    }
+
+    /** The newest app exit already looked at, so each ANR is counted once. */
+    var usageExitsSeen: Long
+        get() = sp.getLong("usage_exits_seen", 0L)
+        set(v) = sp.edit().putLong("usage_exits_seen", v).apply()
+
+    /** A new install of Usage data hasn't sent its first event yet. */
+    var usageOnPending: Boolean
+        get() = sp.getBoolean("usage_on_pending", false)
+        set(v) = sp.edit().putBoolean("usage_on_pending", v).apply()
+
+    /** Forgets the install ID and everything waiting to be sent. */
+    fun clearUsage() {
+        sp.edit().remove("usage_id").remove("usage_day").remove("usage_counts").remove("usage_speeds")
+            .remove("usage_crashes").remove("usage_exits_seen").remove("usage_on_pending").apply()
+    }
 
     /** A version that failed to install; automatic checks skip it until a manual retry. */
     var updateFailedVersion: String?

@@ -350,8 +350,10 @@ app/src/main/java/app/chronotif/
   Content.kt            extracting text/messages/pictures from notifications; app labels & icons
   Act.kt                open / dismiss / action / inline reply
   Updater.kt            opt-in self-update from GitHub Releases (network code)
-  ExchangeRates.kt      ECB daily rates for Search's currency, on by default (the other network code);
+  ExchangeRates.kt      ECB daily rates for Search's currency, on by default (network code);
                         res/xml/network_security_config.xml trusts the ECB's root on older Androids
+  UsageData.kt          Usage data sent to PostHog, on unless turned off (the third network code;
+                        docs/usage-data.md lists every field, core/Usage.kt the counts)
   core/Version.kt       version comparison and checksum parsing (unit-tested)
   ui/NotifList.kt       renders sections with keyed view reuse (shared by panel and lock view)
   ui/CardView.kt        notification card and collapsed stack

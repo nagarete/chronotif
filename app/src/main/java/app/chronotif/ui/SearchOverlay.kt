@@ -39,6 +39,7 @@ import app.chronotif.core.AppMatch
 import app.chronotif.core.Money
 import app.chronotif.core.Numbers
 import app.chronotif.core.PersonalMatch
+import app.chronotif.core.Usage
 import app.chronotif.core.WebQuery
 
 /**
@@ -367,7 +368,7 @@ class SearchOverlay private constructor(
             scaleType = ImageView.ScaleType.CENTER
         }, LinearLayout.LayoutParams(dp(40), dp(40)).apply { marginEnd = dp(14) })
         addView(Ui.text(context, 16f, pal.text, lines = 1).apply { setText(p.label) }, LinearLayout.LayoutParams(0, -2, 1f))
-        setOnClickListener { launch(context.getString(p.label)) { SettingsPages.open(host.context, p) } }
+        setOnClickListener { launch(Usage.Count.SEARCH_SETTING, context.getString(p.label)) { SettingsPages.open(host.context, p) } }
     }
 
     /** A row with [icon] in the leading 40dp slot, the way every result row lines up, and an optional second line. */
@@ -428,7 +429,7 @@ class SearchOverlay private constructor(
                 PersonalData.call(host.context, c)
             })
         }
-        setOnClickListener { launch(contactApp) { PersonalData.openContact(host.context, c) } }
+        setOnClickListener { launch(Usage.Count.SEARCH_CONTACT, contactApp) { PersonalData.openContact(host.context, c) } }
     }
 
     private fun actionButton(icon: Int, label: String, action: () -> Unit): View = ImageView(context).apply {
@@ -438,7 +439,7 @@ class SearchOverlay private constructor(
         background = Ui.pressable(0, dp(22).toFloat(), pal.ripple)
         contentDescription = label
         layoutParams = LinearLayout.LayoutParams(dp(44), dp(44))
-        setOnClickListener { launch(contactApp, action) }
+        setOnClickListener { launch(Usage.Count.SEARCH_CONTACT, contactApp, action) }
     }
 
     private fun showMoreRow(more: Int): View = Ui.text(context, 15f, pal.accent, lines = 1).apply {
@@ -462,7 +463,7 @@ class SearchOverlay private constructor(
             if (e.allDay) "UTC" else null,
         ).toString()
         return iconRow(R.drawable.ic_event, e.title, time) {
-            launch(context.getString(R.string.tutorial_calendar)) { PersonalData.openEvent(host.context, e) }
+            launch(Usage.Count.SEARCH_CALENDAR, context.getString(R.string.tutorial_calendar)) { PersonalData.openEvent(host.context, e) }
         }
     }
 
@@ -492,12 +493,14 @@ class SearchOverlay private constructor(
 
     /**
      * Everything Search opens goes through here. In the Search part of the Tutorial nothing opens:
-     * Search says what would have ([what]) instead.
+     * Search says what would have ([what]) instead. [kind] is what Usage data counts: which sort of
+     * result was opened, never which one.
      */
-    private fun launch(what: CharSequence, action: () -> Unit) {
+    private fun launch(kind: Usage.Count, what: CharSequence, action: () -> Unit) {
         hideKeyboard()
         if (app.chronotif.Tutorial.holdsLaunch(context, what)) return
         host.guarded {
+            app.chronotif.UsageData.count(kind)
             action()
             host.launched()
         }
@@ -523,7 +526,7 @@ class SearchOverlay private constructor(
     private fun openWeb(query: String) {
         val engine = WebQuery.Engine.entries.getOrElse(Prefs.searchEngine) { WebQuery.Engine.GOOGLE }
         val url = if (WebQuery.isAddress(query)) WebQuery.address(query) else WebQuery.search(engine, query)
-        launch(context.getString(R.string.tutorial_browser)) {
+        launch(Usage.Count.SEARCH_WEB, context.getString(R.string.tutorial_browser)) {
             runCatching {
                 host.context.startActivity(
                     android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
@@ -563,7 +566,7 @@ class SearchOverlay private constructor(
         setOnClickListener { open(a) }
     }
 
-    private fun open(a: Launchable) = launch(a.label) { Launchables.launch(host.context, a) }
+    private fun open(a: Launchable) = launch(Usage.Count.SEARCH_APP, a.label) { Launchables.launch(host.context, a) }
 
     private fun focusField() {
         field.requestFocus()

@@ -27,7 +27,8 @@
       "New installs show Chronotif on the lock screen whenever there are notifications, and Search converts currencies without asking first. If you're updating, your settings stay as they were.",
       "Settings → Search starts with a checklist, like General: let Search find contacts and calendar events, place calls and convert currencies, and add its widget to your home screen. Say Not now to any of them; the Search tile is there too if you want it.",
       "Try Chronotif hands-on under Settings → Tutorial: the real panel with made-up notifications, one step at a time. Open it, watch New move to Earlier, open a stack, preview, reply and clear, then open Search every way there is and ask it things, and try the lock screen: the pile, replying while locked, double-tap to sleep. Your own notifications stay hidden and untouched while you practise.",
-      "A conversation renamed by its app shows its new name the next time you open the panel, instead of the old one."
+      "A conversation renamed by its app shows its new name the next time you open the panel, instead of the old one.",
+      "Chronotif now sends anonymous Usage data: counts, panel speeds, settings and crash reports, never anything from your notifications, so it can be improved from how it’s really used. Turn it off under Settings → Privacy and about, where What’s sent lists every field."
     ],
     "video": {
       "src": "/video/release-0.2.7.mp4",
