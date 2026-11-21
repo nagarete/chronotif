@@ -38,6 +38,7 @@ import app.chronotif.BuildConfig
 import app.chronotif.EdgeHandle
 import app.chronotif.ListenerService
 import app.chronotif.PanelTile
+import app.chronotif.FingerprintSensor
 import app.chronotif.Prefs
 import app.chronotif.R
 import app.chronotif.SearchSetup
@@ -763,6 +764,17 @@ class SetupActivity : Activity() {
             toggle(R.string.lock_double_tap, R.string.lock_double_tap_desc, { Prefs.lockDoubleTapSleep }) {
                 Prefs.lockDoubleTapSleep = it
             }
+            // Only phones with a sensor under the screen, or that were fitted to one.
+            if (Prefs.fingerprintTop > 0f || FingerprintSensor.present(this)) {
+                val fitted = Prefs.fingerprintTop > 0f
+                val fit = button(getString(if (fitted) R.string.fingerprint_fit_again else R.string.fingerprint_fit_button), filled = false) {
+                    open(Intent(this, FingerprintFitActivity::class.java))
+                }
+                item(R.string.fingerprint_fit, getString(if (fitted) R.string.fingerprint_fit_desc_fitted else R.string.fingerprint_fit_desc),
+                    trailing = fit)
+                // Back from fitting: show it as fitted.
+                refreshers += { if (current == Section.LOCK && fitted != Prefs.fingerprintTop > 0f) body.post { reshow() } }
+            }
         }
     }
 
@@ -978,6 +990,7 @@ class SetupActivity : Activity() {
         R.string.lock_mode to "lockscreen keyguard",
         R.string.lock_privacy to "private hide privacy",
         R.string.lock_double_tap to "screen off turn off gesture wake",
+        R.string.fingerprint_fit to "fingerprint sensor fod overlap covered bottom unlock",
         R.string.search_setup_widget to "home screen bar launcher",
         R.string.search_setup_tile to "quick settings",
         R.string.setup_tutorial to "learn guide how practice try",

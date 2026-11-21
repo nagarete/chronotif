@@ -35,11 +35,13 @@ import android.window.OnBackInvokedDispatcher
 import app.chronotif.BuildConfig
 import app.chronotif.CardSource
 import app.chronotif.Entry
+import app.chronotif.FingerprintSensor
 import app.chronotif.LockSession
 import app.chronotif.Prefs
 import app.chronotif.Tutorial
 import app.chronotif.TutorialSource
 import app.chronotif.R
+import app.chronotif.core.FingerprintSpot
 import kotlin.math.abs
 
 /**
@@ -185,6 +187,8 @@ class LockActivity : Activity(), NotifList.Host {
         }
         setContentView(root)
         this.root = root
+        // Put Tap to unlock's fingerprint icon on an under-display sensor, the Pile above it.
+        root.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> clearFingerprint(hint) }
 
         list = NotifList(this, listBox, onLock = true, source = Tutorial.source.takeIf { practice } ?: CardSource.Real)
         pile = LockPile(stage, scroll, clockRoom, clockBox, listBox, list, backdrop) { openPile() }
@@ -530,6 +534,24 @@ class LockActivity : Activity(), NotifList.Host {
         }
         return super.dispatchTouchEvent(ev)
     }
+
+    /**
+     * With a fingerprint sensor under the screen, raises Tap to unlock until its fingerprint icon
+     * sits on the sensor, and with it the Pile above, so a finger on the sensor touches no card.
+     */
+    private fun clearFingerprint(hint: LinearLayout) {
+        val top = fingerprintTop ?: return
+        val icon = hint.getChildAt(0) ?: return
+        if (icon.height == 0) return
+        // A little above the sensor's centre, where HyperOS's own icon sits.
+        val sensor = (top * FingerprintSensor.screenHeight(this)).toInt() + dp(FingerprintSpot.HALF_DP) - dp(4)
+        val at = IntArray(2).also { icon.getLocationOnScreen(it) }
+        val bottom = FingerprintSpot.hintPadding(hint.paddingBottom, at[1] + icon.height / 2, sensor, dp(14))
+        if (kotlin.math.abs(hint.paddingBottom - bottom) > 1) hint.setPadding(hint.paddingLeft, hint.paddingTop, hint.paddingRight, bottom)
+    }
+
+    /** The sensor's top edge, read once per view: it doesn't move while the view is up. */
+    private val fingerprintTop: Float? by lazy { FingerprintSensor.top(this) }
 
     companion object {
         /** AOSP's config_lockScreenDisplayTimeout, if the ROM doesn't expose its own. */

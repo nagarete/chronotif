@@ -47,6 +47,12 @@
             android:name=".ui.TutorialActivity"
             android:exported="false" />
 
+        <!-- Settings → Lock screen → Fit to your fingerprint sensor. -->
+        <activity
+            android:name=".ui.FingerprintFitActivity"
+            android:exported="false"
+            android:excludeFromRecents="true" />
+
         <activity
             android:name=".ui.SetupActivity"
             android:exported="true">
