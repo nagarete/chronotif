@@ -30,17 +30,18 @@ class TutorialActivity : Activity() {
                 .putExtra(EXTRA_FROM_START, fromStart)
     }
 
-    private val part by lazy {
-        intent.getStringExtra(EXTRA_PART)?.let { runCatching { Tutorial.Part.valueOf(it) }.getOrNull() }
-            ?: Tutorial.Part.NOTIFICATIONS
-    }
+    /** The part on screen: the one asked for, then whichever the run moves on to. */
+    private var part = Tutorial.Part.NOTIFICATIONS
+    private val follow: () -> Unit = { Tutorial.run?.part?.let { part = it } }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Ui.edgeToEdge(window)
         val c = M3(this)
         window.decorView.setBackgroundColor(c.surface)
+        part = intent.getStringExtra(EXTRA_PART)?.let { runCatching { Tutorial.Part.valueOf(it) }.getOrNull() } ?: part
         Tutorial.start(this, part, fromStart = savedInstanceState == null && intent.getBooleanExtra(EXTRA_FROM_START, false))
+        Tutorial.addListener(follow)
 
         val column = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -66,12 +67,22 @@ class TutorialActivity : Activity() {
     override fun onStart() {
         super.onStart()
         // Back after the run ended (the Panel closed while this screen was away): carry on where it was.
-        if (Tutorial.run?.part != part) Tutorial.start(this, part)
-        Tutorial.screenShown = true
+        if (Tutorial.run == null) Tutorial.start(this, part)
+        Tutorial.shown(Tutorial.Surface.SCREEN, true)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        Tutorial.recheck(this)
+    }
+
+    override fun onDestroy() {
+        Tutorial.removeListener(follow)
+        super.onDestroy()
     }
 
     override fun onStop() {
-        Tutorial.screenShown = false
+        Tutorial.shown(Tutorial.Surface.SCREEN, false)
         super.onStop()
     }
 }

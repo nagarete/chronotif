@@ -52,7 +52,7 @@ interface CardSource {
     fun dismissMedia(context: Context, e: Entry): Boolean
 
     /** What the user did in the Panel that a stand-in source may follow, as the Tutorial does. */
-    enum class Noticed { PANEL_OPENED, PANEL_CLOSED, STACK_OPENED, STACK_CLOSED, PREVIEW }
+    enum class Noticed { PANEL_OPENED, PANEL_CLOSED, STACK_OPENED, STACK_CLOSED, PREVIEW, SEARCH }
 
     fun noticed(what: Noticed) {}
 

@@ -98,7 +98,7 @@ class TutorialTest {
     @Test
     fun stepsNoticeWhatWasTriedAndThePlaceIsKept() {
         val r = Tutorial.start(context, part)
-        Tutorial.screenShown = true
+        Tutorial.shown(Tutorial.Surface.SCREEN, true)
         assertEquals(0, r.step)
         r.source.noticed(Noticed.PANEL_OPENED)
         assertTrue("Opening the Panel is step 1", r.tried)
@@ -157,12 +157,61 @@ class TutorialTest {
     @Test
     fun theRunEndsOnceTheScreenAndThePanelAreBothGone() {
         val r = Tutorial.start(context, part)
-        Tutorial.screenShown = true
+        Tutorial.shown(Tutorial.Surface.SCREEN, true)
         r.source.noticed(Noticed.PANEL_OPENED)
-        Tutorial.screenShown = false
+        Tutorial.shown(Tutorial.Surface.SCREEN, false)
         assertSame("The Panel is still open over the screen that left", r, Tutorial.run)
         r.source.noticed(Noticed.PANEL_CLOSED)
         assertNull(Tutorial.run)
         assertNull(Tutorial.source)
+    }
+
+    @Test
+    fun theSearchPartFollowsSearchAndHoldsItsLaunches() {
+        assertFalse("Outside the Search part, Search opens things", Tutorial.holdsLaunch(context, "Calculator"))
+        val r = Tutorial.start(context, Tutorial.Part.SEARCH)
+        Tutorial.shown(Tutorial.Surface.SCREEN, true)
+        r.source.noticed(Noticed.SEARCH)
+        assertTrue("Pulled down in the Panel", r.tried)
+        Tutorial.next(context)
+        Tutorial.notice(TutorialSource.Event.SEARCH_ELSEWHERE)
+        assertTrue("Opened from the edge handle", r.tried)
+        Tutorial.next(context)
+        Tutorial.notice(TutorialSource.Event.ANSWER_SHOWN)
+        assertTrue(r.tried)
+        Tutorial.next(context)
+        assertTrue("A tapped app doesn't open", Tutorial.holdsLaunch(context, "Calculator"))
+        assertTrue(r.tried)
+        assertNull(shadowOf(context as Application).nextStartedActivity)
+
+        Tutorial.next(context)
+        Tutorial.recheck(context)
+        assertFalse("No widget yet", r.tried)
+        shadowOf(android.appwidget.AppWidgetManager.getInstance(context)).createWidget(SearchWidget::class.java, R.layout.search_widget)
+        Tutorial.recheck(context)
+        assertTrue("The widget is on the home screen", r.tried)
+    }
+
+    @Test
+    fun searchFromTheEdgeHandleKeepsTheRunGoing() {
+        val r = Tutorial.start(context, Tutorial.Part.SEARCH)
+        Tutorial.shown(Tutorial.Surface.SCREEN, true)
+        Tutorial.shown(Tutorial.Surface.SEARCH, true)
+        Tutorial.shown(Tutorial.Surface.SCREEN, false)
+        assertSame("Search covers the tutorial screen", r, Tutorial.run)
+        Tutorial.shown(Tutorial.Surface.SEARCH, false)
+        assertNull(Tutorial.run)
+    }
+
+    @Test
+    fun finishingAPartMovesOnToTheNextWithTheSameSamples() {
+        val r = Tutorial.start(context, part)
+        repeat(Tutorial.steps(part).size) { Tutorial.next(context) }
+        assertTrue(r.finished)
+        assertEquals(Tutorial.Part.SEARCH, Tutorial.nextPart(part))
+        val search = Tutorial.start(context, Tutorial.Part.SEARCH)
+        assertSame("The Panel still open keeps its samples", r.source, search.source)
+        r.source.noticed(Noticed.SEARCH)
+        assertTrue("and they report to the new part", search.tried)
     }
 }

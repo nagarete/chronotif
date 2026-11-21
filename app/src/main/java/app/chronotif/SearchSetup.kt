@@ -61,4 +61,39 @@ object SearchSetup {
 
     private fun granted(ctx: Context, permission: String) =
         ctx.checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
+
+    fun title(step: Step) = when (step) {
+        Step.CONTACTS -> R.string.search_find_contacts
+        Step.CALLS -> R.string.search_calls
+        Step.CURRENCY -> R.string.search_currency_rates
+        Step.CALENDAR -> R.string.search_find_calendar
+        Step.WIDGET -> R.string.search_setup_widget
+        Step.TILE -> R.string.search_setup_tile
+    }
+
+    /** Whether the home screen lets apps place a widget for the user to confirm. */
+    fun canPinWidget(ctx: Context) = AppWidgetManager.getInstance(ctx)?.isRequestPinAppWidgetSupported == true
+
+    /** Asks the home screen to place the Search bar; the step shows whether it did once the user is back. */
+    fun pinWidget(ctx: Context) {
+        if (!canPinWidget(ctx)) return
+        AppWidgetManager.getInstance(ctx).requestPinAppWidget(ComponentName(ctx, SearchWidget::class.java), null, null)
+    }
+
+    /** Asks Android (13 and newer) to add the Search tile to Quick Settings, then calls [answered]. */
+    fun addTile(ctx: Context, answered: () -> Unit = {}) {
+        if (android.os.Build.VERSION.SDK_INT < 33) return
+        ctx.getSystemService(android.app.StatusBarManager::class.java).requestAddTileService(
+            ComponentName(ctx, SearchTile::class.java),
+            ctx.getString(R.string.search_tile_label),
+            android.graphics.drawable.Icon.createWithResource(ctx, R.drawable.ic_search),
+            ctx.mainExecutor,
+        ) { result ->
+            if (result == android.app.StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ADDED ||
+                result == android.app.StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ALREADY_ADDED) {
+                Prefs.searchTileAdded = true
+            }
+            answered()
+        }
+    }
 }
