@@ -420,7 +420,7 @@
     <string name="usage_data_whats_sent">What\'s sent</string>
     <string name="usage_data_whats_sent_desc">Every field Usage data sends, listed on GitHub.</string>
     <string name="usage_notice_title">Chronotif sends Usage data</string>
-    <string name="usage_notice_body">Anonymous counts, Panel speeds, settings and crash reports, so Chronotif can be improved. Never anything from your notifications. You can turn it off now, or later in Privacy and about.</string>
+    <string name="usage_notice_body">Anonymous counts, Panel speeds, settings and crash reports. Never anything from your notifications. Change it any time in Privacy and about.</string>
     <string name="usage_notice_ok">OK</string>
     <string name="usage_notice_off">Turn off</string>
 

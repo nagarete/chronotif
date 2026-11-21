@@ -473,7 +473,6 @@ class SetupActivity : Activity() {
         }
         footnote(getString(R.string.setup_intro))
         progressCard()
-        usageNotice()
         group(R.string.setup_permissions) {
             step(R.string.perm_listener, R.string.perm_listener_desc,
                 done = { ListenerService.isEnabled(this) }, broken = { disconnected() },
@@ -514,14 +513,23 @@ class SetupActivity : Activity() {
                 body.postDelayed({ recreate() }, 150)
             }
         }
+        usageNotice()
     }
 
     /** Says once that Usage data is on (ADR 0016), with the switch a tap away. Gone once answered. */
     private fun usageNotice() {
         if (Prefs.usageNoticed) return
         group {
-            val buttons = LinearLayout(this).apply {
+            // One row: the link to what's sent on the left, the answer on the right.
+            val content = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                addView(text(getString(R.string.usage_data_whats_sent), 14f, weight = 600).apply {
+                    setTextColor(c.primary)
+                    minHeight = dp(40)
+                    gravity = Gravity.CENTER_VERTICAL
+                    setOnClickListener { openWhatsSent() }
+                }, LinearLayout.LayoutParams(0, -2, 1f))
                 addView(button(getString(R.string.usage_notice_off), filled = false) {
                     UsageData.set(false)
                     Prefs.usageNoticed = true
@@ -531,12 +539,6 @@ class SetupActivity : Activity() {
                     Prefs.usageNoticed = true
                     reshow()
                 }, Ui.lp(-2).apply { marginStart = dp(8) })
-            }
-            val content = LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL
-                addView(buttons, Ui.lp(-2))
-                addView(button(getString(R.string.usage_data_whats_sent), filled = false) { openWhatsSent() },
-                    Ui.lp(-2).apply { topMargin = dp(8) })
             }
             item(R.string.usage_notice_title, getString(R.string.usage_notice_body), content = content)
         }
