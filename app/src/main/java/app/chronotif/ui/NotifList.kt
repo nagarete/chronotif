@@ -52,15 +52,33 @@ class NotifList(
     }
 
     /**
-     * One row of the list. A row with a [sig] (everything its binding depends on) is only bound
-     * again when that changes, so reopening a kept panel updates just the cards that changed.
+     * One row of the list. Most rows are bound again on every render. A card is [drawn] from its
+     * look alone, and drawn again only when the look changes, so reopening a kept panel updates
+     * just the cards that changed.
      */
-    private class Row(val id: String, val make: () -> View, val sig: (() -> Any?)? = null, val bind: (View) -> Unit)
+    private class Row private constructor(
+        val id: String, val make: () -> View, val look: (() -> Any)?, val draw: (View, Any?) -> Unit,
+    ) {
+        companion object {
+            operator fun invoke(id: String, make: () -> View, bind: (View) -> Unit) = Row(id, make, null) { v, _ -> bind(v) }
+
+            /**
+             * [draw] gets everything it may show in the look, so what decides a redraw and what's
+             * drawn can't drift apart. The draw functions are in the companion, where the list's
+             * state is out of reach.
+             */
+            fun <L : Any> drawn(id: String, make: () -> View, look: () -> L, draw: (View, L) -> Unit) =
+                Row(id, make, look) { v, l ->
+                    @Suppress("UNCHECKED_CAST")
+                    draw(v, l as L)
+                }
+        }
+    }
 
     private val ctx = container.context
     private val pal = Palette(ctx)
     private val views = HashMap<String, View>()
-    /** What each row was last bound with: see [Row.sig]. */
+    /** The look each card was last drawn with: see [Row.drawn]. */
     private val bound = HashMap<String, Any?>()
     private val expanded = HashSet<String>()
     private val openStacks = HashSet<String>()
@@ -184,19 +202,14 @@ class NotifList(
 
         fun card(e: Entry, style: CardView.Style, newSince: Long = Long.MAX_VALUE) {
             shownUpTo = maxOf(shownUpTo, e.alertTime)
-            val sig = {
-                listOf(e, style, e.key in expanded, replying, newSince, redacted(e), e.key in pendingDismiss,
-                    Ui.relTime(ctx, e.alertTime, now), conversationName(e), Apps.generation)
-            }
-            rows += Row("c:${e.key}", { CardView(ctx, this) }, sig) { v ->
-                v as CardView
+            val look = {
                 val r = redacted(e)
-                val open = e.key in expanded && !r
-                val reply = replying?.takeIf { it.first == e.key }?.second ?: -1
-                v.bind(e, Content.of(ctx, e, r), style, open, reply, now, newSince)
-                if (e.key !in pendingDismiss) v.swipe.reset(v)
-                v.layoutParams = gap(8)
+                CardLook(e, style, open = e.key in expanded && !r,
+                    reply = replying?.takeIf { it.first == e.key }?.second ?: -1, newSince, r,
+                    dismissing = e.key in pendingDismiss, ago = Ui.relTime(ctx, e.alertTime, now),
+                    name = conversationName(e), icons = Apps.generation).also { it.now = now }
             }
+            rows += Row.drawn("c:${e.key}", { CardView(ctx, this) }, look, ::drawCard)
         }
 
         fun player(e: Entry) {
@@ -434,22 +447,21 @@ class NotifList(
         stackId: String, e: Entry, c: Content, m: Content.Msg, latest: Boolean, style: CardView.Style, now: Long,
     ): Row {
         val id = "${e.key}#${m.id}"
-        val sig = {
-            listOf(e, c.redacted, m.id, m.time, latest, style, id in expanded, e.key in expanded, replying,
-                Ui.relTime(ctx, m.time, now), conversationName(e), Apps.generation)
+        val look = {
+            MessageLook(e, c.redacted, m.id, m.time, style, open = id in expanded || (latest && e.key in expanded),
+                reply = replying?.takeIf { it.first == id || (latest && it.first == e.key) }?.second ?: -1,
+                ago = Ui.relTime(ctx, m.time, now), name = conversationName(e), icons = Apps.generation)
+                .also { it.now = now }
         }
-        return Row("m:$stackId#${m.id}", { CardView(ctx, this) }, sig) { v ->
-            v as CardView
-            val open = id in expanded || (latest && e.key in expanded)
-            val reply = replying?.takeIf { it.first == id || (latest && it.first == e.key) }?.second ?: -1
-            // Android can't drop one message from a notification, so only Chronotif hides it.
-            v.swipeAllowed = { true }
-            v.onSwiped = { source.hideMessage(e.key, m.id) }
-            v.showCount(0)
-            v.bind(e, c.forMessage(m), style, open, reply, now, id = id, at = m.time)
-            v.swipe.reset(v)
-            v.layoutParams = gap(8)
+        // The row's id holds the notification's key and the message's, so the view keeps its message.
+        val make = {
+            CardView(ctx, this).apply {
+                // Android can't drop one message from a notification, so only Chronotif hides it.
+                swipeAllowed = { true }
+                onSwiped = { source.hideMessage(e.key, m.id) }
+            }
         }
+        return Row.drawn("m:$stackId#${m.id}", make, look, ::drawMessage)
     }
 
     // --- Card callbacks ---------------------------------------------------------------
@@ -727,10 +739,10 @@ class NotifList(
                 return
             }
             if (v == null) v = r.make().also { it.tag = r.id; views[r.id] = it }
-            val sig = r.sig?.invoke()
-            if (sig == null || bound[r.id] != sig || !bound.containsKey(r.id)) {
-                r.bind(v)
-                bound[r.id] = sig
+            val look = r.look?.invoke()
+            if (look == null || bound[r.id] != look) {
+                r.draw(v, look)
+                bound[r.id] = look
             }
             if (container.getChildAt(i) !== v) {
                 if (v.parent === container) {
@@ -743,10 +755,49 @@ class NotifList(
         if (animates) container.layoutTransition = transition
     }
 
+    /**
+     * Everything a notification's card shows. [e] is the same object across ranking updates,
+     * which change it in place, so what the ranking adds is in [name]. [ago] is the time as
+     * shown; [now] only feeds it, so it stays out of equality.
+     */
+    private data class CardLook(
+        val e: Entry, val style: CardView.Style, val open: Boolean, val reply: Int, val newSince: Long,
+        val redacted: Boolean, val dismissing: Boolean, val ago: String, val name: Any?, val icons: Int,
+    ) {
+        var now = 0L
+    }
+
+    /** Everything a message's card shows: as [CardLook], for message [msg] at [at]. */
+    private data class MessageLook(
+        val e: Entry, val redacted: Boolean, val msg: String, val at: Long, val style: CardView.Style,
+        val open: Boolean, val reply: Int, val ago: String, val name: Any?, val icons: Int,
+    ) {
+        var now = 0L
+    }
+
     private companion object {
         /** Rows made at once, whatever they cost: enough to fill the screen. */
         const val FIRST_SCREEN_ROWS = 12
         /** Time spent making rows per frame after that. */
         const val FRAME_BUDGET_MS = 8L
+
+        fun drawCard(v: View, l: CardLook) {
+            v as CardView
+            v.bind(l.e, Content.of(v.context, l.e, l.redacted), l.style, l.open, l.reply, l.now, l.newSince)
+            if (!l.dismissing) v.swipe.reset(v)
+            v.layoutParams = cardGap(v)
+        }
+
+        fun drawMessage(v: View, l: MessageLook) {
+            v as CardView
+            val c = Content.of(v.context, l.e, l.redacted)
+            val m = c.messages.firstOrNull { it.id == l.msg } ?: return
+            v.showCount(0)
+            v.bind(l.e, c.forMessage(m), l.style, l.open, l.reply, l.now, id = "${l.e.key}#${l.msg}", at = l.at)
+            v.swipe.reset(v)
+            v.layoutParams = cardGap(v)
+        }
+
+        fun cardGap(v: View) = Ui.lp().apply { topMargin = v.dp(8) }
     }
 }
