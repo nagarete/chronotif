@@ -33,9 +33,12 @@ import android.widget.ScrollView
 import android.widget.TextClock
 import android.window.OnBackInvokedDispatcher
 import app.chronotif.BuildConfig
+import app.chronotif.CardSource
 import app.chronotif.Entry
 import app.chronotif.LockSession
 import app.chronotif.Prefs
+import app.chronotif.Tutorial
+import app.chronotif.TutorialSource
 import app.chronotif.R
 import kotlin.math.abs
 
@@ -64,6 +67,13 @@ class LockActivity : Activity(), NotifList.Host {
     private var unlocking = false
     private val markSeen = Runnable { LockSession.seen(list.shownUpTo) }
 
+    /**
+     * The Tutorial's stand-in, on an unlocked phone: it shows the samples and stays up, says what
+     * would wait for an unlock instead of asking for one, goes black only for a moment on a double
+     * tap, and never touches the real check or the screen timeout.
+     */
+    private val practice by lazy { intent.getBooleanExtra(EXTRA_PRACTICE, false) && Tutorial.source != null }
+
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             // Screen off: start fresh next time. Unlocked by biometrics: step aside —
@@ -76,7 +86,7 @@ class LockActivity : Activity(), NotifList.Host {
         super.onCreate(savedInstanceState)
         setShowWhenLocked(true)
         Ui.edgeToEdge(window)
-        useKeyguardTimeout()
+        if (!practice) useKeyguardTimeout()
         val pal = Palette(this)
 
         val root = FrameLayout(this)
@@ -155,6 +165,9 @@ class LockActivity : Activity(), NotifList.Host {
             }, Ui.lp(-2))
             setOnClickListener { unlock(null) }
         }
+        // The Tutorial's card, between the list and Tap to unlock.
+        if (practice) column.addView(TutorialGuide(this, inPanel = false) { finish() },
+            Ui.lp().apply { leftMargin = dp(12); rightMargin = dp(12); bottomMargin = dp(8) })
         column.addView(hint, Ui.lp(-1))
         this.hint = hint
         column.setOnClickListener { tapped() }
@@ -173,7 +186,7 @@ class LockActivity : Activity(), NotifList.Host {
         setContentView(root)
         this.root = root
 
-        list = NotifList(this, listBox, onLock = true)
+        list = NotifList(this, listBox, onLock = true, source = Tutorial.source.takeIf { practice } ?: CardSource.Real)
         pile = LockPile(stage, scroll, clockRoom, clockBox, listBox, list, backdrop) { openPile() }
 
         val filter = IntentFilter().apply {
@@ -188,12 +201,20 @@ class LockActivity : Activity(), NotifList.Host {
     }
 
     /** Unfolds the Pile and scrolls New to the top of the screen. */
-    private fun openPile() = scroll.smoothScrollTo(0, pile.openAt)
+    private fun openPile() {
+        scroll.smoothScrollTo(0, pile.openAt)
+        if (practice) Tutorial.notice(TutorialSource.Event.PILE_TAPPED)
+    }
 
     /** Back folds the open list back into the Pile, then shows the stock lock screen. Not while dark. */
     internal fun back() {
         if (dark != null) return
-        if (pile.resting) finish() else scroll.smoothScrollTo(0, 0)
+        if (pile.resting) {
+            finish()
+            return
+        }
+        scroll.smoothScrollTo(0, 0)
+        if (practice) Tutorial.notice(TutorialSource.Event.PILE_FOLDED)
     }
 
     // Before Android 13, Back arrives as a key.
@@ -205,16 +226,21 @@ class LockActivity : Activity(), NotifList.Host {
         return super.dispatchKeyEvent(event)
     }
 
+    override fun onStart() {
+        super.onStart()
+        if (practice) Tutorial.shown(Tutorial.Surface.LOCK, true)
+    }
+
     override fun onResume() {
         super.onResume()
-        if (!unlocking && !getSystemService(KeyguardManager::class.java).isKeyguardLocked) {
+        if (!practice && !unlocking && !getSystemService(KeyguardManager::class.java).isKeyguardLocked) {
             finish()
             return
         }
         list.source.addListener(render)
         list.render()
         // Seen long enough to count — committed only if the user goes on to unlock.
-        main.postDelayed(markSeen, 1200)
+        if (!practice) main.postDelayed(markSeen, 1200)
     }
 
     override fun onPause() {
@@ -222,11 +248,12 @@ class LockActivity : Activity(), NotifList.Host {
         list.source.removeListener(render)
         main.removeCallbacks(markSeen)
         // Unlocked (any method) while we were up: what was shown has now been seen.
-        if (!getSystemService(KeyguardManager::class.java).isKeyguardLocked) LockSession.unlocked()
+        if (!practice && !getSystemService(KeyguardManager::class.java).isKeyguardLocked) LockSession.unlocked()
     }
 
     override fun onStop() {
         super.onStop()
+        if (practice) Tutorial.shown(Tutorial.Surface.LOCK, false)
         if (!isFinishing && !unlocking) finish()
     }
 
@@ -272,6 +299,13 @@ class LockActivity : Activity(), NotifList.Host {
 
     /** Asks the system to unlock (PIN/pattern/biometric bouncer), then runs [then]. */
     private fun unlock(then: (() -> Unit)?) {
+        if (practice) {
+            // The phone is unlocked already: say what the real lock screen would do.
+            android.widget.Toast.makeText(this, if (then != null) R.string.tutorial_after_unlock else R.string.tutorial_unlock_here,
+                android.widget.Toast.LENGTH_SHORT).show()
+            if (then != null) Tutorial.notice(TutorialSource.Event.UNLOCK_ASKED)
+            return
+        }
         val km = getSystemService(KeyguardManager::class.java)
         if (!km.isKeyguardLocked) {
             then?.invoke()
@@ -319,6 +353,7 @@ class LockActivity : Activity(), NotifList.Host {
     private val pull by lazy {
         PullToSearch(list = scroll, atTop = { !scroll.canScrollVertically(-1) }) {
             SearchOverlay.show(scroll, this)
+            list.source.noticed(CardSource.Noticed.SEARCH)
         }
     }
 
@@ -395,6 +430,15 @@ class LockActivity : Activity(), NotifList.Host {
         if (dark != null) return
         dark = View(this).apply { setBackgroundColor(Color.BLACK) }
             .also { root.addView(it, FrameLayout.LayoutParams(-1, -1)) }
+        if (practice) {
+            // Only a moment: the phone isn't locked, and the real display would be asleep now.
+            main.postDelayed({
+                wake()
+                android.widget.Toast.makeText(this, R.string.tutorial_slept, android.widget.Toast.LENGTH_LONG).show()
+                Tutorial.notice(TutorialSource.Event.SLEPT)
+            }, PRACTICE_DARK_MS)
+            return
+        }
         window.insetsController?.apply {
             systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
             hide(WindowInsets.Type.systemBars())
@@ -410,7 +454,7 @@ class LockActivity : Activity(), NotifList.Host {
         dark = null
         window.insetsController?.show(WindowInsets.Type.systemBars())
         window.attributes = window.attributes.apply { screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE }
-        useKeyguardTimeout()
+        if (!practice) useKeyguardTimeout()
     }
 
     /** The black cover acts as a sleeping screen: a double tap brings the view back, and nothing else does anything. */
@@ -485,8 +529,19 @@ class LockActivity : Activity(), NotifList.Host {
         return super.dispatchTouchEvent(ev)
     }
 
-    private companion object {
+    companion object {
         /** AOSP's config_lockScreenDisplayTimeout, if the ROM doesn't expose its own. */
-        const val KEYGUARD_TIMEOUT_MS = 10_000L
+        private const val KEYGUARD_TIMEOUT_MS = 10_000L
+        private const val EXTRA_PRACTICE = "practice"
+        /** How long a practice double tap keeps the screen black. */
+        private const val PRACTICE_DARK_MS = 1200L
+
+        /**
+         * The lock-screen view as a stand-in for the Tutorial's Lock screen part, while the phone is
+         * unlocked: the Tutorial's samples, nothing unlocked, slept or checked.
+         */
+        fun practice(context: Context): Intent = Intent(context, LockActivity::class.java)
+            .putExtra(EXTRA_PRACTICE, true)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
 }

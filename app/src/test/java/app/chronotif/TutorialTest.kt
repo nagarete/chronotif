@@ -52,7 +52,11 @@ class TutorialTest {
     }
 
     @After
-    fun end() = Tutorial.pause()
+    fun end() {
+        // Tutorial is one object for the app: leave no screen marked as shown for the next test.
+        Tutorial.Surface.entries.forEach { Tutorial.shown(it, false) }
+        Tutorial.pause()
+    }
 
     private fun noRanking(): RankingMap = ReflectionHelpers.callConstructor(RankingMap::class.java,
         ReflectionHelpers.ClassParameter.from(Array<Ranking>::class.java, emptyArray<Ranking>()))
@@ -213,5 +217,60 @@ class TutorialTest {
         assertSame("The Panel still open keeps its samples", r.source, search.source)
         r.source.noticed(Noticed.SEARCH)
         assertTrue("and they report to the new part", search.tried)
+    }
+
+    private fun tapAt(a: android.app.Activity, x: Float, y: Float) {
+        val down = android.os.SystemClock.uptimeMillis()
+        a.dispatchTouchEvent(android.view.MotionEvent.obtain(down, down, android.view.MotionEvent.ACTION_DOWN, x, y, 0))
+        idle(40)
+        a.dispatchTouchEvent(android.view.MotionEvent.obtain(down, android.os.SystemClock.uptimeMillis(), android.view.MotionEvent.ACTION_UP, x, y, 0))
+        idle()
+    }
+
+    @Test
+    fun theLockScreenStandInRunsUnlockedOnTheSamplesAndUnlocksNothing() {
+        postReal("Real secret")
+        val r = Tutorial.start(context, Tutorial.Part.LOCK_SCREEN)
+        val controller = Robolectric.buildActivity(app.chronotif.ui.LockActivity::class.java,
+            app.chronotif.ui.LockActivity.practice(context)).setup()
+        idle(1_500)
+        val a = controller.get()
+        assertFalse("On an unlocked phone the stand-in stays up", a.isFinishing)
+        val shown = texts(a.window.decorView)
+        assertFalse(shown.contains("Real secret"))
+        assertTrue("with the step's card", shown.contains(context.getString(R.string.tutorial_pile_title)))
+
+        val scroll = views(a.window.decorView).filterIsInstance<android.widget.ScrollView>().first { it.isFillViewport }
+        scroll.scrollTo(0, 10_000)
+        idle()
+        a.back()
+        assertTrue("Back folded the Pile", r.tried)
+        assertFalse(a.isFinishing)
+        idle(1_000) // Let the fold finish: a touch during a scroll only stops it.
+
+        repeat(3) { Tutorial.next(context) }
+        views(a.window.decorView).filterIsInstance<android.widget.TextClock>().maxBy { it.textSize }.performClick()
+        assertTrue("The clock says it opens after an unlock", r.tried)
+        assertNull("and asks for none", ReflectionHelpers.getStaticField<Any?>(
+            org.robolectric.shadows.ShadowKeyguardManager::class.java, "callback"))
+
+        repeat(2) { Tutorial.next(context) }
+        val spot = 4 * context.resources.displayMetrics.density
+        tapAt(a, spot, spot)
+        idle(100)
+        tapAt(a, spot, spot)
+        idle(2_000)
+        assertTrue("A double tap goes black for a moment", r.tried)
+        assertEquals("then comes back, without touching the screen timeout", -1L,
+            android.view.WindowManager.LayoutParams::class.java.getField("userActivityTimeout").getLong(a.window.attributes))
+
+        Tutorial.next(context)
+        Tutorial.steps(Tutorial.Part.LOCK_SCREEN).last().extras.first { it.label == R.string.lock_new }.act(context)
+        assertTrue(r.tried)
+        assertEquals(Prefs.LOCK_WHEN_NEW, Prefs.lockMode)
+
+        controller.pause().stop().destroy()
+        LockSession.unlocked()
+        assertEquals("No real check from the stand-in", 0L, Prefs.lastCheck)
     }
 }

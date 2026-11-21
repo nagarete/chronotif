@@ -22,6 +22,8 @@ object LockPolicy {
      * system "hide sensitive content" setting (or ours) redacts everything not marked public.
      */
     fun visibility(context: Context, e: Entry): Vis {
+        // The Tutorial's samples are made up: nothing in them is private.
+        if (e.isSample) return Vis.SHOW
         val secure = context.getSystemService(KeyguardManager::class.java).isDeviceSecure
         if (!secure) return if (Prefs.lockHideContent) Vis.REDACT else Vis.SHOW
 
