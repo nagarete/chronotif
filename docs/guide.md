@@ -226,7 +226,7 @@ To open Chronotif in fullscreen, use the Quick Settings tile, or turn off the ed
   names are full or short, and hides the gear. 12/24-hour time follows Android's setting, and the date's order
   follows your language. A date that doesn't fit beside the clock moves under it.
 - **Tutorial**: *Settings → Tutorial* runs the real panel with made-up notifications, a step at a
-  time, each with Back and Continue: Notifications, then Search. Your own notifications are hidden meanwhile and nothing reaches
+  time, each with Back and Continue: Notifications, then Search, then the Lock screen on a stand-in. Your own notifications are hidden meanwhile and nothing reaches
   an app or counts as a check. The step you left at is kept.
 - **Turn it off**: switch off *Settings → Chronotif is on* to hide the edge handle, status-bar
   swipe and lock-screen view without uninstalling. Your handle and lock-screen settings are kept for when

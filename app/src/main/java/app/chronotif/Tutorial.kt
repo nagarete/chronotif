@@ -23,6 +23,7 @@ object Tutorial {
     enum class Part(val title: Int, val desc: Int) {
         NOTIFICATIONS(R.string.tutorial_notifications, R.string.tutorial_notifications_desc),
         SEARCH(R.string.tutorial_search, R.string.tutorial_search_desc),
+        LOCK_SCREEN(R.string.tutorial_lock, R.string.tutorial_lock_desc),
     }
 
     /**
@@ -41,7 +42,14 @@ object Tutorial {
      * A button the tutorial screen offers with a step, such as adding a tile. Where Android or the
      * home screen can't do it, [manual] says how to do it by hand instead.
      */
-    class Extra(val label: Int, val manual: Int?, val available: (Context) -> Boolean, val act: (Context) -> Unit)
+    class Extra(
+        val label: Int,
+        val manual: Int?,
+        val available: (Context) -> Boolean,
+        /** A choice among extras: whether this one is the current pick, shown with a check. */
+        val picked: ((Context) -> Boolean)? = null,
+        val act: (Context) -> Unit,
+    )
 
     class Run internal constructor(val part: Part, val startedAt: Long, val source: TutorialSource) {
         var step = 0
@@ -64,11 +72,13 @@ object Tutorial {
     val source: CardSource? get() = run?.source
 
     /** Where a run is being followed. Once none of them is up, the run ends. */
-    enum class Surface { SCREEN, PANEL, SEARCH }
+    enum class Surface { SCREEN, PANEL, SEARCH, LOCK }
 
     private val shown = HashSet<Surface>()
 
     /** The tutorial screen, the Panel or Search (from the edge handle) came up, or went. */
+    fun isShown(surface: Surface) = surface in shown
+
     fun shown(surface: Surface, on: Boolean) {
         if (on) shown += surface else shown -= surface
         if (shown.isEmpty()) pause()
@@ -90,6 +100,7 @@ object Tutorial {
     fun steps(part: Part): List<Step> = when (part) {
         Part.NOTIFICATIONS -> notificationSteps
         Part.SEARCH -> searchSteps
+        Part.LOCK_SCREEN -> lockSteps
     }
 
     /** The part after [part], offered once it's finished. */
@@ -257,7 +268,7 @@ object Tutorial {
         Step(R.string.tutorial_home_title, { it.getString(R.string.tutorial_home_body) },
             triedNow = SearchSetup::widgetPlaced,
             extras = listOf(
-                Extra(R.string.search_setup_widget, R.string.search_setup_widget_manual, SearchSetup::canPinWidget, SearchSetup::pinWidget),
+                Extra(R.string.search_setup_widget, R.string.search_setup_widget_manual, SearchSetup::canPinWidget, act = SearchSetup::pinWidget),
                 Extra(R.string.search_setup_tile, R.string.search_setup_tile_manual, canAddTile) { SearchSetup.addTile(it) },
             )),
         // The Search checklist's steps, as they stand; they're done in Settings, the same as there.
@@ -274,12 +285,47 @@ object Tutorial {
             })),
     )
 
+    // --- Lock screen, on a stand-in of the lock-screen view while the phone is unlocked.
+
+    private val showLock = Extra(R.string.tutorial_show_lock, null, { !isShown(Surface.LOCK) }) { ctx ->
+        ctx.startActivity(app.chronotif.ui.LockActivity.practice(ctx))
+    }
+
+    private fun lockMode(label: Int, mode: Int) = Extra(label, null, { true }, picked = { Prefs.lockMode == mode }) {
+        Prefs.lockMode = mode
+        notice(Event.LOCK_MODE_PICKED)
+    }
+
+    private val lockSteps = listOf(
+        Step(R.string.tutorial_pile_title, { it.getString(R.string.tutorial_pile_body) },
+            { _, e -> e == Event.PILE_FOLDED }, extras = listOf(showLock)),
+        Step(R.string.tutorial_pile_tap_title, { it.getString(R.string.tutorial_pile_tap_body) },
+            { _, e -> e == Event.PILE_TAPPED }, extras = listOf(showLock)),
+        Step(R.string.tutorial_lock_reply_title, { it.getString(R.string.tutorial_lock_reply_body) },
+            { _, e -> e == Event.REPLIED }, extras = listOf(showLock)),
+        Step(R.string.tutorial_lock_clock_title, { it.getString(R.string.tutorial_lock_clock_body) },
+            { _, e -> e == Event.UNLOCK_ASKED }, extras = listOf(showLock)),
+        Step(R.string.tutorial_lock_search_title, { it.getString(R.string.tutorial_lock_search_body) },
+            { _, e -> e == Event.SEARCH }, extras = listOf(showLock)),
+        Step(R.string.tutorial_sleep_title, { ctx ->
+            ctx.getString(R.string.tutorial_sleep_body) +
+                (if (Prefs.lockDoubleTapSleep) "" else "\n\n" + ctx.getString(R.string.tutorial_sleep_off))
+        }, { _, e -> e == Event.SLEPT }, extras = listOf(showLock)),
+        Step(R.string.tutorial_lock_mode_title, { it.getString(R.string.tutorial_lock_mode_body) },
+            { _, e -> e == Event.LOCK_MODE_PICKED },
+            extras = listOf(
+                lockMode(R.string.lock_off, Prefs.LOCK_OFF),
+                lockMode(R.string.lock_new, Prefs.LOCK_WHEN_NEW),
+                lockMode(R.string.lock_any, Prefs.LOCK_ALWAYS),
+            )),
+    )
+
     private const val MINUTE = 60_000L
 
-    /** Every part's Panel shows the same samples: the Search part opens Search from it. */
+    /** Every part shows the same samples: Search opens over them, and the lock-screen stand-in rests them as its Pile. */
     private fun samples(app: Context, part: Part, now: Long, onEvent: (Event) -> Unit): TutorialSource {
         return when (part) {
-            Part.NOTIFICATIONS, Part.SEARCH -> TutorialSource(listOf(
+            Part.NOTIFICATIONS, Part.SEARCH, Part.LOCK_SCREEN -> TutorialSource(listOf(
                 // Checked already: Earlier.
                 Samples.entry(app, Samples.stride, 1, now - 180 * MINUTE) {
                     setContentTitle(app.getString(R.string.sample_stride_title)).setContentText(app.getString(R.string.sample_stride_text))

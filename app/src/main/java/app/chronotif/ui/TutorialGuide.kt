@@ -100,8 +100,8 @@ class TutorialGuide(
         // Asking Android or the home screen for something needs an activity in front: not the Panel.
         if (!inPanel) step.extras.forEach { extra ->
             if (extra.available(context)) {
-                extras.addView(button(context.getString(extra.label), filled = false) { extra.act(context) },
-                    gap(10).apply { width = -2 })
+                val label = context.getString(extra.label).let { if (extra.picked?.invoke(context) == true) "✓  $it" else it }
+                extras.addView(button(label, filled = false) { extra.act(context) }, gap(10).apply { width = -2 })
             } else if (extra.manual != null) {
                 extras.addView(text(13f, c.textSecondary).apply { setText(extra.manual) }, gap(10))
             }
