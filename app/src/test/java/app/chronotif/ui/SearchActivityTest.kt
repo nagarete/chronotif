@@ -7,6 +7,9 @@ import android.content.Context
 import android.os.Looper
 import android.view.ViewGroup
 import app.chronotif.Prefs
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -118,6 +121,31 @@ class SearchActivityTest {
         val shown = texts(search).filter { it.isNotBlank() }
         controller.destroy()
         return shown
+    }
+
+    @Test fun inTheTutorialsSearchPartTheWebRowSaysWhatWouldOpenInstead() {
+        val run = app.chronotif.Tutorial.start(context, app.chronotif.Tutorial.Part.SEARCH)
+        app.chronotif.Tutorial.shown(app.chronotif.Tutorial.Surface.SCREEN, true)
+        val controller = Robolectric.buildActivity(SearchActivity::class.java, SearchActivity.intent(context)).setup()
+        try {
+            shadowOf(Looper.getMainLooper()).idle()
+            val search = overlays(controller.get().window.decorView as ViewGroup).single()
+            typeInto(search, "example.com")
+            val views = generateSequence(listOf<android.view.View>(search)) { level ->
+                level.flatMap { v -> if (v is ViewGroup) (0 until v.childCount).map(v::getChildAt) else emptyList() }.ifEmpty { null }
+            }.flatten()
+            val web = views.last { v -> v.hasOnClickListeners() && texts(v).any { it == "Open example.com" } }
+            app.chronotif.Tutorial.next(context)
+            web.performClick()
+            assertEquals("In the tutorial nothing opens. Otherwise your browser would.",
+                org.robolectric.shadows.ShadowToast.getTextOfLatestToast())
+            assertNull(shadowOf(context as Application).nextStartedActivity)
+            assertSame(run, app.chronotif.Tutorial.run)
+        } finally {
+            controller.destroy()
+            app.chronotif.Tutorial.Surface.entries.forEach { app.chronotif.Tutorial.shown(it, false) }
+            app.chronotif.Tutorial.pause()
+        }
     }
 
     @Test fun currencyOffersToTurnOnRatesFirst() {
