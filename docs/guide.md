@@ -295,7 +295,9 @@ it can replace its nightlies. Build numbers must be 1 through 9998.
 At 01:00 Asia/Jakarta each day, CI publishes a nightly from main if its commit changed since
 the last nightly. You can also run the build workflow manually to publish a nightly from a
 selected branch. Scheduled and manual builds use the workflow run number. GitHub only runs
-the schedule once this workflow is on the default branch.
+the schedule once this workflow is on the default branch. To hold changes back from nightly users,
+pause the schedule with `gh variable set NIGHTLY_PAUSED --body true` and resume it with
+`gh variable delete NIGHTLY_PAUSED`. While paused, manual runs and pushed tags still publish.
 
 To publish a specific commit as a nightly, commit it and push a tag with an unused build
 number greater than previous nightlies for the same version:

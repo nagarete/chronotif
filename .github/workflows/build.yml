@@ -34,6 +34,8 @@ jobs:
         id: release
         env:
           EVENT: ${{ github.event_name }}
+          # Repository variable: "true" stops the nightly schedule from publishing. Manual runs and tags still do.
+          NIGHTLY_PAUSED: ${{ vars.NIGHTLY_PAUSED }}
         run: |
           set -euo pipefail
           version=$(sed -n 's/^ *versionName = "\([0-9.]*\)"/\1/p' app/build.gradle.kts)
@@ -55,6 +57,10 @@ jobs:
             if [[ "$EVENT" == schedule ]]; then
               previous=$(git for-each-ref --sort=-creatordate --count=1 --format='%(refname:short)' 'refs/tags/nightly-*')
               if [[ -n "$previous" && "$(git rev-parse "$previous^{commit}")" == "$GITHUB_SHA" ]]; then
+                publish=false
+              fi
+              if [[ "${NIGHTLY_PAUSED:-}" == true ]]; then
+                echo "::notice::Nightly schedule paused (NIGHTLY_PAUSED=true)"
                 publish=false
               fi
             fi
