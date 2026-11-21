@@ -348,7 +348,10 @@ class PanelView(
         list = scroll,
         atTop = { !scroll.canScrollVertically(-1) },
         ready = { !closing && seenSince != 0L && android.os.SystemClock.uptimeMillis() - openedAt >= OPEN_ANIMATION_MS },
-        open = { SearchOverlay.show(this, host) },
+        open = {
+            SearchOverlay.show(this, host)
+            list.source.noticed(CardSource.Noticed.SEARCH)
+        },
     )
 
     // --- Back swipe from a screen edge. Over the home screen, MIUI turns its Back gesture off

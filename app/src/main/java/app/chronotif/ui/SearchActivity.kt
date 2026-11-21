@@ -60,9 +60,17 @@ class SearchActivity : Activity(), NotifList.Host {
         root.post { SearchOverlay.show(root, this, query) { finishQuietly() } }
         registerReceiver(screenOff, IntentFilter(Intent.ACTION_SCREEN_OFF),
             if (Build.VERSION.SDK_INT >= 33) RECEIVER_EXPORTED else 0)
+        app.chronotif.Tutorial.notice(app.chronotif.TutorialSource.Event.SEARCH_ELSEWHERE)
+    }
+
+    // Opened over the tutorial screen (holding the edge handle), Search keeps a Tutorial run going.
+    override fun onStart() {
+        super.onStart()
+        app.chronotif.Tutorial.shown(app.chronotif.Tutorial.Surface.SEARCH, true)
     }
 
     override fun onStop() {
+        app.chronotif.Tutorial.shown(app.chronotif.Tutorial.Surface.SEARCH, false)
         super.onStop()
         // Like the panel: once something else covers it, it's gone.
         if (!isFinishing && !unlocking) finish()

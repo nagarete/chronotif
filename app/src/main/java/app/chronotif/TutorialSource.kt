@@ -10,9 +10,13 @@ import android.content.Context
  * them changes only these samples and is reported as an [Event], so the Tutorial can tell when a
  * step is done. Nothing reaches Android, another app or the real last check.
  */
-class TutorialSource(initial: List<Entry>, lastCheck: Long, private val onEvent: (Event) -> Unit) : CardSource {
+class TutorialSource(initial: List<Entry>, lastCheck: Long, internal var onEvent: (Event) -> Unit) : CardSource {
 
-    enum class Event { PANEL_OPENED, PANEL_CLOSED, STACK_OPENED, STACK_CLOSED, PREVIEW, CHECKED, REPLIED, SNOOZED, CLEARED }
+    enum class Event {
+        PANEL_OPENED, PANEL_CLOSED, STACK_OPENED, STACK_CLOSED, PREVIEW, CHECKED, REPLIED, SNOOZED, CLEARED,
+        /** Search pulled down in the Panel, opened anywhere else, an answer shown, an app tapped. */
+        SEARCH, SEARCH_ELSEWHERE, ANSWER_SHOWN, APP_TAPPED,
+    }
 
     private val entries = initial.toMutableList()
     private val hidden = HashMap<String, MutableSet<String>>()

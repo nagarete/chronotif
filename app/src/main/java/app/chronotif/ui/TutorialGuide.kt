@@ -2,25 +2,22 @@
 
 package app.chronotif.ui
 
-import android.content.ComponentName
-import android.graphics.drawable.Icon
-import android.os.Build
 import android.view.Gravity
 import android.widget.LinearLayout
 import android.widget.TextView
-import app.chronotif.PanelTile
 import app.chronotif.R
 import app.chronotif.Tutorial
 
 /**
- * The Tutorial's card: which step of which part, what to try, a mark once it was tried, then
- * Back and Continue. It sits on the tutorial screen, and at the bottom of the Panel while the
- * Panel is open, and follows [Tutorial] as the step changes. It's an ordinary view, not an
- * [Overlay], so the Panel's Previews, Search and Back work as they do without it.
+ * The Tutorial's card: which step of which part, what to try, a mark once it was tried, any extra
+ * the step offers (adding a tile or the widget), then Back and Continue. It sits on the tutorial
+ * screen, and at the bottom of the Panel while the Panel is open, and follows [Tutorial] as the
+ * step changes. It's an ordinary view, not an [Overlay], so the Panel's Previews, Search and Back
+ * work as they do without it.
  */
 class TutorialGuide(
     context: android.content.Context,
-    /** In the Panel the card is compact, and finishing closes the Panel. */
+    /** In the Panel the card is compact, has no extras, and finishing closes the Panel. */
     private val inPanel: Boolean,
     private val onFinished: () -> Unit,
 ) : LinearLayout(context) {
@@ -30,12 +27,19 @@ class TutorialGuide(
     private val title = text(18f, c.text, bold = true)
     private val body = text(15f, c.text)
     private val tried = text(14f, c.good, bold = true).apply { setText(R.string.tutorial_tried) }
-    private val tile = button(context.getString(R.string.tutorial_add_tile), filled = false) { addPanelTile() }
-    private val tileHint = text(13f, c.textSecondary).apply { setText(R.string.tutorial_add_tile_manual) }
-    private val back = button(context.getString(R.string.tutorial_back), filled = false) { Tutorial.back(context) }
-    private val next = button("", filled = true) {
+    private val extras = LinearLayout(context).apply { orientation = VERTICAL }
+    private val back = button("", filled = false) {
         val r = Tutorial.run
-        if (r?.finished == true) onFinished() else Tutorial.next(context)
+        if (r?.finished == true) onFinished() else Tutorial.back(context)
+    }
+    private val next = button("", filled = true) {
+        val r = Tutorial.run ?: return@button
+        val following = Tutorial.nextPart(r.part)
+        when {
+            !r.finished -> Tutorial.next(context)
+            following != null -> Tutorial.start(context, following, fromStart = Tutorial.placeOf(following) == null)
+            else -> onFinished()
+        }
     }
     private val refresh: () -> Unit = { bind() }
 
@@ -50,8 +54,7 @@ class TutorialGuide(
         addView(title, gap(6))
         addView(body, gap(6))
         addView(tried, gap(10))
-        addView(tile, gap(14).apply { width = -2 })
-        addView(tileHint, gap(10))
+        addView(extras, gap(4))
         addView(LinearLayout(context).apply {
             orientation = HORIZONTAL
             gravity = Gravity.END or Gravity.CENTER_VERTICAL
@@ -76,15 +79,17 @@ class TutorialGuide(
         val r = Tutorial.run ?: return
         val steps = r.steps
         val partName = context.getString(r.part.title)
+        extras.removeAllViews()
         if (r.finished) {
+            val following = Tutorial.nextPart(r.part)
             counter.text = partName
             title.setText(R.string.tutorial_finished_title)
             body.text = context.getString(R.string.tutorial_finished_body, partName)
             tried.visibility = GONE
-            tile.visibility = GONE
-            tileHint.visibility = GONE
-            back.visibility = GONE
-            next.setText(R.string.tutorial_done)
+            back.visibility = if (following != null) VISIBLE else GONE
+            back.setText(R.string.tutorial_done)
+            next.text = following?.let { context.getString(R.string.tutorial_next_part, context.getString(it.title)) }
+                ?: context.getString(R.string.tutorial_done)
             return
         }
         val step = steps[r.step]
@@ -92,22 +97,19 @@ class TutorialGuide(
         title.setText(step.title)
         body.text = step.body(context)
         tried.visibility = if (r.tried) VISIBLE else GONE
-        // Asking Android to add a tile needs Android 13 and an activity in front: not the Panel.
-        val offerTile = step.offersTile && !inPanel
-        tile.visibility = if (offerTile && Build.VERSION.SDK_INT >= 33) VISIBLE else GONE
-        tileHint.visibility = if (offerTile && Build.VERSION.SDK_INT < 33) VISIBLE else GONE
+        // Asking Android or the home screen for something needs an activity in front: not the Panel.
+        if (!inPanel) step.extras.forEach { extra ->
+            if (extra.available(context)) {
+                extras.addView(button(context.getString(extra.label), filled = false) { extra.act(context) },
+                    gap(10).apply { width = -2 })
+            } else if (extra.manual != null) {
+                extras.addView(text(13f, c.textSecondary).apply { setText(extra.manual) }, gap(10))
+            }
+        }
+        extras.visibility = if (extras.childCount > 0) VISIBLE else GONE
         back.visibility = if (r.step > 0) VISIBLE else INVISIBLE
+        back.setText(R.string.tutorial_back)
         next.setText(if (r.step == steps.lastIndex) R.string.tutorial_finish else R.string.tutorial_continue)
-    }
-
-    private fun addPanelTile() {
-        if (Build.VERSION.SDK_INT < 33) return
-        context.getSystemService(android.app.StatusBarManager::class.java).requestAddTileService(
-            ComponentName(context, PanelTile::class.java),
-            context.getString(R.string.tile_label),
-            Icon.createWithResource(context, R.drawable.ic_tile),
-            context.mainExecutor,
-        ) {}
     }
 
     private fun text(sp: Float, color: Int, bold: Boolean = false) = Ui.text(context, sp, color, bold)

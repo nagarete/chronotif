@@ -224,7 +224,10 @@ class SearchOverlay private constructor(
         results.removeAllViews()
         Answer.of(query, numbers)?.let { a ->
             val card = if (a is Answer.Currency) currencyCard(a.query) else answerCard(a)
-            card?.let { results.addView(it, cardLp()) }
+            card?.let {
+                results.addView(it, cardLp())
+                app.chronotif.Tutorial.notice(app.chronotif.TutorialSource.Event.ANSWER_SHOWN)
+            }
         }
         val found = AppMatch.search(apps, query) { it.label }
         if (found.isNotEmpty()) results.addView(card(R.string.search_apps, found.map(::row)), cardLp())
@@ -366,6 +369,7 @@ class SearchOverlay private constructor(
         addView(Ui.text(context, 16f, pal.text, lines = 1).apply { setText(p.label) }, LinearLayout.LayoutParams(0, -2, 1f))
         setOnClickListener {
             hideKeyboard()
+            if (app.chronotif.Tutorial.holdsLaunch(context, context.getString(p.label))) return@setOnClickListener
             host.guarded {
                 SettingsPages.open(host.context, p)
                 host.launched()
@@ -491,6 +495,7 @@ class SearchOverlay private constructor(
 
     private fun launch(action: () -> Unit) {
         hideKeyboard()
+        if (app.chronotif.Tutorial.holdsLaunch(context, context.getString(R.string.tutorial_contacts_app))) return
         host.guarded {
             action()
             host.launched()
@@ -518,6 +523,7 @@ class SearchOverlay private constructor(
         val engine = WebQuery.Engine.entries.getOrElse(Prefs.searchEngine) { WebQuery.Engine.GOOGLE }
         val url = if (WebQuery.isAddress(query)) WebQuery.address(query) else WebQuery.search(engine, query)
         hideKeyboard()
+        if (app.chronotif.Tutorial.holdsLaunch(context, context.getString(R.string.tutorial_browser))) return
         host.guarded {
             runCatching {
                 host.context.startActivity(
@@ -561,6 +567,8 @@ class SearchOverlay private constructor(
 
     private fun open(a: Launchable) {
         hideKeyboard()
+        // In the Search part of the Tutorial, Search says what would open instead.
+        if (app.chronotif.Tutorial.holdsLaunch(context, a.label)) return
         host.guarded {
             Launchables.launch(host.context, a)
             host.launched()

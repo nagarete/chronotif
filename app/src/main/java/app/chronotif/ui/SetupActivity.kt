@@ -1435,14 +1435,7 @@ class SetupActivity : Activity() {
         }
     }
 
-    private fun stepTitle(step: SearchSetup.Step) = when (step) {
-        SearchSetup.Step.CONTACTS -> R.string.search_find_contacts
-        SearchSetup.Step.CALLS -> R.string.search_calls
-        SearchSetup.Step.CURRENCY -> R.string.search_currency_rates
-        SearchSetup.Step.CALENDAR -> R.string.search_find_calendar
-        SearchSetup.Step.WIDGET -> R.string.search_setup_widget
-        SearchSetup.Step.TILE -> R.string.search_setup_tile
-    }
+    private fun stepTitle(step: SearchSetup.Step) = SearchSetup.title(step)
 
     /**
      * One step of Search's checklist: a mark, its name and what it does, then [act] (Allow, Turn on
@@ -1513,31 +1506,11 @@ class SetupActivity : Activity() {
         }
     }
 
-    private fun canPinWidget() = android.appwidget.AppWidgetManager.getInstance(this)?.isRequestPinAppWidgetSupported == true
+    private fun canPinWidget() = SearchSetup.canPinWidget(this)
 
-    /** Asks the home screen to place the Search bar; back here, the step shows whether it did. */
-    private fun addSearchWidget() {
-        if (!canPinWidget()) return
-        android.appwidget.AppWidgetManager.getInstance(this)
-            .requestPinAppWidget(ComponentName(this, app.chronotif.SearchWidget::class.java), null, null)
-    }
+    private fun addSearchWidget() = SearchSetup.pinWidget(this)
 
-    /** Asks Android (13 and newer) to add the Search tile to Quick Settings. */
-    private fun addSearchTile() {
-        if (Build.VERSION.SDK_INT < 33) return
-        getSystemService(android.app.StatusBarManager::class.java).requestAddTileService(
-            ComponentName(this, app.chronotif.SearchTile::class.java),
-            getString(R.string.search_tile_label),
-            android.graphics.drawable.Icon.createWithResource(this, R.drawable.ic_search),
-            mainExecutor,
-        ) { result ->
-            if (result == android.app.StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ADDED ||
-                result == android.app.StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ALREADY_ADDED) {
-                Prefs.searchTileAdded = true
-            }
-            refreshAll()
-        }
-    }
+    private fun addSearchTile() = SearchSetup.addTile(this) { refreshAll() }
 
     /** What to do with a permission answer, by request code: a switch or a checklist step waits on each. */
     private val pendingPermission = HashMap<Int, (Boolean) -> Unit>()

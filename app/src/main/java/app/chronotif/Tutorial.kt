@@ -14,18 +14,34 @@ import app.chronotif.ui.Panel
  * notifications (see GLOSSARY). A part is a few steps; each asks the user to try one thing,
  * shows when it worked, and moves on with Continue, whether or not they tried.
  *
- * A run lives only in memory: it ends when the user leaves the tutorial screen with the Panel
- * closed, or Android stops Chronotif, and the real Panel is back at once. Only the step reached
+ * A run lives only in memory: it ends once the tutorial screen, the Panel and Search are all
+ * gone, or Android stops Chronotif, and the real Panel is back at once. Only the step reached
  * is saved, so the part continues there next time.
  */
 object Tutorial {
 
     enum class Part(val title: Int, val desc: Int) {
         NOTIFICATIONS(R.string.tutorial_notifications, R.string.tutorial_notifications_desc),
+        SEARCH(R.string.tutorial_search, R.string.tutorial_search_desc),
     }
 
-    /** One step: what to try, and the moment it counts as tried. */
-    class Step(val title: Int, val body: (Context) -> CharSequence, val tried: (Run, Event) -> Boolean, val offersTile: Boolean = false)
+    /**
+     * One step: what to try, and the moment it counts as tried, by an [Event] or, for what the
+     * user does outside Chronotif (placing a widget), by how things stand when they're back.
+     */
+    class Step(
+        val title: Int,
+        val body: (Context) -> CharSequence,
+        val tried: (Run, Event) -> Boolean = { _, _ -> false },
+        val triedNow: ((Context) -> Boolean)? = null,
+        val extras: List<Extra> = emptyList(),
+    )
+
+    /**
+     * A button the tutorial screen offers with a step, such as adding a tile. Where Android or the
+     * home screen can't do it, [manual] says how to do it by hand instead.
+     */
+    class Extra(val label: Int, val manual: Int?, val available: (Context) -> Boolean, val act: (Context) -> Unit)
 
     class Run internal constructor(val part: Part, val startedAt: Long, val source: TutorialSource) {
         var step = 0
@@ -47,13 +63,16 @@ object Tutorial {
     /** The Tutorial's samples while a part runs, for the Panel to show instead of the phone's. */
     val source: CardSource? get() = run?.source
 
-    /** The tutorial screen is up; while it isn't, closing the Panel ends the run. */
-    var screenShown = false
-        set(v) {
-            field = v
-            if (!v && !panelShown) pause()
-        }
-    private var panelShown = false
+    /** Where a run is being followed. Once none of them is up, the run ends. */
+    enum class Surface { SCREEN, PANEL, SEARCH }
+
+    private val shown = HashSet<Surface>()
+
+    /** The tutorial screen, the Panel or Search (from the edge handle) came up, or went. */
+    fun shown(surface: Surface, on: Boolean) {
+        if (on) shown += surface else shown -= surface
+        if (shown.isEmpty()) pause()
+    }
 
     private val listeners = ArrayList<() -> Unit>()
     private val main = Handler(Looper.getMainLooper())
@@ -70,6 +89,37 @@ object Tutorial {
 
     fun steps(part: Part): List<Step> = when (part) {
         Part.NOTIFICATIONS -> notificationSteps
+        Part.SEARCH -> searchSteps
+    }
+
+    /** The part after [part], offered once it's finished. */
+    fun nextPart(part: Part): Part? = Part.entries.getOrNull(part.ordinal + 1)
+
+    /** Something the user did outside the Panel's cards: in Search, or back from the home screen. */
+    fun notice(e: Event) {
+        run?.let { onEvent(it, e) }
+    }
+
+    /** Back on the tutorial screen: a step done outside Chronotif, such as placing a widget, counts now. */
+    fun recheck(context: Context) {
+        val r = run ?: return
+        if (r.finished || r.tried) return
+        if (r.steps[r.step].triedNow?.invoke(context) == true) {
+            r.tried = true
+            changed()
+        }
+    }
+
+    /**
+     * While the Search part runs, Search says what a tap would open instead of opening it, so the
+     * user stays in the tutorial. True when it did.
+     */
+    fun holdsLaunch(context: Context, what: CharSequence): Boolean {
+        val r = run ?: return false
+        if (r.part != Part.SEARCH || r.finished) return false
+        android.widget.Toast.makeText(context, context.getString(R.string.tutorial_would_open, what), android.widget.Toast.LENGTH_SHORT).show()
+        onEvent(r, Event.APP_TAPPED)
+        return true
     }
 
     /** The step a part was left at, or null when it hasn't been started or was finished. */
@@ -85,8 +135,14 @@ object Tutorial {
         main.removeCallbacksAndMessages(null)
         val app = context.applicationContext
         val now = System.currentTimeMillis()
+        // Moving on to the next part, perhaps with the Panel still open, keeps the same samples.
+        val previous = run?.takeIf { it.part != part && !fromStart }
         lateinit var r: Run
-        r = Run(part, now, samples(app, part, now) { onEvent(r, it) })
+        r = if (previous != null) {
+            Run(part, previous.startedAt, previous.source).also { previous.source.onEvent = { e -> onEvent(r, e) } }
+        } else {
+            Run(part, now, samples(app, part, now) { onEvent(r, it) })
+        }
         r.step = if (fromStart) 0 else placeOf(part) ?: 0
         run = r
         Panel.drop()
@@ -100,7 +156,7 @@ object Tutorial {
         if (run == null) return
         main.removeCallbacksAndMessages(null)
         run = null
-        panelShown = false
+        shown -= Surface.PANEL
         Panel.drop()
         changed()
     }
@@ -144,8 +200,8 @@ object Tutorial {
 
     private fun onEvent(r: Run, e: Event) {
         when (e) {
-            Event.PANEL_OPENED -> panelShown = true
-            Event.PANEL_CLOSED -> panelShown = false
+            Event.PANEL_OPENED -> shown += Surface.PANEL
+            Event.PANEL_CLOSED -> shown -= Surface.PANEL
             Event.CHECKED -> r.checked = true
             Event.STACK_OPENED -> r.stackOpened = true
             else -> {}
@@ -153,7 +209,7 @@ object Tutorial {
         if (run !== r) return
         if (!r.finished && !r.tried && r.steps[r.step].tried(r, e)) r.tried = true
         changed()
-        if (e == Event.PANEL_CLOSED && !screenShown) pause()
+        if (e == Event.PANEL_CLOSED && shown.isEmpty()) pause()
     }
 
     // --- Notifications
@@ -161,11 +217,24 @@ object Tutorial {
     private const val NEW_AND_EARLIER = 1
     private const val NEW_MESSAGE_DELAY_MS = 2500L
 
+    /** Asking Android to add a tile needs Android 13 and Chronotif in front. */
+    private val canAddTile: (Context) -> Boolean = { android.os.Build.VERSION.SDK_INT >= 33 }
+
+    private val panelTile = Extra(R.string.tutorial_add_tile, R.string.tutorial_add_tile_manual, canAddTile) { ctx ->
+        if (android.os.Build.VERSION.SDK_INT < 33) return@Extra
+        ctx.getSystemService(android.app.StatusBarManager::class.java).requestAddTileService(
+            android.content.ComponentName(ctx, PanelTile::class.java),
+            ctx.getString(R.string.tile_label),
+            android.graphics.drawable.Icon.createWithResource(ctx, R.drawable.ic_tile),
+            ctx.mainExecutor,
+        ) {}
+    }
+
     private val notificationSteps = listOf(
         Step(R.string.tutorial_open_title, { ctx ->
             ctx.getString(if (Prefs.statusSwipeEnabled && StatusBarSwipe.isEnabled(ctx)) R.string.tutorial_open_body_swipe
             else R.string.tutorial_open_body)
-        }, { _, e -> e == Event.PANEL_OPENED }, offersTile = true),
+        }, { _, e -> e == Event.PANEL_OPENED }, extras = listOf(panelTile)),
         Step(R.string.tutorial_check_title, { it.getString(R.string.tutorial_check_body) },
             { r, e -> e == Event.PANEL_OPENED && r.checked }),
         Step(R.string.tutorial_stack_title, { it.getString(R.string.tutorial_stack_body) },
@@ -178,11 +247,39 @@ object Tutorial {
             { _, e -> e == Event.PANEL_CLOSED }),
     )
 
+    // --- Search
+
+    private val searchSteps = listOf(
+        Step(R.string.tutorial_pull_title, { it.getString(R.string.tutorial_pull_body) }, { _, e -> e == Event.SEARCH }),
+        Step(R.string.tutorial_hold_title, { it.getString(R.string.tutorial_hold_body) }, { _, e -> e == Event.SEARCH_ELSEWHERE }),
+        Step(R.string.tutorial_answer_title, { it.getString(R.string.tutorial_answer_body) }, { _, e -> e == Event.ANSWER_SHOWN }),
+        Step(R.string.tutorial_app_title, { it.getString(R.string.tutorial_app_body) }, { _, e -> e == Event.APP_TAPPED }),
+        Step(R.string.tutorial_home_title, { it.getString(R.string.tutorial_home_body) },
+            triedNow = SearchSetup::widgetPlaced,
+            extras = listOf(
+                Extra(R.string.search_setup_widget, R.string.search_setup_widget_manual, SearchSetup::canPinWidget, SearchSetup::pinWidget),
+                Extra(R.string.search_setup_tile, R.string.search_setup_tile_manual, canAddTile) { SearchSetup.addTile(it) },
+            )),
+        // The Search checklist's steps, as they stand; they're done in Settings, the same as there.
+        Step(R.string.tutorial_more_title, { ctx ->
+            val lines = SearchSetup.counted.filter { it != SearchSetup.Step.WIDGET }.joinToString("\n") {
+                (if (SearchSetup.done(ctx, it)) "✓  " else "○  ") + ctx.getString(SearchSetup.title(it))
+            }
+            ctx.getString(R.string.tutorial_more_body) + "\n\n" + lines
+        }, triedNow = { ctx -> SearchSetup.left(ctx) == 0 },
+            extras = listOf(Extra(R.string.tutorial_more_open, null, { true }) { ctx ->
+                Prefs.settingsSection = "SEARCH"
+                ctx.startActivity(android.content.Intent(ctx, app.chronotif.ui.SetupActivity::class.java)
+                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+            })),
+    )
+
     private const val MINUTE = 60_000L
 
+    /** Every part's Panel shows the same samples: the Search part opens Search from it. */
     private fun samples(app: Context, part: Part, now: Long, onEvent: (Event) -> Unit): TutorialSource {
         return when (part) {
-            Part.NOTIFICATIONS -> TutorialSource(listOf(
+            Part.NOTIFICATIONS, Part.SEARCH -> TutorialSource(listOf(
                 // Checked already: Earlier.
                 Samples.entry(app, Samples.stride, 1, now - 180 * MINUTE) {
                     setContentTitle(app.getString(R.string.sample_stride_title)).setContentText(app.getString(R.string.sample_stride_text))
