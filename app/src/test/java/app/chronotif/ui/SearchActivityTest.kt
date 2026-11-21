@@ -123,29 +123,67 @@ class SearchActivityTest {
         return shown
     }
 
-    @Test fun inTheTutorialsSearchPartTheWebRowSaysWhatWouldOpenInstead() {
+    /**
+     * In the Tutorial's Search part: types [query], taps the row showing [row] once it's there,
+     * and returns what Search said instead of opening it.
+     */
+    private fun tapInTutorialSearch(query: String, row: String): CharSequence? {
         val run = app.chronotif.Tutorial.start(context, app.chronotif.Tutorial.Part.SEARCH)
         app.chronotif.Tutorial.shown(app.chronotif.Tutorial.Surface.SCREEN, true)
         val controller = Robolectric.buildActivity(SearchActivity::class.java, SearchActivity.intent(context)).setup()
         try {
             shadowOf(Looper.getMainLooper()).idle()
             val search = overlays(controller.get().window.decorView as ViewGroup).single()
-            typeInto(search, "example.com")
-            val views = generateSequence(listOf<android.view.View>(search)) { level ->
+            typeInto(search, query)
+            fun find() = generateSequence(listOf<android.view.View>(search)) { level ->
                 level.flatMap { v -> if (v is ViewGroup) (0 until v.childCount).map(v::getChildAt) else emptyList() }.ifEmpty { null }
-            }.flatten()
-            val web = views.last { v -> v.hasOnClickListeners() && texts(v).any { it == "Open example.com" } }
+            }.flatten().lastOrNull { v -> v.hasOnClickListeners() && texts(v).any { it == row } }
+            // Contacts and events load on a background thread.
+            var target = find()
+            repeat(100) {
+                if (target != null) return@repeat
+                Thread.sleep(10)
+                shadowOf(Looper.getMainLooper()).idle()
+                target = find()
+            }
             app.chronotif.Tutorial.next(context)
-            web.performClick()
-            assertEquals("In the tutorial nothing opens. Otherwise your browser would.",
-                org.robolectric.shadows.ShadowToast.getTextOfLatestToast())
-            assertNull(shadowOf(context as Application).nextStartedActivity)
-            assertSame(run, app.chronotif.Tutorial.run)
+            target!!.performClick()
+            assertNull("Nothing opens", shadowOf(context as Application).nextStartedActivity)
+            assertSame("The run goes on", run, app.chronotif.Tutorial.run)
+            return org.robolectric.shadows.ShadowToast.getTextOfLatestToast()
         } finally {
             controller.destroy()
             app.chronotif.Tutorial.Surface.entries.forEach { app.chronotif.Tutorial.shown(it, false) }
             app.chronotif.Tutorial.pause()
         }
+    }
+
+    @Test fun inTheTutorialsSearchPartTheWebRowSaysWhatWouldOpenInstead() {
+        assertEquals("In the tutorial nothing opens. Otherwise your browser would.",
+            tapInTutorialSearch("example.com", "Open example.com"))
+    }
+
+    /** One event an hour from now, as the calendar provider lists it. */
+    class OneEvent : android.content.ContentProvider() {
+        override fun onCreate() = true
+        override fun query(
+            uri: android.net.Uri, projection: Array<out String>?, selection: String?, args: Array<out String>?, sort: String?,
+        ): android.database.Cursor {
+            val begin = System.currentTimeMillis() + 3_600_000
+            return android.database.MatrixCursor(projection).apply { addRow(arrayOf<Any>(1L, "Dentist", begin, begin + 1_800_000, 0)) }
+        }
+        override fun getType(uri: android.net.Uri): String? = null
+        override fun insert(uri: android.net.Uri, values: android.content.ContentValues?): android.net.Uri? = null
+        override fun delete(uri: android.net.Uri, selection: String?, args: Array<out String>?) = 0
+        override fun update(uri: android.net.Uri, values: android.content.ContentValues?, selection: String?, args: Array<out String>?) = 0
+    }
+
+    @Test fun inTheTutorialsSearchPartAnEventSaysTheCalendarWouldOpen() {
+        Prefs.searchCalendar = true
+        shadowOf(RuntimeEnvironment.getApplication()).grantPermissions(android.Manifest.permission.READ_CALENDAR)
+        Robolectric.setupContentProvider(OneEvent::class.java, android.provider.CalendarContract.AUTHORITY)
+        assertEquals("In the tutorial nothing opens. Otherwise your calendar would.",
+            tapInTutorialSearch("dentist", "Dentist"))
     }
 
     @Test fun currencyOffersToTurnOnRatesFirst() {
