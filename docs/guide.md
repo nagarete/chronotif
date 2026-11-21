@@ -280,7 +280,8 @@ so losing it means every user has to uninstall and reinstall.
 
 ### Releasing on GitHub
 
-`.github/workflows/build.yml` builds and tests pushes to main and pull requests. Published
+`.github/workflows/build.yml` builds and tests pushes to main and pull requests, except those
+that only touch `website/` (`website.yml` builds and deploys those; see `website/README.md`). Published
 APKs require these repository secrets: `KEYSTORE_B64` (`base64 -w0 release.jks`),
 `KEYSTORE_PASSWORD`, `KEY_ALIAS`, and `KEY_PASSWORD`. Both channels use this same signing key.
 Each release includes an APK and its SHA-256 checksum, named `chronotif-<tag>.apk` and
