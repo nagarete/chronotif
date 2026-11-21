@@ -485,12 +485,7 @@ class NotificationBehaviorTest {
         }
         val e = post(notification("hi"))
         e.ranking = named("Old name")
-        withLockList { _, container ->
-            val list = NotifList(object : NotifList.Host {
-                override val context: Context = container.context
-                override fun launched() {}
-                override fun guarded(action: () -> Unit) = action()
-            }, container, onLock = false)
+        withPanelList { list, container ->
             list.render()
             assertTrue(shownTexts(container).contains("Old name"))
             // A ranking update changes the entry in place; the notification itself is the same.
