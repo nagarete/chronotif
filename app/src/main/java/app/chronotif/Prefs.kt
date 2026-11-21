@@ -196,6 +196,12 @@ object Prefs {
         get() = sp.getBoolean("lock_double_tap_sleep", true)
         set(v) = sp.edit().putBoolean("lock_double_tap_sleep", v).apply()
 
+    /** Where the person's touch put their under-display fingerprint sensor's top edge, as a
+     *  fraction of the screen's height; 0 when it hasn't been fitted (see FingerprintSpot). */
+    var fingerprintTop: Float
+        get() = sp.getFloat("fingerprint_top", 0f)
+        set(v) = sp.edit().putFloat("fingerprint_top", v).apply()
+
     // --- Panel header. Android decides what the time and date say; these choose what shows,
     // where and how big (ADR 0005).
 

@@ -350,6 +350,8 @@ app/src/main/java/app/chronotif/
   EdgeHandle.kt         edge overlay
   PanelTile.kt          Quick Settings tile
   LockPolicy.kt         when the lock view appears and what it may reveal
+  FingerprintSensor.kt  where an under-display fingerprint sensor is, so the lock view keeps clear of it
+                        (core/FingerprintSpot.kt does the sums)
   Content.kt            extracting text/messages/pictures from notifications; app labels & icons
   Act.kt                open / dismiss / action / inline reply
   Updater.kt            opt-in self-update from GitHub Releases (network code)

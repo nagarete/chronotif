@@ -1641,4 +1641,29 @@ class NotificationBehaviorTest {
         Prefs.headerSettings = false
         withPanelHeader { _, start -> assertNull(gear(start)) }
     }
+
+    @Test
+    fun onAPhoneWithAnInScreenFingerprintSensorTapToUnlocksIconSitsOnIt() {
+        plain("Lunch?", System.currentTimeMillis(), 1, "example.chat")
+        fun icon(activity: LockActivity): Pair<Int, Int> {
+            val hint = views(activity.window.decorView).filterIsInstance<TextView>()
+                .first { it.text.toString() == activity.getString(R.string.tap_to_unlock) }.parent as ViewGroup
+            val at = IntArray(2).also { hint.getChildAt(0).getLocationOnScreen(it) }
+            return at[1] + hint.getChildAt(0).height / 2 to hint.paddingBottom
+        }
+        val usual = withLockView { icon(it).second }
+
+        // HyperOS: a sensor under the screen, fitted to a touch.
+        android.provider.Settings.System.putString(context.contentResolver, "fod_animation_type", "14")
+        Prefs.fingerprintTop = 0.6f
+        withLockView { activity ->
+            val (centre, padding) = icon(activity)
+            val density = activity.resources.displayMetrics.density
+            val screen = app.chronotif.FingerprintSensor.screenHeight(activity)
+            val sensor = (0.6f * screen).toInt() + ((app.chronotif.core.FingerprintSpot.HALF_DP - 4) * density).toInt()
+            assertTrue("Tap to unlock was raised", padding > usual)
+            assertTrue("its icon sits on the sensor ($centre vs $sensor)", kotlin.math.abs(centre - sensor) <= 2)
+            assertTrue("The Pile's card is above the sensor", seen(activity.window.decorView).contains("Lunch?"))
+        }
+    }
 }
