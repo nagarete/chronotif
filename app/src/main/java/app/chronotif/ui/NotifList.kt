@@ -63,9 +63,10 @@ class NotifList(
             operator fun invoke(id: String, make: () -> View, bind: (View) -> Unit) = Row(id, make, null) { v, _ -> bind(v) }
 
             /**
-             * [draw] gets everything it may show in the look, so what decides a redraw and what's
-             * drawn can't drift apart. The draw functions are in the companion, where the list's
-             * state is out of reach.
+             * [draw] gets the look that decided the redraw, and the draw functions sit in the
+             * companion, where the list's state (what's expanded, being replied to, dismissed) is
+             * out of reach. What a card shows from elsewhere, such as the entry's ranking, still
+             * has to be put in its look by hand: see [CardLook].
              */
             fun <L : Any> drawn(id: String, make: () -> View, look: () -> L, draw: (View, L) -> Unit) =
                 Row(id, make, look) { v, l ->
@@ -451,7 +452,11 @@ class NotifList(
             MessageLook(e, c.redacted, m.id, m.time, style, open = id in expanded || (latest && e.key in expanded),
                 reply = replying?.takeIf { it.first == id || (latest && it.first == e.key) }?.second ?: -1,
                 ago = Ui.relTime(ctx, m.time, now), name = conversationName(e), icons = Apps.generation)
-                .also { it.now = now }
+                .also {
+                    it.now = now
+                    it.content = c
+                    it.message = m
+                }
         }
         // The row's id holds the notification's key and the message's, so the view keeps its message.
         val make = {
@@ -756,9 +761,10 @@ class NotifList(
     }
 
     /**
-     * Everything a notification's card shows. [e] is the same object across ranking updates,
-     * which change it in place, so what the ranking adds is in [name]. [ago] is the time as
-     * shown; [now] only feeds it, so it stays out of equality.
+     * Everything a notification's card shows. [e] compares as the same object, and ranking
+     * updates change it in place, so anything a card shows from the ranking has to be in the
+     * look too, as the conversation's [name] is. [ago] is the time as shown; [now] only feeds
+     * it, so it stays out of equality.
      */
     private data class CardLook(
         val e: Entry, val style: CardView.Style, val open: Boolean, val reply: Int, val newSince: Long,
@@ -767,12 +773,18 @@ class NotifList(
         var now = 0L
     }
 
-    /** Everything a message's card shows: as [CardLook], for message [msg] at [at]. */
+    /**
+     * Everything a message's card shows: as [CardLook], for message [msg] at [at]. [content] and
+     * [message] are what the entry, [redacted] and [msg] give, built once for the whole
+     * conversation; like [now], they stay out of equality.
+     */
     private data class MessageLook(
         val e: Entry, val redacted: Boolean, val msg: String, val at: Long, val style: CardView.Style,
         val open: Boolean, val reply: Int, val ago: String, val name: Any?, val icons: Int,
     ) {
         var now = 0L
+        lateinit var content: Content
+        lateinit var message: Content.Msg
     }
 
     private companion object {
@@ -790,10 +802,8 @@ class NotifList(
 
         fun drawMessage(v: View, l: MessageLook) {
             v as CardView
-            val c = Content.of(v.context, l.e, l.redacted)
-            val m = c.messages.firstOrNull { it.id == l.msg } ?: return
             v.showCount(0)
-            v.bind(l.e, c.forMessage(m), l.style, l.open, l.reply, l.now, id = "${l.e.key}#${l.msg}", at = l.at)
+            v.bind(l.e, l.content.forMessage(l.message), l.style, l.open, l.reply, l.now, id = "${l.e.key}#${l.msg}", at = l.at)
             v.swipe.reset(v)
             v.layoutParams = cardGap(v)
         }
