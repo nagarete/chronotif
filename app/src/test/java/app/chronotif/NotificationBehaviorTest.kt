@@ -1425,11 +1425,16 @@ class NotificationBehaviorTest {
         assertNotEquals("On screen for a moment, and opened", before, Prefs.lastCheck)
     }
 
-    /** The installed app looks updated rather than newly installed, so What's new has something to show. */
+    /**
+     * The installed app looks updated rather than newly installed, from a version that had seen
+     * none of the bundled notes, so What's new has something to show even while the version being
+     * built has no notes of its own yet (just after a release).
+     */
     private fun pretendUpdated() {
         val info = shadowOf(context.packageManager).getInternalMutablePackageInfo(context.packageName)
         info.firstInstallTime = 1
         info.lastUpdateTime = 2
+        Prefs.whatsNewSeen = emptySet()
     }
 
     private fun gotIt(root: View): View? {
