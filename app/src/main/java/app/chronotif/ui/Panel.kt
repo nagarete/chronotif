@@ -70,6 +70,7 @@ object Panel {
     }
 
     private fun overlay(context: Context, pulling: Boolean): OverlayPanel? {
+        val requestedAt = SystemClock.uptimeMillis()
         val app = context.applicationContext
         val locked = app.getSystemService(KeyguardManager::class.java).isKeyguardLocked
         // Opening while it animates out replaces it, rather than losing the request.
@@ -78,9 +79,10 @@ object Panel {
         // A panel kept from before the Tutorial started, or ended, shows the wrong notifications.
         val source = Tutorial.source ?: CardSource.Real
         if (kept?.source !== source) drop()
+        val wasKept = kept != null
         val panel = kept ?: OverlayPanel(app, source)
         kept = null
-        if (!panel.show(pulling)) return null
+        if (!panel.show(pulling, PanelView.Timing(requestedAt, wasKept))) return null
         current = panel
         return panel
     }
@@ -237,7 +239,7 @@ internal class OverlayPanel(app: Context, val source: CardSource = CardSource.Re
      * Returns false if the window couldn't be added; the caller falls back to the activity. A
      * [pulling] panel starts out of sight and follows [move] until [release].
      */
-    fun show(pulling: Boolean): Boolean {
+    fun show(pulling: Boolean, timing: PanelView.Timing? = null): Boolean {
         view.reset()
         hadFocus = false
         pendingFocus = null
@@ -268,7 +270,7 @@ internal class OverlayPanel(app: Context, val source: CardSource = CardSource.Re
             ctx.registerReceiver(receiver, filter)
         }
         StatusBarSwipe.ownUiVisible(true)
-        view.shown(pulling)
+        view.shown(pulling, timing)
         if (!pulling) view.animateIn()
         root.postDelayed(focusTimeout, FOCUS_TIMEOUT_MS)
         return true

@@ -6,7 +6,7 @@
     <title>Chronotif: calm, chronological notifications for Android</title>
     <meta
       name="description"
-      content="Chronotif is a free, open-source Android app that shows what arrived since you last checked under New, and dims what you've already seen under Earlier, still in the order it arrived. No accounts, no analytics, and your notifications never leave your phone."
+      content="Chronotif is a free, open-source Android app that shows what arrived since you last checked under New, and dims what you've already seen under Earlier, still in the order it arrived. No accounts, and your notifications never leave your phone."
     />
     <link rel="canonical" href="https://chronotif.com/" />
     <meta name="theme-color" content="#0b0c0e" />
@@ -424,16 +424,17 @@
             <li>
               <h3>Notifications never leave</h3>
               <p>
-                No accounts, analytics, crash reporters or backend. Your notifications, settings and
-                identifiers are never sent anywhere.
+                No accounts. Your notifications, contacts, calendar, what you type in Search and your
+                phone’s identifiers are never sent anywhere.
               </p>
             </li>
             <li>
               <h3>Almost nothing stored</h3>
               <p>
                 Notifications are mirrored in memory only. The time of your last check, when the
-                last few apps notified (for Search, never what they said) and your settings are
-                the only things saved, in app-private storage excluded from backups.
+                last few apps notified (for Search, never what they said), your settings and Usage
+                data waiting to be sent are the only things saved, in app-private storage excluded
+                from backups.
               </p>
             </li>
             <li>
@@ -453,20 +454,25 @@
               </p>
             </li>
             <li>
-              <h3>Two downloads, nothing sent</h3>
+              <h3>Three connections, each one switchable</h3>
               <p>
-                Chronotif connects to the internet for two things, and you can turn off either.
+                Chronotif connects to the internet for three things, and you can turn off each.
                 Search's currency conversion, on unless you turn it off, downloads the European Central
                 Bank's public daily rates when you type a currency and newer ones are out, and sends
                 nothing you type. The update check, off until you turn it on, is the other. Once a day, or when
                 you tap <em>Check for updates</em>, it reads the public release list on GitHub and
                 downloads the new APK. The request includes only the app’s version, though like any
-                download, GitHub sees your IP address.
+                download, GitHub sees your IP address. <strong>Usage data</strong>, on unless you
+                turn it off, sends anonymous counts, panel speeds, settings and crash reports to
+                PostHog’s EU servers, so Chronotif can be improved from how it’s really used. Never
+                anything from your notifications.
+                <a href="https://github.com/nagarete/chronotif/blob/main/docs/usage-data.md">What’s sent</a>
+                lists every field.
               </p>
             </li>
           </ul>
           <p class="note">
-            This website has no cookies, analytics or third-party requests either.
+            This website has no cookies or third-party requests.
           </p>
         </div>
       </section>

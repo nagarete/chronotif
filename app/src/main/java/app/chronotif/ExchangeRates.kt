@@ -87,17 +87,24 @@ object ExchangeRates {
      * in (by its mobile network, then SIM), else of its language's region, else US dollars.
      */
     fun localCurrency(context: Context): String {
-        val tm = context.getSystemService(TelephonyManager::class.java)
-        val countries = listOfNotNull(
-            runCatching { tm?.networkCountryIso }.getOrNull(),
-            runCatching { tm?.simCountryIso }.getOrNull(),
-            context.resources.configuration.locales[0].country,
-        )
-        for (cc in countries) {
+        for (cc in phoneCountries(context)) {
             if (cc.length != 2) continue
             val code = runCatching { java.util.Currency.getInstance(Locale("", cc.uppercase())).currencyCode }.getOrNull()
             if (code != null && code in Money.CODES) return code
         }
         return "USD"
     }
+}
+
+/**
+ * The country the phone is in, best guess first, as ISO codes: by its mobile network, then its SIM,
+ * then its language's region. Needs no permission and no network.
+ */
+fun phoneCountries(context: Context): List<String> {
+    val tm = context.getSystemService(TelephonyManager::class.java)
+    return listOfNotNull(
+        runCatching { tm?.networkCountryIso }.getOrNull(),
+        runCatching { tm?.simCountryIso }.getOrNull(),
+        context.resources.configuration.locales[0].country,
+    ).filter { it.isNotEmpty() }
 }

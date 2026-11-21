@@ -239,6 +239,7 @@ class LockActivity : Activity(), NotifList.Host {
         }
         list.source.addListener(render)
         list.render()
+        if (!practice) app.chronotif.UsageData.count(app.chronotif.core.Usage.Count.LOCK_SHOWN)
         // Seen long enough to count — committed only if the user goes on to unlock.
         if (!practice) main.postDelayed(markSeen, 1200)
     }
@@ -428,6 +429,7 @@ class LockActivity : Activity(), NotifList.Host {
      */
     private fun sleep() {
         if (dark != null) return
+        if (!practice) app.chronotif.UsageData.count(app.chronotif.core.Usage.Count.DOUBLE_TAP_SLEEP)
         dark = View(this).apply { setBackgroundColor(Color.BLACK) }
             .also { root.addView(it, FrameLayout.LayoutParams(-1, -1)) }
         if (practice) {

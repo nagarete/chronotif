@@ -6,6 +6,9 @@ plugins {
 // Without it, release builds fall back to the debug key so they stay installable.
 val releaseKeystore: String? = System.getenv("CHRONOTIF_KEYSTORE")
 
+// PostHog (EU) project key for Usage data, compiled into Stable and Nightly builds only.
+val USAGE_DATA_KEY = "phc_zWiU4QUsQFcsXwSrzyUB9BFvagv2B2YE4tLq5xpjtEEr"
+
 // Reserve the last code in each version's range for stable, above all of its nightlies.
 val nightlyBuild = providers.gradleProperty("nightlyBuild").orNull?.toInt()?.also {
     require(it in 1..9998) { "nightlyBuild must be between 1 and 9998" }
@@ -43,12 +46,17 @@ android {
         debug {
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
+            // The debug build sends no Usage data: test runs on a developer's phone aren't use.
+            buildConfigField("String", "USAGE_DATA_KEY", "\"\"")
         }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
+            // PostHog's project key for Usage data (ADR 0016). It can only send events, not read
+            // them, so it's public like the rest of the code.
+            buildConfigField("String", "USAGE_DATA_KEY", "\"$USAGE_DATA_KEY\"")
         }
     }
 

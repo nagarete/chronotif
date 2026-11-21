@@ -16,6 +16,7 @@ class App : Application() {
         super.onCreate()
         Prefs.init(this)
         DemoMode.init(this)
+        UsageData.init(this)
         Updater.sync(this)
         SearchShortcut.publish(this)
         registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {

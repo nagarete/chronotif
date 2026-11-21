@@ -4,6 +4,7 @@ package app.chronotif
 
 import android.app.Notification
 import android.content.Context
+import app.chronotif.core.Usage
 
 /**
  * Where the Panel and the lock-screen view get the notifications they draw, the last check that
@@ -66,14 +67,34 @@ interface CardSource {
         override fun markChecked(seenUpTo: Long) = Prefs.markChecked(seenUpTo)
         override fun addListener(l: () -> Unit) = NotifStore.addListener(l)
         override fun removeListener(l: () -> Unit) = NotifStore.removeListener(l)
-        override fun open(context: Context, e: Entry) = Act.open(context, e)
+        override fun open(context: Context, e: Entry) = Act.open(context, e).also { if (it) count(Usage.Count.NOTIFICATION_OPENED) }
         // Act can't tell a sample by its button alone, so the backstop for buttons and replies is here.
-        override fun action(context: Context, e: Entry, a: Notification.Action) = !e.isSample && Act.action(context, a)
+        override fun action(context: Context, e: Entry, a: Notification.Action) =
+            (!e.isSample && Act.action(context, a)).also { if (it) count(Usage.Count.ACTION_TAPPED) }
         override fun reply(context: Context, e: Entry, a: Notification.Action, text: CharSequence) =
-            !e.isSample && Act.reply(context, a, text)
-        override fun dismissAll(entries: List<Entry>) = Act.dismissAll(entries)
+            (!e.isSample && Act.reply(context, a, text)).also { if (it) count(Usage.Count.REPLY_SENT) }
+        override fun dismissAll(entries: List<Entry>) {
+            Act.dismissAll(entries)
+            count(Usage.Count.CLEARED)
+        }
         override fun hideMessage(key: String, messageId: String) = NotifStore.hideMessage(key, messageId)
-        override fun snooze(e: Entry, until: Long) = Act.snooze(e, until)
-        override fun dismissMedia(context: Context, e: Entry) = MediaDismiss.dismiss(context, e)
+        override fun snooze(e: Entry, until: Long) {
+            Act.snooze(e, until)
+            count(Usage.Count.SNOOZED)
+        }
+        override fun dismissMedia(context: Context, e: Entry) =
+            MediaDismiss.dismiss(context, e).also { if (it) count(Usage.Count.MEDIA_DISMISSED) }
+
+        // Only the real Panel is counted for Usage data: the Tutorial has its own source.
+        override fun noticed(what: Noticed) = when (what) {
+            Noticed.PANEL_OPENED -> count(Usage.Count.PANEL_OPENED)
+            Noticed.PANEL_CLOSED -> UsageData.sendIfDue()
+            Noticed.STACK_OPENED -> count(Usage.Count.STACK_OPENED)
+            Noticed.PREVIEW -> count(Usage.Count.PREVIEW_OPENED)
+            Noticed.SEARCH -> count(Usage.Count.SEARCH_OPENED)
+            Noticed.STACK_CLOSED -> Unit
+        }
+
+        private fun count(c: Usage.Count) = UsageData.count(c)
     }
 }

@@ -178,6 +178,7 @@ object Tutorial {
         if (r.step == r.steps.lastIndex) {
             r.finished = true
             Prefs.tutorialDone = Prefs.tutorialDone + r.part.name
+            UsageData.count(app.chronotif.core.Usage.Count.TUTORIAL_PART_DONE)
             Prefs.tutorialPlace = null
         } else {
             r.step++

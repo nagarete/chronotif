@@ -21,6 +21,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import app.chronotif.CardSource
 import app.chronotif.TutorialSource
+import app.chronotif.UsageData
 import kotlin.math.abs
 
 /**
@@ -218,11 +219,14 @@ class PanelView(
         if (cardsAt != 0L) list.render()
     }
 
+    /** When an open was asked for and whether it reused the kept panel, to time it for Usage data. */
+    class Timing(val requestedAt: Long, val kept: Boolean)
+
     /**
      * The panel is on screen: show the header now, the cards once it has drawn, then follow
      * notifications. A [pulling] panel isn't open yet: [pull] moves it until [settle].
      */
-    fun shown(pulling: Boolean = false) {
+    fun shown(pulling: Boolean = false, timing: Timing? = null) {
         showing = true
         settled = !pulling
         // The header was filled when the panel was built. Its clock and date keep themselves
@@ -232,6 +236,10 @@ class PanelView(
             if (!showing || cardsAt != 0L) return@afterNextFrame
             cardsAt = android.os.SystemClock.uptimeMillis()
             list.render()
+            if (timing != null && list.source === CardSource.Real) {
+                UsageData.panelSpeed(android.os.SystemClock.uptimeMillis() - timing.requestedAt,
+                    list.source.visible().size, timing.kept, pulling)
+            }
             revealCards()
             startSeen()
             list.source.noticed(CardSource.Noticed.PANEL_OPENED)
