@@ -20,4 +20,5 @@ Time order is the product. Every section sorts newest first by the time its card
 ## Verifying
 
 - `./gradlew testDebugUnitTest lintDebug assembleDebug` must pass. Changes to `core/Attention.kt` update `AttentionTest`. Visible list changes get a Robolectric case in `NotificationBehaviorTest`.
+- Lint is most of that check's time, and it reruns on any source edit. While working, run `assembleDebug` and the tests you touch (`testDebugUnitTest --tests '*NotificationBehaviorTest*'`); run the full check before committing.
 - There's no emulator setup, so visible changes are confirmed on a real phone. The debug build (`app.chronotif.debug`) installs next to the stable app. After `adb install`, reconnect its listener with `cmd notification disallow_listener` then `allow_listener` for `app.chronotif.debug/app.chronotif.ListenerService`. MIUI/HyperOS needs this.
