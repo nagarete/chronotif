@@ -49,6 +49,8 @@ class TutorialTest {
         context.getSharedPreferences("chronotif", Context.MODE_PRIVATE).edit().clear().commit()
         Prefs.init(context)
         NotifStore.connect(emptyArray(), noRanking())
+        // Other test classes run activities that mark screens as shown, such as Search.
+        end()
     }
 
     @After

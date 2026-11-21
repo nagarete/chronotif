@@ -30,6 +30,13 @@ class SearchActivityTest {
         Prefs.init(context)
     }
 
+    // A destroyed controller never stops its activity, so Search stays marked as shown in the
+    // Tutorial, which is one object for the app.
+    @org.junit.After fun forgetSearch() {
+        app.chronotif.Tutorial.Surface.entries.forEach { app.chronotif.Tutorial.shown(it, false) }
+        app.chronotif.Tutorial.pause()
+    }
+
     private fun overlays(root: ViewGroup) = (0 until root.childCount).map { root.getChildAt(it) }.filterIsInstance<SearchOverlay>()
 
     @Test fun opensStraightIntoSearchAndFinishesWhenItCloses() {
