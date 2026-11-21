@@ -105,6 +105,7 @@
     <string name="tutorial_would_open">In the tutorial nothing opens. Otherwise %1$s would.</string>
     <string name="tutorial_browser">your browser</string>
     <string name="tutorial_contacts_app">the app for that contact</string>
+    <string name="tutorial_calendar">your calendar</string>
     <string name="tutorial_pull_title">Pull down for Search</string>
     <string name="tutorial_pull_body">Open the Panel, then pull down from the top of the list. Search finds apps and answers questions, and never looks through your notifications.</string>
     <string name="tutorial_hold_title">Hold the edge handle</string>
