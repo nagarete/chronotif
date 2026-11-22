@@ -47,6 +47,14 @@ One continuous period from the display waking until it sleeps. Chronotif and the
 Double-tapping empty space on the lock-screen view puts the display to sleep, ending the Wake session, as double-tapping the stock lock screen does on phones that offer it. Like the display timing out, it is not a check.
 _Avoid_: Double-tap to lock (the phone is already locked), screen off
 
+**Lock-screen shortcut**:
+One of two buttons in the bottom corners of Chronotif's lock-screen view, each set by the user to the flashlight, the camera, the QR scanner, Do Not Disturb, an app, or nothing. Holding one uses it; a tap only says to hold. The stock lock screen's own shortcuts are a different thing and are covered while Chronotif's view shows.
+_Avoid_: Quick affordance, corner button, quick action
+
+**QR scanner**:
+Scanning a code with Google Lens, from a Lock-screen shortcut or the Chronotif QR scanner tile. Chronotif has no scanner of its own, so without Lens it isn't available.
+_Avoid_: Code scanner, Scanner (HyperOS's own)
+
 **Off**:
 Chronotif's standing surfaces (the edge handle, the status-bar swipe and the lock-screen view) are withheld. Notifications are still tracked and the panel can still be opened on purpose, e.g. from the Quick Settings tile. The user's surface settings are kept for when Chronotif is turned back on.
 _Avoid_: Disabled, Paused

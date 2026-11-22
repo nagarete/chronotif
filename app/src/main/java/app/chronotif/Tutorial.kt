@@ -312,6 +312,12 @@ object Tutorial {
             ctx.getString(R.string.tutorial_sleep_body) +
                 (if (Prefs.lockDoubleTapSleep) "" else "\n\n" + ctx.getString(R.string.tutorial_sleep_off))
         }, { _, e -> e == Event.SLEPT }, extras = listOf(showLock)),
+        Step(R.string.tutorial_shortcut_title, { ctx ->
+            ctx.getString(R.string.tutorial_shortcut_body) +
+                (if (Prefs.lockShortcutLeft != app.chronotif.core.LockShortcut.NONE ||
+                    Prefs.lockShortcutRight != app.chronotif.core.LockShortcut.NONE) "" else "\n\n" + ctx.getString(R.string.tutorial_shortcut_none)) +
+                (if (Haptics.on(ctx)) "" else "\n\n" + ctx.getString(R.string.lock_shortcut_haptics_off_desc))
+        }, { _, e -> e == Event.SHORTCUT_HELD }, extras = listOf(showLock)),
         Step(R.string.tutorial_lock_mode_title, { it.getString(R.string.tutorial_lock_mode_body) },
             { _, e -> e == Event.LOCK_MODE_PICKED },
             extras = listOf(

@@ -68,6 +68,7 @@ class LockActivity : Activity(), NotifList.Host {
     private val render: () -> Unit = { list.render() }
     private var unlocking = false
     private val markSeen = Runnable { LockSession.seen(list.shownUpTo) }
+    private val shortcuts by lazy { LockShortcuts(this, practice) { then -> unlock(then) } }
 
     /**
      * The Tutorial's stand-in, on an unlocked phone: it shows the samples and stays up, says what
@@ -156,7 +157,6 @@ class LockActivity : Activity(), NotifList.Host {
         val hint = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(0, dp(6), 0, dp(14))
             addView(ImageView(context).apply {
                 setImageResource(R.drawable.ic_fingerprint)
                 imageTintList = ColorStateList.valueOf(pal.onScrimSecondary)
@@ -170,7 +170,16 @@ class LockActivity : Activity(), NotifList.Host {
         // The Tutorial's card, between the list and Tap to unlock.
         if (practice) column.addView(TutorialGuide(this, inPanel = false) { finish() },
             Ui.lp().apply { leftMargin = dp(12); rightMargin = dp(12); bottomMargin = dp(8) })
-        column.addView(hint, Ui.lp(-1))
+        // Tap to unlock between the two Lock-screen shortcuts, all three raised together over a fingerprint sensor.
+        val bar = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(28), dp(6), dp(28), dp(14))
+            addView(shortcuts.left, LinearLayout.LayoutParams(dp(LockShortcuts.SIZE_DP), dp(LockShortcuts.SIZE_DP)))
+            addView(hint, LinearLayout.LayoutParams(0, -2, 1f))
+            addView(shortcuts.right, LinearLayout.LayoutParams(dp(LockShortcuts.SIZE_DP), dp(LockShortcuts.SIZE_DP)))
+        }
+        column.addView(bar, Ui.lp(-1))
         this.hint = hint
         column.setOnClickListener { tapped() }
         // Blurred artwork in place of the wallpaper while a Media player shows (see LockPile).
@@ -188,7 +197,12 @@ class LockActivity : Activity(), NotifList.Host {
         setContentView(root)
         this.root = root
         // Put Tap to unlock's fingerprint icon on an under-display sensor, the Pile above it.
-        root.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> clearFingerprint(hint) }
+        root.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> clearFingerprint(bar, hint) }
+        // A Preview, the image viewer or Search over the view hides the shortcuts.
+        val decor = window.decorView as android.view.ViewGroup
+        decor.viewTreeObserver.addOnGlobalLayoutListener {
+            shortcuts.cover((0 until decor.childCount).any { decor.getChildAt(it) is Overlay })
+        }
 
         list = NotifList(this, listBox, onLock = true, source = Tutorial.source.takeIf { practice } ?: CardSource.Real)
         pile = LockPile(stage, scroll, clockRoom, clockBox, listBox, list, backdrop) { openPile() }
@@ -233,6 +247,7 @@ class LockActivity : Activity(), NotifList.Host {
     override fun onStart() {
         super.onStart()
         if (practice) Tutorial.shown(Tutorial.Surface.LOCK, true)
+        shortcuts.start()
     }
 
     override fun onResume() {
@@ -259,6 +274,7 @@ class LockActivity : Activity(), NotifList.Host {
     override fun onStop() {
         super.onStop()
         if (practice) Tutorial.shown(Tutorial.Surface.LOCK, false)
+        shortcuts.stop()
         if (!isFinishing && !unlocking) finish()
     }
 
@@ -539,15 +555,15 @@ class LockActivity : Activity(), NotifList.Host {
      * With a fingerprint sensor under the screen, raises Tap to unlock until its fingerprint icon
      * sits on the sensor, and with it the Pile above, so a finger on the sensor touches no card.
      */
-    private fun clearFingerprint(hint: LinearLayout) {
+    private fun clearFingerprint(bar: LinearLayout, hint: LinearLayout) {
         val top = fingerprintTop ?: return
         val icon = hint.getChildAt(0) ?: return
         if (icon.height == 0) return
         // A little above the sensor's centre, where HyperOS's own icon sits.
         val sensor = (top * FingerprintSensor.screenHeight(this)).toInt() + dp(FingerprintSpot.HALF_DP) - dp(4)
         val at = IntArray(2).also { icon.getLocationOnScreen(it) }
-        val bottom = FingerprintSpot.hintPadding(hint.paddingBottom, at[1] + icon.height / 2, sensor, dp(14))
-        if (kotlin.math.abs(hint.paddingBottom - bottom) > 1) hint.setPadding(hint.paddingLeft, hint.paddingTop, hint.paddingRight, bottom)
+        val bottom = FingerprintSpot.hintPadding(bar.paddingBottom, at[1] + icon.height / 2, sensor, dp(14))
+        if (kotlin.math.abs(bar.paddingBottom - bottom) > 1) bar.setPadding(bar.paddingLeft, bar.paddingTop, bar.paddingRight, bottom)
     }
 
     /** The sensor's top edge, read once per view: it doesn't move while the view is up. */

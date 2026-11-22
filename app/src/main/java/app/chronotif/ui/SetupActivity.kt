@@ -776,6 +776,104 @@ class SetupActivity : Activity() {
                 refreshers += { if (current == Section.LOCK && fitted != Prefs.fingerprintTop > 0f) body.post { reshow() } }
             }
         }
+        lockShortcuts()
+    }
+
+    /** The two Lock-screen shortcuts, the QR scanner's need for Google Lens (ADR 0017), and its tile. */
+    private fun lockShortcuts() {
+        val lens = app.chronotif.GoogleLens.installed(this)
+        val haptics = app.chronotif.Haptics.on(this)
+        group(R.string.lock_shortcuts) {
+            slot(R.string.lock_shortcut_left, left = true, lens)
+            slot(R.string.lock_shortcut_right, left = false, lens)
+            // Android drops every app's touch vibration while it's off, so holding a shortcut can't be felt.
+            if (!haptics) item(R.string.lock_shortcut_haptics_off, getString(R.string.lock_shortcut_haptics_off_desc),
+                trailing = button(getString(R.string.lock_shortcut_haptics_open), filled = false) {
+                    open(Intent(Settings.ACTION_SOUND_SETTINGS))
+                })
+            if (!lens) {
+                item(R.string.qr_scanner, getString(R.string.qr_needs_lens),
+                    trailing = button(getString(R.string.qr_get_lens), filled = false) { app.chronotif.GoogleLens.get(this) })
+            } else if (Build.VERSION.SDK_INT >= 33 && !Prefs.qrTileAdded) {
+                item(null, getString(R.string.qr_tile_hint), content = LinearLayout(this).apply {
+                    addView(button("+ " + getString(R.string.qr_tile_label), filled = false) {
+                        getSystemService(StatusBarManager::class.java).requestAddTileService(
+                            ComponentName(context, app.chronotif.QrTile::class.java),
+                            getString(R.string.qr_tile_label),
+                            Icon.createWithResource(context, R.drawable.ic_qr),
+                            mainExecutor,
+                        ) { body.post { if (current == Section.LOCK) reshow() } }
+                    })
+                })
+            }
+        }
+        footnote(getString(R.string.lock_shortcuts_desc))
+        // Back from the Play Store with Lens, or from Quick Settings with the tile: show it.
+        val tile = Prefs.qrTileAdded
+        refreshers += {
+            if (current == Section.LOCK && (lens != app.chronotif.GoogleLens.installed(this) || tile != Prefs.qrTileAdded ||
+                    haptics != app.chronotif.Haptics.on(this))) {
+                body.post { reshow() }
+            }
+        }
+    }
+
+    /** One corner's row: what it's set to, and a list to change it. */
+    private fun slot(title: Int, left: Boolean, lens: Boolean) {
+        val kind = if (left) Prefs.lockShortcutLeft else Prefs.lockShortcutRight
+        val appKey = if (left) Prefs.lockShortcutLeftApp else Prefs.lockShortcutRightApp
+        val now = when {
+            kind != app.chronotif.core.LockShortcut.APP -> getString(LockShortcuts.label(kind))
+            else -> app.chronotif.Launchables.find(this, appKey)?.label ?: getString(R.string.lock_shortcut_app_missing)
+        }
+        val value = text(now, 14f, secondary = true)
+        item(title, trailing = value, onClick = {
+            val other = if (left) Prefs.lockShortcutRight else Prefs.lockShortcutLeft
+            val choices = app.chronotif.core.LockShortcut.choicesBeside(other)
+            val labels = choices.map {
+                val name = getString(LockShortcuts.label(it))
+                if (it == app.chronotif.core.LockShortcut.QR_SCANNER && !lens) "$name · ${getString(R.string.qr_tile_needs_lens)}" else name
+            }.toTypedArray()
+            android.app.AlertDialog.Builder(this)
+                .setTitle(title)
+                .setSingleChoiceItems(labels, choices.indexOf(kind)) { d, i ->
+                    d.dismiss()
+                    val picked = choices[i]
+                    when {
+                        picked == app.chronotif.core.LockShortcut.QR_SCANNER && !lens ->
+                            showLensMissing(this, unlockFirst = { it() })
+                        picked == app.chronotif.core.LockShortcut.APP -> pickApp(left)
+                        else -> setSlot(left, picked, null)
+                    }
+                }
+                .setNegativeButton(R.string.close, null)
+                .show()
+        })
+    }
+
+    private fun pickApp(left: Boolean) {
+        app.chronotif.Launchables.load(this) { apps ->
+            if (isFinishing) return@load
+            android.app.AlertDialog.Builder(this)
+                .setTitle(R.string.lock_shortcut_pick_app)
+                .setItems(apps.map { it.label }.toTypedArray()) { _, i ->
+                    setSlot(left, app.chronotif.core.LockShortcut.APP, app.chronotif.Launchables.key(this, apps[i]))
+                }
+                .setNegativeButton(R.string.close, null)
+                .show()
+        }
+    }
+
+    private fun setSlot(left: Boolean, kind: app.chronotif.core.LockShortcut, appKey: String?) {
+        if (left) {
+            Prefs.lockShortcutLeft = kind
+            Prefs.lockShortcutLeftApp = appKey
+        } else {
+            Prefs.lockShortcutRight = kind
+            Prefs.lockShortcutRightApp = appKey
+        }
+        changed()
+        reshow()
     }
 
     private fun search() {
