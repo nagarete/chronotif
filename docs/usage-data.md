@@ -39,7 +39,7 @@ Sent once a day, the first time Chronotif starts or the Panel closes on a new da
 | `system` | `HyperOS 3.0`, `One UI 6.1`, `MIUI 14` or `Android` |
 | `country`, `$geoip_country_code` | `DE`, from the mobile network, else the SIM, else the language's region |
 
-**Settings and permissions**, as they are when the event is sent: `set_enabled`, `set_swipe_to_clear`, `set_status_swipe`, `set_handle`, `set_handle_right`, `set_handle_shape`, `set_handle_colour`, `set_handle_new_colour`, `set_handle_look`, `set_handle_hide_landscape`, `set_lock_mode`, `set_lock_hide_content`, `set_lock_double_tap`, `set_lock_shortcut_left`, `set_lock_shortcut_right` (`none`, `flashlight`, `camera`, `qr`, `dnd` or `app`, never which app), `set_qr_tile`, `has_google_lens`, `set_header_clock`, `set_header_clock_size`, `set_header_date_beside`, `set_header_date_align`, `set_header_weekday`, `set_header_year`, `set_header_short_names`, `set_header_settings`, `set_pull_down_search`, `set_search_engine`, `set_search_contacts`, `set_search_calls`, `set_search_calendar`, `set_currency_rates`, `set_search_tile`, `set_auto_update`, `set_nightly_updates`, `set_settings_theme`, `tutorial_parts_done` (how many parts), `perm_listener`, `perm_overlay`, `perm_status_swipe`.
+**Settings and permissions**, as they are when the event is sent: `set_enabled`, `set_swipe_to_clear`, `set_priority_apps`, `set_quiet_apps` (how many Priority and Quiet apps, never which), `set_status_swipe`, `set_handle`, `set_handle_right`, `set_handle_shape`, `set_handle_colour`, `set_handle_new_colour`, `set_handle_look`, `set_handle_hide_landscape`, `set_lock_mode`, `set_lock_hide_content`, `set_lock_double_tap`, `set_lock_shortcut_left`, `set_lock_shortcut_right` (`none`, `flashlight`, `camera`, `qr`, `dnd` or `app`, never which app), `set_qr_tile`, `has_google_lens`, `set_header_clock`, `set_header_clock_size`, `set_header_date_beside`, `set_header_date_align`, `set_header_weekday`, `set_header_year`, `set_header_short_names`, `set_header_settings`, `set_pull_down_search`, `set_search_engine`, `set_search_contacts`, `set_search_calls`, `set_search_calendar`, `set_currency_rates`, `set_search_tile`, `set_auto_update`, `set_nightly_updates`, `set_settings_theme`, `tutorial_parts_done` (how many parts), `perm_listener`, `perm_overlay`, `perm_status_swipe`.
 
 **Counts** since the last `daily`. Each is how often something happened, never what it was about. A count that stayed at 0 is left out.
 
@@ -54,6 +54,7 @@ Sent once a day, the first time Chronotif starts or the Panel closes on a new da
 | `n_reply_sent` | Replies sent (never what was written) |
 | `n_cleared` | Clears (one card or a whole section) |
 | `n_snoozed` | Snoozes |
+| `n_priority_set`, `n_quiet_set` | Apps made a Priority app or a Quiet app, never which |
 | `n_media_dismissed` | Media players swiped away |
 | `n_search_opened` | Search opened |
 | `n_search_app`, `n_search_contact`, `n_search_calendar`, `n_search_setting`, `n_search_web` | Which sort of Search result was opened, never which one |

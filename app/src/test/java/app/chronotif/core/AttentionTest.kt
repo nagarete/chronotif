@@ -3,6 +3,7 @@
 package app.chronotif.core
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -97,6 +98,58 @@ class AttentionTest {
         assertEquals(listOf("v"), s.running.map { it.key })
         assertEquals(listOf("x"), s.fresh.map { it.key })
         assertTrue(listOf(call, music, vpn).none { Attention.isNew(it, 0) })
+    }
+
+    @Test
+    fun priorityAppsSitAboveNewUntilOpenedAndQuietAppsAreNeverNew() {
+        val tiers = mapOf("bank" to AppTier(Tier.PRIORITY, since = 10), "promo" to AppTier(Tier.QUIET))
+        val opened = mapOf("b1" to 25L)
+        fun s(lastCheck: Long) = Attention.sections(
+            listOf(N("b1", "bank", 20), N("b2", "bank", 30), N("b3", "bank", 5), N("c", "chat", 40), N("p", "promo", 50)),
+            lastCheck, tier = { tiers[it.app] ?: AppTier.NORMAL }, openedAt = { opened[it.key] ?: 0L },
+        )
+        val before = s(lastCheck = 10)
+        // b1 was opened after it arrived, so it has left Priority; b2 hasn't been, b3 came before the app was picked.
+        assertEquals(listOf("b2"), before.priority.map { it.key })
+        assertEquals(listOf("c"), before.fresh.map { it.key })
+        assertEquals(listOf("p", "b1", "b3"), before.earlier.map { it.key })
+        // A check moves New to Earlier but leaves Priority alone.
+        val after = s(lastCheck = 100)
+        assertEquals(listOf("b2"), after.priority.map { it.key })
+        assertTrue(after.fresh.isEmpty())
+        assertFalse(after.isEmpty)
+    }
+
+    @Test
+    fun onlyAnArrivalSinceTheCheckIsAnnounced() {
+        val priority = AppTier(Tier.PRIORITY)
+        assertTrue(Attention.isNew(N("b", "bank", 30), lastCheck = 20, tier = priority))
+        assertFalse("A Priority card already looked at stays up, but doesn't wake the view again",
+            Attention.isNew(N("b", "bank", 30), lastCheck = 40, tier = priority))
+        assertFalse(Attention.isNew(N("p", "promo", 30), lastCheck = 20, tier = AppTier(Tier.QUIET)))
+    }
+
+    @Test
+    fun changingAnAppsTierNeverBringsCheckedCardsBackUp() {
+        val lastCheck = 100L
+        val now = 500L
+        // Normal to Priority: its New cards go along, Earlier stays.
+        val priority = Attention.retier(AppTier.NORMAL, Tier.PRIORITY, lastCheck, now)
+        assertEquals(AppTier(Tier.PRIORITY, 100), priority)
+        assertEquals(100, Attention.since(priority, lastCheck))
+        // Priority to Normal: its Priority cards count as checked.
+        val normal = Attention.retier(priority, Tier.NORMAL, lastCheck, now)
+        assertEquals(now, Attention.since(normal, lastCheck))
+        // Quiet to Normal: nothing comes up; only later arrivals are New.
+        val quiet = Attention.retier(AppTier.NORMAL, Tier.QUIET, lastCheck, now)
+        assertEquals(Long.MAX_VALUE, Attention.since(quiet, lastCheck))
+        assertEquals(now + 1, Attention.since(Attention.retier(quiet, Tier.NORMAL, lastCheck, now + 1), lastCheck))
+        // Quiet to Priority: nothing it posted while Quiet moves up.
+        assertEquals(now, Attention.retier(quiet, Tier.PRIORITY, lastCheck, now).since)
+        // Picking the same again changes nothing.
+        assertEquals(priority, Attention.retier(priority, Tier.PRIORITY, lastCheck, now))
+        // A Priority conversation splits at its last open, not at the check.
+        assertEquals(300, Attention.since(priority, lastCheck = 400, openedAt = 300))
     }
 
     @Test

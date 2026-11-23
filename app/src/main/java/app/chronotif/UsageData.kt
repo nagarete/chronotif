@@ -11,6 +11,7 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
 import android.util.Log
+import app.chronotif.core.Tier
 import app.chronotif.core.Usage
 import java.net.HttpURLConnection
 import java.net.URL
@@ -261,6 +262,9 @@ object UsageData {
     private fun settings(): Map<String, Any?> = mapOf(
         "set_enabled" to Prefs.enabled,
         "set_swipe_to_clear" to Prefs.swipeToClear,
+        // How many, never which (ADR 0016).
+        "set_priority_apps" to Prefs.appTiers.values.count { it.tier == Tier.PRIORITY },
+        "set_quiet_apps" to Prefs.appTiers.values.count { it.tier == Tier.QUIET },
         "set_status_swipe" to Prefs.statusSwipeEnabled,
         "set_handle" to Prefs.handleEnabled,
         "set_handle_right" to Prefs.handleRight,

@@ -37,6 +37,9 @@ object Usage {
         SHORTCUT_DND("shortcut_dnd"),
         SHORTCUT_APP("shortcut_app"),
         QR_TILE("qr_tile"),
+        /** An app made a Priority app or a Quiet app, from a Preview or Settings; never which app. */
+        PRIORITY_SET("priority_set"),
+        QUIET_SET("quiet_set"),
         TUTORIAL_PART_DONE("tutorial_part_done"),
         ANR("anr"),
         NATIVE_CRASH("native_crash"),

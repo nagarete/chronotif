@@ -62,6 +62,8 @@ object Tutorial {
         internal var checked = false
         internal var stackOpened = false
         internal var mayaWroteAgain = false
+        /** The steps' fresh Parcelly and Daybook cards have arrived. */
+        internal var arrived = HashSet<Int>()
         val steps get() = steps(part)
     }
 
@@ -208,6 +210,10 @@ object Tutorial {
                 r.source.post(maya(app, r.startedAt, writesAgainAt = System.currentTimeMillis()))
             }, NEW_MESSAGE_DELAY_MS)
         }
+        // A fresh card arrives in New to make a Priority app, then one to make a Quiet app.
+        if (r.part == Part.NOTIFICATIONS && (r.step == PRIORITY || r.step == QUIET) && r.arrived.add(r.step)) {
+            r.source.post(if (r.step == PRIORITY) parcellyAgain(app, System.currentTimeMillis()) else daybookAgain(app, System.currentTimeMillis()))
+        }
     }
 
     private fun onEvent(r: Run, e: Event) {
@@ -227,6 +233,8 @@ object Tutorial {
     // --- Notifications
 
     private const val NEW_AND_EARLIER = 1
+    private const val PRIORITY = 4
+    private const val QUIET = 5
     private const val NEW_MESSAGE_DELAY_MS = 2500L
 
     /** Asking Android to add a tile needs Android 13 and Chronotif in front. */
@@ -253,6 +261,10 @@ object Tutorial {
             { r, e -> e == Event.STACK_CLOSED && r.stackOpened }),
         Step(R.string.tutorial_preview_title, { it.getString(R.string.tutorial_preview_body) },
             { _, e -> e == Event.REPLIED || e == Event.SNOOZED }),
+        Step(R.string.tutorial_priority_title, { it.getString(R.string.tutorial_priority_body) },
+            { _, e -> e == Event.PRIORITY_SET }),
+        Step(R.string.tutorial_quiet_title, { it.getString(R.string.tutorial_quiet_body) },
+            { _, e -> e == Event.QUIET_SET }),
         Step(R.string.tutorial_clear_title, { it.getString(R.string.tutorial_clear_body) },
             { _, e -> e == Event.CLEARED }),
         Step(R.string.tutorial_close_title, { it.getString(R.string.tutorial_close_body) },
@@ -350,6 +362,16 @@ object Tutorial {
                 maya(app, now),
             ), lastCheck = now - 90 * MINUTE, onEvent = onEvent)
         }
+    }
+
+    /** Parcelly writes again, for the step that makes it a Priority app. */
+    private fun parcellyAgain(app: Context, at: Long) = Samples.entry(app, Samples.parcelly, 6, at) {
+        setContentTitle(app.getString(R.string.sample_parcelly_2_title)).setContentText(app.getString(R.string.sample_parcelly_2_text))
+    }
+
+    /** Daybook reminds again, for the step that makes it a Quiet app. */
+    private fun daybookAgain(app: Context, at: Long) = Samples.entry(app, Samples.daybook, 7, at) {
+        setContentTitle(app.getString(R.string.sample_daybook_2_title)).setContentText(app.getString(R.string.sample_daybook_2_text))
     }
 
     /**

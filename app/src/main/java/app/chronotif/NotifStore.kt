@@ -79,7 +79,7 @@ object NotifStore {
     /** A conversation whose every message was swiped away isn't New: there's nothing left to show. */
     fun newCount(): Int {
         val lastCheck = Prefs.lastCheck
-        return visible().count { Attention.isNew(it, lastCheck) && !allHidden(it) }
+        return visible().count { Attention.isNew(it, lastCheck, Prefs.appTier(it.pkg)) && !allHidden(it) }
     }
 
     private fun allHidden(e: Entry): Boolean {
@@ -94,6 +94,7 @@ object NotifStore {
         hidden.keys.retainAll(active.orEmpty().map { it.key }.toSet())
         clock.clear()
         active?.sortedBy { it.postTime }?.forEach { put(it, map) }
+        Prefs.forgetOpened(entries.keys)
         changed()
     }
 
@@ -114,6 +115,7 @@ object NotifStore {
         entries.remove(key)
         hidden.remove(key)
         clock.onRemoved(key)
+        if (Prefs.openedAt(key) != 0L) Prefs.forgetOpened(entries.keys)
         map?.let(::rerank)
         changed()
     }

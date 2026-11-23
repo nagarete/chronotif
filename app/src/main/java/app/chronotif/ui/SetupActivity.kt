@@ -673,6 +673,70 @@ class SetupActivity : Activity() {
                 Prefs.swipeToClear = it
             }
         }
+        appPriority()
+    }
+
+    /** Priority apps and Quiet apps (ADR 0019): the apps made either, and a way to add one. */
+    private fun appPriority() {
+        val set = Prefs.appTiers.filterValues { it.tier != app.chronotif.core.Tier.NORMAL }
+            .map { (pkg, t) -> Triple(pkg, appLabel(pkg), t.tier) }
+            .sortedWith(compareBy({ it.third }, { app.chronotif.core.AppMatch.fold(it.second) }))
+        group(R.string.app_priority) {
+            item(R.string.app_priority_add, getString(R.string.app_priority_add_desc)) { pickTierApp() }
+            for ((pkg, label, tier) in set) {
+                item(null, label = label, trailing = text(getString(tierName(tier)), 14f, secondary = true)) {
+                    chooseTier(pkg, label, tier)
+                }
+            }
+        }
+        footnote(getString(R.string.app_priority_desc))
+    }
+
+    private fun tierName(t: app.chronotif.core.Tier) = when (t) {
+        app.chronotif.core.Tier.PRIORITY -> R.string.tier_priority
+        app.chronotif.core.Tier.NORMAL -> R.string.tier_normal
+        app.chronotif.core.Tier.QUIET -> R.string.tier_quiet
+    }
+
+    private fun appLabel(pkg: String): String = try {
+        packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString()
+    } catch (_: android.content.pm.PackageManager.NameNotFoundException) {
+        pkg
+    }
+
+    /** The apps that notified most recently first, then every other app, one entry per package. */
+    private fun pickTierApp() {
+        app.chronotif.Launchables.load(this) { apps ->
+            if (isFinishing) return@load
+            val set = Prefs.appTiers.filterValues { it.tier != app.chronotif.core.Tier.NORMAL }.keys
+            val byPkg = LinkedHashMap<String, String>()
+            for (a in app.chronotif.Launchables.suggestions(apps) + apps) {
+                val pkg = a.component.packageName
+                if (pkg !in set) byPkg.putIfAbsent(pkg, a.label)
+            }
+            val pkgs = byPkg.keys.toList()
+            android.app.AlertDialog.Builder(this)
+                .setTitle(R.string.app_priority_add)
+                .setItems(pkgs.map { byPkg.getValue(it) }.toTypedArray()) { _, i ->
+                    chooseTier(pkgs[i], byPkg.getValue(pkgs[i]), app.chronotif.core.Tier.NORMAL)
+                }
+                .setNegativeButton(R.string.close, null)
+                .show()
+        }
+    }
+
+    private fun chooseTier(pkg: String, label: String, now: app.chronotif.core.Tier) {
+        val tiers = app.chronotif.core.Tier.entries
+        android.app.AlertDialog.Builder(this)
+            .setTitle(label)
+            .setSingleChoiceItems(tiers.map { getString(tierName(it)) }.toTypedArray(), tiers.indexOf(now)) { d, i ->
+                d.dismiss()
+                if (tiers[i] != now) app.chronotif.CardSource.Real.setTier(pkg, tiers[i])
+                changed()
+                reshow()
+            }
+            .setNegativeButton(R.string.close, null)
+            .show()
     }
 
     private fun handle() {
@@ -1075,6 +1139,7 @@ class SetupActivity : Activity() {
         R.string.handle_position to "height move",
         R.string.header_clock_size to "font text big small",
         R.string.swipe_to_clear to "dismiss delete remove",
+        R.string.app_priority_add to "priority quiet mute silence important pin top favourite",
         R.string.lock_mode to "lockscreen keyguard",
         R.string.lock_privacy to "private hide privacy",
         R.string.lock_double_tap to "screen off turn off gesture wake",
@@ -1496,14 +1561,17 @@ class SetupActivity : Activity() {
     private fun item(
         title: Int?,
         desc: CharSequence? = null,
+        /** The title when it isn't one of Chronotif's strings, such as an app's name; not indexed for search. */
+        label: CharSequence? = null,
         trailing: View? = null,
         content: View? = null,
         onClick: (() -> Unit)? = null,
     ): LinearLayout {
         val texts = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            if (title != null) addView(text(getString(title), 16f, weight = 500))
-            if (desc != null) addView(text(desc, 13.5f, secondary = true), if (title != null) gap(3) else Ui.lp())
+            val name = title?.let { getString(it) } ?: label
+            if (name != null) addView(text(name, 16f, weight = 500))
+            if (desc != null) addView(text(desc, 13.5f, secondary = true), if (name != null) gap(3) else Ui.lp())
         }
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL

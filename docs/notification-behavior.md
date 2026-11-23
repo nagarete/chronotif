@@ -10,11 +10,11 @@ The first reported failure was approximately ten seconds of Chronotif followed b
 
 ## The lock-screen view at rest
 
-The lock-screen view wakes with the clock big and New resting at the bottom as a Pile (ADR 0011): the newest card or Conversation stack whole, one or two slivers behind it, and "N more" under it when New holds more than one. Earlier isn't shown. With nothing New, it rests as the clock and an "N earlier" line. A Media player or ongoing call sits whole under the clock, above the Pile.
+The lock-screen view wakes with the clock big and New resting at the bottom as a Pile (ADR 0011): the newest card or Conversation stack whole, one or two slivers behind it, and "N more" under it when New holds more than one. Priority, when there is any, comes first in the Pile (see Priority apps and Quiet apps). Earlier isn't shown. With nothing in Priority or New, it rests as the clock and an "N earlier" line. A Media player or ongoing call sits whole under the clock, above the Pile.
 
 With a Media player whose track has artwork, and no call going, the artwork rests large under the clock, the player under it, and the Pile under the player (ADR 0012). The artwork takes the room the Pile leaves, up to the screen's width; when too little is left, the player shows as usual. Behind everything, a blurred copy of the artwork replaces the wallpaper for as long as the player shows, also once the list is open. Scrolling up shrinks the artwork into the player's thumbnail as the list moves, while the Pile unfolds as usual. Back, or the next wake, brings it back. Only the newest player gets this; others sit under it as usual. When content is hidden on the lock screen, no artwork shows.
 
-The Pile is the list itself, scrolled to its top. Scrolling up anywhere unfolds it under the finger: the cards folded under the top one slide out from behind it, New then Earlier, the same cards in the same order, and the slivers and count fade. The clock stays where it is until the list reaches it, then the list pushes it up and it fades, so the list takes its place. Tapping the Pile's count unfolds it and scrolls New to the top. Tapping the Pile's card opens just that card, in place, while the view stays at rest (ADR 0018): a Conversation stack opens into its messages with the newest one expanded and its buttons showing, and a card expands. The rest of New and Earlier stay folded under it, behind the slivers and the count. A card with nothing more to show unfolds the list instead. An opened card too tall for the room under the clock pushes the clock up and fades it, as the unfold does, and scrolling down shows its top. Once open, the card takes taps as in the open list. The Pile isn't a grouping: it holds all of New in time order and never gathers an app's cards. While it rests, only its card can be swiped away or held for its Preview, and once opened each card in it can. Back folds the list back into the Pile, Back again closes an opened card, and Back again shows the stock lock screen. Each wake starts at the Pile, with its card closed.
+The Pile is the list itself, scrolled to its top. Scrolling up anywhere unfolds it under the finger: the cards folded under the top one slide out from behind it, Priority, New, then Earlier, the same cards in the same order, and the slivers and count fade. The clock stays where it is until the list reaches it, then the list pushes it up and it fades, so the list takes its place. Tapping the Pile's count unfolds it and scrolls New to the top. Tapping the Pile's card opens just that card, in place, while the view stays at rest (ADR 0018): a Conversation stack opens into its messages with the newest one expanded and its buttons showing, a Priority App stack opens into its cards, and a card expands. The rest of New and Earlier stay folded under it, behind the slivers and the count. A card with nothing more to show unfolds the list instead. An opened card too tall for the room under the clock pushes the clock up and fades it, as the unfold does, and scrolling down shows its top. Once open, the card takes taps as in the open list. The Pile isn't a grouping: it holds all of Priority and New, each in time order, and never gathers an app's cards. While it rests, only its card can be swiped away or held for its Preview, and once opened each card in it can. Back folds the list back into the Pile, Back again closes an opened card, and Back again shows the stock lock screen. Each wake starts at the Pile, with its card closed.
 
 Unlocking after the view was up for a moment checks all of New, the cards folded under the Pile included. Tapping empty space, or swiping up from *Tap to unlock* at the bottom, unlocks; swiping up anywhere else scrolls. Tapping the clock asks to unlock, then opens the alarms, and tapping the date opens the calendar at today the same way, as in the Panel's header. Pulling down at the top opens Search.
 
@@ -94,11 +94,25 @@ Tapping the Preview's image opens a full-screen viewer, still without unlocking.
 
 Chronotif reads Attachments through the sending app's content links, which Android lets notification listeners read. Many apps send a shrunk preview rather than the original, so a saved image can be lower quality than the one in the chat. An Attachment that can't be read just isn't shown.
 
+## Priority apps and Quiet apps
+
+Agreed in the November 2026 interview about users asking for some apps' notifications to stay on top (ADR 0019).
+
+Every app starts Normal. *Settings → Panel → App priority* makes any app a Priority app or a Quiet app, and so does a card's Preview (*Make Priority app*, *Make Quiet app*, and *No longer a…* to undo either). From the lock-screen view, the Preview asks to unlock first. Neither changes calls, Media players or Running.
+
+A Priority app's cards sit in **Priority**, a section between Media players and New, newest first. One app's neighbouring cards that arrived within 30 minutes of the newest stack there as in Earlier (ADR 0004), but show in full. A Priority card stays there through checks, until it's opened from Chronotif (tapped, a button used, or replied to), cleared or snoozed; a snoozed one comes back to Priority. Priority has no Clear for the whole section. Opening the app some other way doesn't count, so a card stays until the app removes it. For a conversation, the messages since it was last opened stack in Priority, and the older ones in its Earlier stack.
+
+A Quiet app's cards never count as New: they go to Earlier at their own time and never bring up the lock-screen view or light the edge handle. Chronotif can't silence another app, so its sound and vibration stay as Android's notification settings have them; Settings says so.
+
+On the lock-screen view, Priority comes first in the Pile, so its newest card or stack rests whole on top, with Priority's other cards and then New's folded behind it, and "N more" counts both. A Priority card brings up the lock-screen view when it arrives, as a New card does, but not again once it has been checked; it then just stays on top of the Pile.
+
+Changing an app's setting never brings checked cards back up. Made a Priority app, its New cards move to Priority and its Earlier ones stay. No longer a Priority app, its Priority cards go to Earlier. Made a Quiet app, its New and Priority cards go to Earlier. No longer a Quiet app, only its next notifications are New.
+
 ## Calls, media and Running
 
 Agreed in the October 2026 interview about always-running services crowding the top of the panel.
 
-Ongoing calls come first, then Media players, then New and Earlier. Every other ongoing notification is Running: always-running services, connected devices, step counters, downloads, navigation and timers. Running sits below Earlier behind an "N running" pill and collapses again each time the panel opens. When Running is all there is, only the pill shows.
+Ongoing calls come first, then Media players, then Priority, New and Earlier. Every other ongoing notification is Running: always-running services, connected devices, step counters, downloads, navigation and timers. Running sits below Earlier behind an "N running" pill and collapses again each time the panel opens. When Running is all there is, only the pill shows.
 
 A media player stays a Media player while paused, even though apps drop the ongoing flag when they pause. It never falls into Earlier. Calls, Media players and Running never count as New. Calls and Running never bring up the lock-screen view by themselves. A playing Media player does, unless the lock-screen view is off, so waking the phone during playback shows its artwork and controls; a paused one doesn't, since apps leave paused players around for hours (ADR 0012). On the lock-screen view, Running sits below Earlier behind its pill, as in the Panel.
 
@@ -138,16 +152,18 @@ Results show while locked, contacts and calendar events included (ADR 0013). Onl
 
 ## Tutorial
 
-*Settings → Tutorial*, above Tips, runs Chronotif hands-on with made-up notifications. Each part is a few steps; a step says what to try, shows *✓ That's it* once the user did, and Back and Continue move between steps whether or not they tried. The first part, Notifications, has six:
+*Settings → Tutorial*, above Tips, runs Chronotif hands-on with made-up notifications. Each part is a few steps; a step says what to try, shows *✓ That's it* once the user did, and Back and Continue move between steps whether or not they tried. The first part, Notifications, has eight:
 
 1. Open the Panel with the edge handle (or the status-bar swipe when it's on). The tutorial screen also offers to add the Chronotif tile to Quick Settings on Android 13 and newer, and says how to add it by hand on older versions.
 2. New and Earlier. The Panel opens with three samples in New (Daybook, Parcelly, and Maya Chen's two Murmur messages as a Conversation stack) and two in Earlier (Fernbank, Stride). Maya writes again a moment later. Closing the Panel after it was seen, then opening it again, moves what was seen to Earlier.
 3. Open the stack and close it by its name.
 4. Hold a card for its Preview, and reply or snooze from there.
-5. Swipe a card to clear it.
-6. Close the Panel.
+5. Priority apps. A new Parcelly card arrives in New; making Parcelly a Priority app from its Preview lifts it into Priority.
+6. Quiet apps. A new Daybook card arrives; making Daybook a Quiet app from its Preview sends it to Earlier. The step says Chronotif can't silence an app, and where *App priority* is in Settings.
+7. Swipe a card to clear it.
+8. Close the Panel.
 
-While a part runs, the Panel, however it's opened, shows only the samples, with the step's card at its bottom; cards scroll up clear of it, and it steps aside for the keyboard. The samples have a last check of their own, so New and Earlier work as usual without touching the real one. Opening, replying, clearing, hiding a message and snoozing change only the samples: nothing reaches Android or an app, and a sample has nothing to open, so tapping it opens it in place. What's new waits for the real Panel. The edge handle's tint, the header and Search stay real.
+While a part runs, the Panel, however it's opened, shows only the samples, with the step's card at its bottom; cards scroll up clear of it, and it steps aside for the keyboard. The samples have a last check of their own, so New and Earlier work as usual without touching the real one. Opening, replying, clearing, hiding a message, snoozing and making an app a Priority or Quiet app change only the samples: nothing reaches Android or an app, and a sample has nothing to open, so tapping it opens it in place. What's new waits for the real Panel. The edge handle's tint, the header and Search stay real.
 
 The second part, Search, has six steps over the same samples: pull down in the Panel for Search; hold the edge handle for Search over anything; ask Search something (`12*7.5+3`, `5 km in mi`, `time in tokyo`); find an app and tap it; add the Search widget (and, as an extra, the Search tile; holding Chronotif's icon and binding a launcher's swipe to its Search shortcut are described); and see what Search can do once allowed, with each step of Search's checklist and whether it's done, and a button to that checklist in Settings, where doing it counts in both places. While the Search part runs, Search says what a tap would open (an app, a Settings page, the browser, a contact's app, the calendar) instead of opening it. The widget and checklist steps count once the user is back on the tutorial screen with them done. Finishing a part offers the next, keeping the samples, so it can go on in the Panel that's open.
 
@@ -173,6 +189,8 @@ A run lives only in memory. Leaving the tutorial screen, the Panel, the lock-scr
 - Tap the clock on the lock-screen view: the unlock prompt shows, then Clock's alarms open. Tap the date: after the unlock, the calendar opens at today.
 - Wake the phone with nothing New and some checked notifications, on *Whenever there are notifications*. The clock shows with "N earlier" at the bottom; tapping it opens Earlier.
 - Let one app post three notifications within a few minutes, and another notification from it hours earlier, then check. Earlier shows the three as one collapsed App stack and the old one apart from them; tapping the stack opens the three in place.
+- Make an app a Priority app from a card's Preview and let it post. Its card sits in Priority above newer New cards. Close and reopen the Panel: New has moved to Earlier, the Priority card hasn't. Tap it: it opens, and the next Panel shows it in Earlier. Lock the phone and let it post again: the view wakes with its card on top of the Pile.
+- Make an app a Quiet app and let it post. The card shows in Earlier, the edge handle doesn't light, and the lock-screen view doesn't come up for it.
 - Receive several messages in one conversation. New shows a collapsed stack with the count on the Avatar; tapping it shows one card per message. Messages from before the last check sit in the conversation's own Earlier stack.
 - Swipe one message card away. Only that message disappears; the chat stays in the system shade. Swipe the collapsed stack and the conversation is cleared everywhere.
 - Open a Conversation stack and tap its title. It collapses, as Show less does.

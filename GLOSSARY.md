@@ -18,7 +18,7 @@ Still-active notifications the user has already checked, receded but still newes
 A conversation shown as one card per message, collapsed to its latest message with a count until opened.
 
 **App stack**:
-One app's cards that sit next to each other in Earlier and arrived within 30 minutes of the newest of them, collapsed to that newest card until opened. Opening it shows its cards in the same place, so it never puts an old card above a newer one from another app. A Conversation stack with several messages never joins one.
+One app's cards that sit next to each other in Earlier or Priority and arrived within 30 minutes of the newest of them, collapsed to that newest card until opened. Opening it shows its cards in the same place, so it never puts an old card above a newer one from another app. A Conversation stack with several messages never joins one.
 _Avoid_: Group, per-app stack (the old design that gathered all of an app's cards)
 
 **Conversation history**:
@@ -60,7 +60,7 @@ Chronotif's standing surfaces (the edge handle, the status-bar swipe and the loc
 _Avoid_: Disabled, Paused
 
 **Pile**:
-How the lock-screen view holds New at rest: below the clock, the newest card whole with the next ones as slivers behind it, still newest first. Unfolding it lays the same cards out in the same order. Its card can be opened on its own, as it would be in the list, while the rest stays folded. It is a resting state of the view, not a grouping.
+How the lock-screen view holds Priority and New at rest: below the clock, the top card whole with the next ones as slivers behind it, Priority first, each newest first. Unfolding it lays the same cards out in the same order. Its card can be opened on its own, as it would be in the list, while the rest stays folded. It is a resting state of the view, not a grouping.
 _Avoid_: Stack (Conversation and App stacks), Peek, compact view
 
 **Media player**:
@@ -70,6 +70,18 @@ _Avoid_: Now playing card
 **Running**:
 Notifications for work that continues in the background (always-running services, connected devices, step counters, downloads, navigation, timers). They sit collapsed below Earlier and never count as New. Ongoing calls are not Running; they stay at the top with Media players.
 _Avoid_: Ongoing, Background
+
+**Priority app**:
+An app the user has picked so its notifications aren't lost among other apps'. Its cards sit in Priority instead of New. No app is one until the user picks it.
+_Avoid_: Pinned (sounds like one card), Important (Android's channel importance), Favourite
+
+**Priority**:
+The section above New holding Priority apps' cards, newest first, with App stacks as in Earlier. A card stays in it until it is opened, cleared or snoozed; a check doesn't move it to Earlier.
+_Avoid_: Pinned, Top
+
+**Quiet app**:
+An app the user has picked so its notifications never count as New. Its cards go straight to Earlier at their own time. Chronotif can't silence it; its sound stays Android's.
+_Avoid_: Muted (suggests no sound), Blocked, Hidden
 
 **Status-bar swipe**:
 Opening the panel by swiping down on, or tapping, the notification side of the status bar, in place of the system shade.

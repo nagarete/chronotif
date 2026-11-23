@@ -5,7 +5,8 @@
     "notes": [
       "The lock screen has shortcuts in its bottom corners again: press and hold for the flashlight or the camera, which opens without unlocking. Set each corner to the flashlight, the camera, the QR scanner, Do Not Disturb, an app or nothing under Settings → Lock screen → Shortcuts.",
       "Scan QR codes with Google Lens from a lock-screen shortcut or the new Chronotif QR scanner tile in Quick Settings.",
-      "On the lock screen, tapping the top notification opens just that one in place, with a conversation’s messages and its Reply button, instead of unfolding everything. Tap the count under it to see the rest."
+      "On the lock screen, tapping the top notification opens just that one in place, with a conversation’s messages and its Reply button, instead of unfolding everything. Tap the count under it to see the rest.",
+      "Make an app a Priority app and its notifications sit in Priority, above New, until you open, clear or snooze them, and on top of the lock screen's pile. Make one a Quiet app and its notifications go straight to Earlier. Choose under Settings → Panel → App priority, or from a card's Preview (press and hold it). The tutorial has a step for each."
     ]
   },
   "stable": [

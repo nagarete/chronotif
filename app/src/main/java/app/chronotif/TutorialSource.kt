@@ -4,6 +4,9 @@ package app.chronotif
 
 import android.app.Notification
 import android.content.Context
+import app.chronotif.core.AppTier
+import app.chronotif.core.Attention
+import app.chronotif.core.Tier
 
 /**
  * The Tutorial's notifications: [Samples] with a last check of their own. What the user does with
@@ -14,6 +17,8 @@ class TutorialSource(initial: List<Entry>, lastCheck: Long, internal var onEvent
 
     enum class Event {
         PANEL_OPENED, PANEL_CLOSED, STACK_OPENED, STACK_CLOSED, PREVIEW, CHECKED, REPLIED, SNOOZED, CLEARED,
+        /** A sample app made a Priority app or a Quiet app; the real settings never change. */
+        PRIORITY_SET, QUIET_SET,
         /** Search pulled down in the Panel, opened anywhere else, an answer shown, an app tapped. */
         SEARCH, SEARCH_ELSEWHERE, ANSWER_SHOWN, APP_TAPPED,
         /**
@@ -26,6 +31,8 @@ class TutorialSource(initial: List<Entry>, lastCheck: Long, internal var onEvent
     private val entries = initial.toMutableList()
     private val hidden = HashMap<String, MutableSet<String>>()
     private val listeners = ArrayList<() -> Unit>()
+    private val tiers = HashMap<String, AppTier>()
+    private val opened = HashMap<String, Long>()
 
     override var lastCheck = lastCheck
         private set
@@ -49,6 +56,16 @@ class TutorialSource(initial: List<Entry>, lastCheck: Long, internal var onEvent
         onEvent(Event.CHECKED)
     }
 
+    override fun tier(e: Entry) = tiers[e.pkg] ?: AppTier.NORMAL
+
+    override fun openedAt(e: Entry) = opened[e.key] ?: 0L
+
+    override fun setTier(pkg: String, tier: Tier) {
+        tiers[pkg] = Attention.retier(tiers[pkg] ?: AppTier.NORMAL, tier, lastCheck, System.currentTimeMillis())
+        changed()
+        if (tier == Tier.PRIORITY) onEvent(Event.PRIORITY_SET) else if (tier == Tier.QUIET) onEvent(Event.QUIET_SET)
+    }
+
     override fun addListener(l: () -> Unit) {
         listeners += l
     }
@@ -70,6 +87,8 @@ class TutorialSource(initial: List<Entry>, lastCheck: Long, internal var onEvent
     override fun action(context: Context, e: Entry, a: Notification.Action) = false
 
     override fun reply(context: Context, e: Entry, a: Notification.Action, text: CharSequence): Boolean {
+        opened[e.key] = System.currentTimeMillis()
+        changed()
         onEvent(Event.REPLIED)
         return true
     }

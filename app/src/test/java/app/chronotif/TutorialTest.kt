@@ -14,6 +14,9 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 import app.chronotif.CardSource.Noticed
+import app.chronotif.core.AppTier
+import app.chronotif.core.Attention
+import app.chronotif.core.Tier
 import app.chronotif.ui.PanelActivity
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -134,6 +137,25 @@ class TutorialTest {
         Tutorial.next(context)
         r.source.snooze(r.source.visible().first(), Long.MAX_VALUE)
         assertTrue("Snoozing from the Preview", r.tried)
+
+        // Priority apps: a fresh Parcelly card arrives in New, and making Parcelly one lifts it above New.
+        Tutorial.next(context)
+        assertFalse(r.tried)
+        val parcel = r.source.visible().filter { it.pkg == Samples.parcelly.pkg }.maxBy { it.alertTime }
+        assertTrue("The fresh card is New", parcel.alertTime > r.source.lastCheck)
+        r.source.setTier(Samples.parcelly.pkg, Tier.PRIORITY)
+        assertTrue(r.tried)
+        val lifted = Attention.sections(r.source.visible(), r.source.lastCheck, r.source::tier, r.source::openedAt)
+        assertEquals(listOf(parcel.key), lifted.priority.map { it.key })
+        assertEquals("Nothing reached the real settings", AppTier.NORMAL, Prefs.appTier(Samples.parcelly.pkg))
+
+        // Quiet apps: a fresh Daybook card arrives, and making Daybook one sends it to Earlier.
+        Tutorial.next(context)
+        val day = r.source.visible().filter { it.pkg == Samples.daybook.pkg }.maxBy { it.alertTime }
+        r.source.setTier(Samples.daybook.pkg, Tier.QUIET)
+        assertTrue(r.tried)
+        val quiet = Attention.sections(r.source.visible(), r.source.lastCheck, r.source::tier, r.source::openedAt)
+        assertTrue(quiet.earlier.any { it.key == day.key })
 
         Tutorial.next(context)
         r.source.dismissAll(listOf(r.source.visible().first()))
