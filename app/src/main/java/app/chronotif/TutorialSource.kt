@@ -16,8 +16,11 @@ class TutorialSource(initial: List<Entry>, lastCheck: Long, internal var onEvent
         PANEL_OPENED, PANEL_CLOSED, STACK_OPENED, STACK_CLOSED, PREVIEW, CHECKED, REPLIED, SNOOZED, CLEARED,
         /** Search pulled down in the Panel, opened anywhere else, an answer shown, an app tapped. */
         SEARCH, SEARCH_ELSEWHERE, ANSWER_SHOWN, APP_TAPPED,
-        /** On the lock-screen stand-in: the Pile folded by Back or tapped open, an unlock asked for, a double tap slept, a mode picked. */
-        PILE_FOLDED, PILE_TAPPED, UNLOCK_ASKED, SLEPT, LOCK_MODE_PICKED,
+        /**
+         * On the lock-screen stand-in: the Pile folded by Back or tapped open, an unlock asked for, a
+         * double tap slept, a Lock-screen shortcut held, a mode picked.
+         */
+        PILE_FOLDED, PILE_TAPPED, UNLOCK_ASKED, SLEPT, SHORTCUT_HELD, LOCK_MODE_PICKED,
     }
 
     private val entries = initial.toMutableList()

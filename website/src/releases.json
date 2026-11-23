@@ -1,4 +1,12 @@
 {
+  "next": {
+    "version": "0.2.8",
+    "headline": "The flashlight and the camera, in the lock screen's corners.",
+    "notes": [
+      "The lock screen has shortcuts in its bottom corners again: press and hold for the flashlight or the camera, which opens without unlocking. Set each corner to the flashlight, the camera, the QR scanner, Do Not Disturb, an app or nothing under Settings → Lock screen → Shortcuts.",
+      "Scan QR codes with Google Lens from a lock-screen shortcut or the new Chronotif QR scanner tile in Quick Settings."
+    ]
+  },
   "stable": [
     {
       "version": "0.2.7",

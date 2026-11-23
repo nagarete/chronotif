@@ -196,6 +196,32 @@ object Prefs {
         get() = sp.getBoolean("lock_double_tap_sleep", true)
         set(v) = sp.edit().putBoolean("lock_double_tap_sleep", v).apply()
 
+    /**
+     * The Lock-screen shortcuts, left and right. Flashlight and Camera unless changed, older
+     * installs included: the lock-screen view covered the stock lock screen's own shortcuts.
+     */
+    var lockShortcutLeft: app.chronotif.core.LockShortcut
+        get() = app.chronotif.core.LockShortcut.of(sp.getString("lock_shortcut_left", null), app.chronotif.core.LockShortcut.DEFAULT_LEFT)
+        set(v) = sp.edit().putString("lock_shortcut_left", v.key).apply()
+
+    var lockShortcutRight: app.chronotif.core.LockShortcut
+        get() = app.chronotif.core.LockShortcut.of(sp.getString("lock_shortcut_right", null), app.chronotif.core.LockShortcut.DEFAULT_RIGHT)
+        set(v) = sp.edit().putString("lock_shortcut_right", v.key).apply()
+
+    /** The app a slot set to An app opens, as [Launchables.key]; never sent anywhere. */
+    var lockShortcutLeftApp: String?
+        get() = sp.getString("lock_shortcut_left_app", null)
+        set(v) = sp.edit().putString("lock_shortcut_left_app", v).apply()
+
+    var lockShortcutRightApp: String?
+        get() = sp.getString("lock_shortcut_right_app", null)
+        set(v) = sp.edit().putString("lock_shortcut_right_app", v).apply()
+
+    /** Whether the Chronotif QR scanner tile is in Quick Settings, as far as Android has told the tile. */
+    var qrTileAdded: Boolean
+        get() = sp.getBoolean("qr_tile_added", false)
+        set(v) = sp.edit().putBoolean("qr_tile_added", v).apply()
+
     /** Where the person's touch put their under-display fingerprint sensor's top edge, as a
      *  fraction of the screen's height; 0 when it hasn't been fitted (see FingerprintSpot). */
     var fingerprintTop: Float

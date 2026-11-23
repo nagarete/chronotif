@@ -267,6 +267,14 @@ class TutorialTest {
             android.view.WindowManager.LayoutParams::class.java.getField("userActivityTimeout").getLong(a.window.attributes))
 
         Tutorial.next(context)
+        val flashlight = views(a.window.decorView).filterIsInstance<android.widget.ImageView>()
+            .first { it.contentDescription == context.getString(R.string.lock_shortcut_flashlight) }
+        flashlight.performLongClick()
+        assertTrue("Holding a shortcut counts", r.tried)
+        assertEquals("and says what it would do", context.getString(R.string.tutorial_shortcut_flashlight),
+            org.robolectric.shadows.ShadowToast.getTextOfLatestToast())
+
+        Tutorial.next(context)
         Tutorial.steps(Tutorial.Part.LOCK_SCREEN).last().extras.first { it.label == R.string.lock_new }.act(context)
         assertTrue(r.tried)
         assertEquals(Prefs.LOCK_WHEN_NEW, Prefs.lockMode)

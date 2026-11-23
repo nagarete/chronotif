@@ -65,6 +65,23 @@ object Launchables {
         }
     }
 
+    /** A lasting name for [a], kept by a Lock-screen shortcut: its activity and its profile's serial number. */
+    fun key(context: Context, a: Launchable): String {
+        val serial = context.getSystemService(android.os.UserManager::class.java).getSerialNumberForUser(a.user)
+        return "${a.component.flattenToString()}#$serial"
+    }
+
+    /** The launcher entry [key] names, or null once its app or profile is gone. Reads the package manager. */
+    fun find(context: Context, key: String?): Launchable? {
+        val component = ComponentName.unflattenFromString(key?.substringBefore('#') ?: return null) ?: return null
+        val serial = key.substringAfter('#').toLongOrNull() ?: return null
+        val user = context.getSystemService(android.os.UserManager::class.java).getUserForSerialNumber(serial) ?: return null
+        val la = context.getSystemService(LauncherApps::class.java)
+        val info = runCatching { la.getActivityList(component.packageName, user) }.getOrNull()
+            ?.firstOrNull { it.componentName == component } ?: return null
+        return Launchable(info.label?.toString().orEmpty(), info)
+    }
+
     fun launch(context: Context, a: Launchable) {
         context.getSystemService(LauncherApps::class.java).startMainActivity(a.component, a.user, null, null)
     }

@@ -1654,7 +1654,8 @@ class NotificationBehaviorTest {
             val hint = views(activity.window.decorView).filterIsInstance<TextView>()
                 .first { it.text.toString() == activity.getString(R.string.tap_to_unlock) }.parent as ViewGroup
             val at = IntArray(2).also { hint.getChildAt(0).getLocationOnScreen(it) }
-            return at[1] + hint.getChildAt(0).height / 2 to hint.paddingBottom
+            // Tap to unlock sits in a row with the Lock-screen shortcuts, which rises as one.
+            return at[1] + hint.getChildAt(0).height / 2 to (hint.parent as ViewGroup).paddingBottom
         }
         val usual = withLockView { icon(it).second }
 
@@ -1669,6 +1670,53 @@ class NotificationBehaviorTest {
             assertTrue("Tap to unlock was raised", padding > usual)
             assertTrue("its icon sits on the sensor ($centre vs $sensor)", kotlin.math.abs(centre - sensor) <= 2)
             assertTrue("The Pile's card is above the sensor", seen(activity.window.decorView).contains("Lunch?"))
+        }
+    }
+
+    // --- Lock-screen shortcuts
+
+    private fun LockActivity.shortcut(label: Int): android.widget.ImageView? =
+        views(window.decorView).filterIsInstance<android.widget.ImageView>()
+            .firstOrNull { it.contentDescription == getString(label) && it.visibility == View.VISIBLE }
+
+    @Test
+    fun theLockScreenHasTheFlashlightAndTheCameraInItsCornersAndATapOnlySaysToHold() {
+        withLockView { activity ->
+            val flashlight = activity.shortcut(R.string.lock_shortcut_flashlight)!!
+            val camera = activity.shortcut(R.string.lock_shortcut_camera)!!
+            val at = { v: View -> IntArray(2).also { v.getLocationOnScreen(it) }[0] }
+            assertTrue("Flashlight on the left, camera on the right", at(flashlight) < at(camera))
+
+            camera.performClick()
+            assertEquals(context.getString(R.string.lock_shortcut_hold), org.robolectric.shadows.ShadowToast.getTextOfLatestToast())
+            assertNull("A tap opens nothing", shadowOf(activity).nextStartedActivity)
+            assertNull("and asks for no unlock", ReflectionHelpers.getStaticField<Any?>(ShadowKeyguardManager::class.java, "callback"))
+
+            camera.performLongClick()
+            assertEquals("Holding it opens the camera over the lock screen",
+                android.provider.MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA_SECURE, shadowOf(activity).nextStartedActivity.action)
+        }
+    }
+
+    @Test
+    fun aShortcutSetToNoneLeavesItsCornerEmpty() {
+        Prefs.lockShortcutLeft = app.chronotif.core.LockShortcut.NONE
+        Prefs.lockShortcutRight = app.chronotif.core.LockShortcut.DO_NOT_DISTURB
+        withLockView { activity ->
+            assertNull(activity.shortcut(R.string.lock_shortcut_flashlight))
+            assertNull(activity.shortcut(R.string.lock_shortcut_camera))
+            assertNotNull(activity.shortcut(R.string.lock_shortcut_dnd))
+        }
+    }
+
+    @Test
+    fun withoutGoogleLensTheQrScannerSaysItIsNotAvailable() {
+        Prefs.lockShortcutRight = app.chronotif.core.LockShortcut.QR_SCANNER
+        withLockView { activity ->
+            activity.shortcut(R.string.qr_scanner)!!.performLongClick()
+            val dialog = org.robolectric.shadows.ShadowAlertDialog.getLatestAlertDialog()
+            assertEquals(context.getString(R.string.qr_needs_lens), shadowOf(dialog).message.toString())
+            assertNull("Nothing opens", shadowOf(activity).nextStartedActivity)
         }
     }
 }

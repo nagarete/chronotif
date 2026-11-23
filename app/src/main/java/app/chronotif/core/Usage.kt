@@ -30,6 +30,13 @@ object Usage {
         SEARCH_SETTING("search_setting"),
         SEARCH_WEB("search_web"),
         DOUBLE_TAP_SLEEP("double_tap_sleep"),
+        /** Lock-screen shortcuts used, by what they're set to; never which app. */
+        SHORTCUT_FLASHLIGHT("shortcut_flashlight"),
+        SHORTCUT_CAMERA("shortcut_camera"),
+        SHORTCUT_QR("shortcut_qr"),
+        SHORTCUT_DND("shortcut_dnd"),
+        SHORTCUT_APP("shortcut_app"),
+        QR_TILE("qr_tile"),
         TUTORIAL_PART_DONE("tutorial_part_done"),
         ANR("anr"),
         NATIVE_CRASH("native_crash"),
