@@ -32,6 +32,10 @@ import app.chronotif.R
  * nothing is rebuilt mid-gesture. The clock stays put until the list reaches it, then is pushed
  * up and fades.
  *
+ * Tapping the Pile's card opens that card in place, and the rest stays folded under it. An opened
+ * card too tall for the room under the clock rests scrolled by the difference ([restAt]), so it
+ * pushes the clock up as the unfold does, and scrolling back down shows its top.
+ *
  * With a Media player that has artwork, the artwork rests large between the clock and the player,
  * and the Pile sits under the player (ADR 0012). Scrolling up shrinks it into the player's
  * thumbnail as the list moves, and a blurred copy stands in for the wallpaper behind everything.
@@ -102,29 +106,43 @@ class LockPile(
         })
     }
 
-    /** How far the Pile has unfolded: 0 resting, 1 open. */
-    val progress: Float get() = (scroll.scrollY / unfold).coerceIn(0f, 1f)
+    /**
+     * The scroll position the Pile rests at: 0, or how far an opened Pile card overflows the room
+     * under the clock, so its bottom still rests where the Pile does.
+     */
+    var restAt = 0
+        private set
+    /** Set when [restAt] moves while resting, until the list has scrolled to it. */
+    private var settling = false
 
-    val resting: Boolean get() = scroll.scrollY == 0
+    /** How far the Pile has unfolded: 0 resting, 1 open. */
+    val progress: Float get() = ((scroll.scrollY - restAt) / unfold).coerceIn(0f, 1f)
+
+    val resting: Boolean get() = scroll.scrollY <= restAt
 
     /** The scroll position at which the list is open with New at the top of the screen. */
     val openAt: Int
-        get() = maxOf(unfold.toInt(), listBox.top + (list.spacer?.bottom ?: 0) - ctx.dp(8))
+        get() = maxOf(restAt + unfold.toInt(), listBox.top + (list.spacer?.bottom ?: 0) - ctx.dp(8))
 
-    /** Whether [ev] lands on the Pile's card or its count while the Pile isn't open. */
-    fun hits(ev: MotionEvent): Boolean {
-        if (progress >= 1f) return false
-        return listOfNotNull(list.pileTop, count.takeIf { it.visibility == View.VISIBLE }).any {
-            val r = Rect()
-            it.getGlobalVisibleRect(r) && r.contains(ev.rawX.toInt(), ev.rawY.toInt())
-        }
+    /** Whether [ev] lands on the Pile's card while the Pile isn't open. */
+    fun hitsCard(ev: MotionEvent): Boolean = progress < 1f && list.pile.any { on(it, ev) }
+
+    /** Whether [ev] lands on the count under the Pile while it isn't open. */
+    fun hitsCount(ev: MotionEvent): Boolean = progress < 1f && count.visibility == View.VISIBLE && on(count, ev)
+
+    private fun on(v: View, ev: MotionEvent): Boolean {
+        val r = Rect()
+        return v.getGlobalVisibleRect(r) && r.contains(ev.rawX.toInt(), ev.rawY.toInt())
     }
 
-    /** The first card the rest fold under: New's newest, or with nothing New, Earlier's first row. */
-    private fun folded(): Pair<View?, List<View>> {
-        val sp = list.spacer ?: return null to emptyList()
+    /**
+     * The Pile's card, whose last row the rest fold under, and the rows after the clock's room. With
+     * nothing New the card is empty, and everything folds where Earlier's first row is.
+     */
+    private fun folded(): Pair<List<View>, List<View>> {
+        val sp = list.spacer ?: return emptyList<View>() to emptyList()
         val after = (listBox.indexOfChild(sp) + 1 until listBox.childCount).map { listBox.getChildAt(it) }
-        return list.pileTop to after
+        return list.pile to after
     }
 
     /**
@@ -140,7 +158,8 @@ class LockPile(
             clockRoom.layoutParams = clockRoom.layoutParams.apply { height = room }
             changed = true
         }
-        val (top, after) = folded()
+        val (card, after) = folded()
+        val top = card.lastOrNull()
         val first = top ?: after.firstOrNull()
         var gap = list.gap
         var art = 0
@@ -176,17 +195,32 @@ class LockPile(
                 list.gap + list.artRoom + target - at
             }
         }
+        // An opened card taller than the room rests scrolled by what doesn't fit.
+        val rest = if (top != null && list.pileOpened) maxOf(0, -gap) else 0
         gap = maxOf(0, gap)
+        if (rest != restAt) {
+            if (resting) settling = true
+            restAt = rest
+            changed = true
+        }
         if (art != list.artRoom) { list.artRoom = art; changed = true }
         if (gap != list.gap) { list.gap = gap; changed = true }
         // Scroll room for the unfold, even when the list is short.
         val bottom = listBox.top + listBox.height - listBox.paddingBottom
         // With artwork, room to scroll it all the way into the player, too.
-        val reach = maxOf(if (first == null) 0 else unfold.toInt(), art)
+        val reach = maxOf(if (first == null) 0 else restAt + unfold.toInt(), art)
         val need = maxOf(ctx.dp(16), stage.height + reach - bottom)
         if (listBox.paddingBottom != need) {
             listBox.setPadding(listBox.paddingLeft, listBox.paddingTop, listBox.paddingRight, need)
             changed = true
+        }
+        // Once laid out, move to the new resting place, once: the user may scroll from there.
+        if (settling && !changed) {
+            settling = false
+            if (scroll.scrollY != restAt) {
+                scroll.scrollTo(0, restAt)
+                changed = true
+            }
         }
         return changed
     }
@@ -231,13 +265,14 @@ class LockPile(
      */
     fun apply() {
         val p = progress
-        val (top, after) = folded()
+        val (card, after) = folded()
+        val top = card.lastOrNull()
         val sy = scroll.scrollY
         val first = top ?: after.firstOrNull()
         moved.retainAll { it.parent === listBox }
-        if (top != null && top in moved) {
-            unfoldRow(top)
-            moved -= top
+        for (v in card) if (v in moved) {
+            unfoldRow(v)
+            moved -= v
         }
         if (p >= 1f) {
             moved.forEach(::unfoldRow)
@@ -247,7 +282,7 @@ class LockPile(
             val below = top?.let { after.indexOf(it) } ?: -1
             val edge = top?.bottom ?: Int.MIN_VALUE
             for ((i, v) in after.withIndex()) {
-                if (v === top) continue
+                if (v in card) continue
                 moved += v
                 v.translationY = lift
                 v.alpha = p

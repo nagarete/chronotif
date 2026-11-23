@@ -60,7 +60,7 @@ Chronotif's standing surfaces (the edge handle, the status-bar swipe and the loc
 _Avoid_: Disabled, Paused
 
 **Pile**:
-How the lock-screen view holds New at rest: below the clock, the newest card whole with the next ones as slivers behind it, still newest first. Opening it lays the same cards out in the same order. It is a resting state of the view, not a grouping.
+How the lock-screen view holds New at rest: below the clock, the newest card whole with the next ones as slivers behind it, still newest first. Unfolding it lays the same cards out in the same order. Its card can be opened on its own, as it would be in the list, while the rest stays folded. It is a resting state of the view, not a grouping.
 _Avoid_: Stack (Conversation and App stacks), Peek, compact view
 
 **Media player**:

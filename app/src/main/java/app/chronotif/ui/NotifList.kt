@@ -120,9 +120,43 @@ class NotifList(
     /** The row [gap] sizes; the rows after it are the list the Pile unfolds into. */
     val spacer: View? get() = views["sp"]?.takeIf { it.parent === container }
 
-    /** The Pile's card: New's newest card or Conversation stack, or null when nothing is New. */
-    val pileTop: View? get() = pileTopId?.let { views[it] }?.takeIf { it.parent === container }
-    private var pileTopId: String? = null
+    /**
+     * The Pile's card: New's newest card or Conversation stack, or empty when nothing is New. Opened,
+     * a stack is several rows (its header and one card per message), and all of them stay out of the fold.
+     */
+    val pile: List<View> get() = pileIds.mapNotNull { views[it]?.takeIf { v -> v.parent === container } }
+    private var pileIds: List<String> = emptyList()
+
+    /** Whether the Pile's card is open: a stack opened in place, or a card expanded. */
+    var pileOpened = false
+        private set
+    private var pileOpen: (() -> Unit)? = null
+    private var pileClose: (() -> Unit)? = null
+
+    /**
+     * Opens the Pile's card in place, as tapping it in the open list would: a Conversation stack
+     * opens with its newest message expanded, a card expands. False when there's nothing to open.
+     */
+    fun openPileCard(): Boolean {
+        val open = pileOpen?.takeIf { !pileOpened } ?: return false
+        open()
+        render()
+        return true
+    }
+
+    /** Closes the Pile's card back to how it rests. */
+    fun closePileCard() {
+        val close = pileClose?.takeIf { pileOpened } ?: return
+        close()
+        render()
+    }
+
+    /** What closing one notification's card or stack undoes: opened, expanded, being replied to. */
+    private fun closeOf(e: Entry, stackId: String?) = {
+        stackId?.let { openStacks -= it }
+        expanded.removeAll { it == e.key || it.startsWith("${e.key}#") }
+        if (replying?.first.let { it == e.key || it?.startsWith("${e.key}#") == true }) replying = null
+    }
 
     /** Cards or Conversation stacks in New, and cards or stacks in Earlier, as last rendered. */
     var newPieces = 0
@@ -245,7 +279,8 @@ class NotifList(
         // A conversation that lists its messages is split by message: those since the check
         // stack in New, the rest in Earlier (ADR 0002). Each part sorts by its newest message, the
         // time its card shows: apps quietly repost old chats, which moves the notification's own time.
-        val fresh = ArrayList<Pair<Long, List<Row>>>()
+        class Fresh(val time: Long, val rows: List<Row>, val opened: Boolean, val open: (() -> Unit)?, val close: () -> Unit)
+        val fresh = ArrayList<Fresh>()
         var newCount = 0
         val earlier = ArrayList<Piece>()
         for (e in s.fresh) {
@@ -254,7 +289,9 @@ class NotifList(
             if (incoming.isEmpty()) {
                 val before = rows.size
                 card(e, CardView.Style.FULL, newSince = lastCheck)
-                fresh += e.alertTime to listOf(rows.removeAt(before))
+                val canOpen = !c.redacted && (c.expandable || !e.n.actions.isNullOrEmpty())
+                fresh += Fresh(e.alertTime, listOf(rows.removeAt(before)), e.key in expanded,
+                    { expanded += e.key }.takeIf { canOpen }, closeOf(e, null))
                 newCount++
                 continue
             }
@@ -267,7 +304,18 @@ class NotifList(
                 conversation(newStackId(e.key), e, c, new, CardView.Style.FULL, rows, now)
                 val part = ArrayList<Row>()
                 while (rows.size > before) part += rows.removeAt(before)
-                fresh += new.last().time to part
+                val stackId = newStackId(e.key)
+                val one = new.singleOrNull()?.let { "${e.key}#${it.id}" }
+                val replyingHere = replying?.first.let { r -> r == e.key || new.any { r == "${e.key}#${it.id}" } }
+                val opened = if (one != null) one in expanded || (new.last().id == shown.last().id && e.key in expanded)
+                    else stackId in openStacks || replyingHere
+                // A stack opens with its newest message expanded, the one woken up for.
+                val open = if (one != null) ({ expanded += one }) else ({
+                    openStacks += stackId
+                    expanded += e.key
+                    source.noticed(CardSource.Noticed.STACK_OPENED)
+                })
+                fresh += Fresh(new.last().time, part, opened, open, closeOf(e, stackId))
                 newCount++
             }
             if (old.isNotEmpty()) earlier += Piece(old.last().time, e, c, old) { style ->
@@ -275,12 +323,20 @@ class NotifList(
             }
         }
         newPieces = newCount
-        pileTopId = null
+        pileIds = emptyList()
+        pileOpened = false
+        pileOpen = null
+        pileClose = null
         if (fresh.isNotEmpty()) {
             rows += header("h:new", ctx.getString(R.string.section_new) + "  $newCount", null)
-            val sorted = fresh.sortedByDescending { it.first }
-            pileTopId = sorted[0].second.firstOrNull()?.id
-            sorted.forEach { rows += it.second }
+            val sorted = fresh.sortedByDescending { it.time }
+            sorted[0].let { top ->
+                pileIds = top.rows.map { it.id }
+                pileOpened = top.opened
+                pileOpen = top.open
+                pileClose = top.close
+            }
+            sorted.forEach { rows += it.rows }
         }
 
         for (e in s.earlier) {

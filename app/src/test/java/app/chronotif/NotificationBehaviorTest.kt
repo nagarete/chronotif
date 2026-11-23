@@ -240,6 +240,95 @@ class NotificationBehaviorTest {
         }
     }
 
+    /** A conversation of [texts], sent in order from [from], with a Mark as read button. */
+    private fun chat(vararg texts: String, from: Long, id: Int = 5): Entry {
+        val pending = android.app.PendingIntent.getBroadcast(context, id, Intent("test.read"),
+            android.app.PendingIntent.FLAG_IMMUTABLE)
+        val n = Notification.Builder(context, "messages")
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setCategory(Notification.CATEGORY_MESSAGE)
+            .setStyle(Notification.MessagingStyle(me).also { style ->
+                texts.forEachIndexed { i, text -> style.addMessage(text, from + i, sender) }
+            })
+            .addAction(Notification.Action.Builder(null, "Mark as read", pending).build())
+            .build()
+        return post(n, from + texts.size - 1, id, "example.chat")
+    }
+
+    private fun LockActivity.tapOn(text: String) {
+        val v = views(window.decorView).filterIsInstance<TextView>().first { it.isShown && it.text.toString() == text }
+        val at = IntArray(2).also { v.getLocationInWindow(it) }
+        tapAt(at[0] + v.width / 2f, at[1] + v.height / 2f)
+    }
+
+    private fun LockActivity.bigClock() = views(window.decorView).filterIsInstance<TextClock>().maxBy { it.textSize }
+
+    private fun LockActivity.clockAlpha(): Float = bigClock().let { c ->
+        generateSequence(c as View) { it.parent as? View }.fold(1f) { a, v -> a * v.alpha }
+    }
+
+    @Test
+    @Config(sdk = [35], application = Application::class, qualifiers = "w411dp-h891dp")
+    fun tappingThePilesConversationStackOpensJustThatStackInPlace() {
+        plain("Old news", 500, 1, "example.news")
+        Prefs.markChecked(1000)
+        plain("Meeting", 1500, 2, "example.calendar")
+        chat("on my way", "see you at 5", from = 2000)
+        withLockView { activity ->
+            assertFalse("Folded, the stack shows only its latest", seen(activity.window.decorView).contains("on my way"))
+            activity.tapOn("see you at 5")
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(500))
+            val shown = seen(activity.window.decorView)
+            assertTrue("The stack opens into its messages", shown.contains("on my way") && shown.contains("see you at 5"))
+            assertTrue("with the newest one's buttons", shown.contains("Mark as read"))
+            assertFalse("The rest of New stays folded", shown.contains("Meeting"))
+            assertTrue("under its count", shown.contains("1 more"))
+            assertFalse("and Earlier stays folded", shown.contains("Old news") || shown.contains("EARLIER"))
+            assertEquals("The clock stays", 1f, activity.clockAlpha())
+            assertFalse("Opening the card asks for no unlock", unlockAsked)
+
+            activity.back()
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(1))
+            assertFalse("Back closes the card first", seen(activity.window.decorView).contains("on my way"))
+            assertFalse(activity.isFinishing)
+            activity.back()
+            assertTrue(activity.isFinishing)
+        }
+    }
+
+    @Test
+    @Config(sdk = [35], application = Application::class, qualifiers = "w411dp-h891dp")
+    fun tappingThePilesCountUnfoldsTheWholeList() {
+        plain("Old news", 500, 1, "example.news")
+        Prefs.markChecked(1000)
+        plain("Meeting", 1500, 2, "example.calendar")
+        chat("on my way", "see you at 5", from = 2000)
+        withLockView { activity ->
+            activity.tapOn("1 more")
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(1))
+            val shown = seen(activity.window.decorView)
+            assertTrue("New unfolds, then Earlier", shown.contains("Meeting") && shown.contains("Old news"))
+            assertFalse("The stack itself stays as it was", shown.contains("on my way"))
+        }
+    }
+
+    @Test
+    @Config(sdk = [35], application = Application::class, qualifiers = "w411dp-h891dp")
+    fun aPileStackTooTallForTheRoomPushesTheClockUp() {
+        Prefs.markChecked(1000)
+        plain("Meeting", 1500, 2, "example.calendar")
+        chat(*Array(10) { "message $it" }, from = 2000)
+        withLockView { activity ->
+            activity.tapOn("message 9")
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(500))
+            val shown = seen(activity.window.decorView)
+            assertTrue("The stack is open", shown.contains("message 0"))
+            assertFalse("The rest stays folded", shown.contains("Meeting"))
+            assertTrue("The clock gives way", activity.clockAlpha() < 1f)
+            assertTrue("The stack rests scrolled", activity.scroll().scrollY > 0)
+        }
+    }
+
     private fun song(title: String, playing: Boolean, id: Int = 9): Entry {
         val art = android.graphics.Bitmap.createBitmap(300, 300, android.graphics.Bitmap.Config.ARGB_8888)
             .apply { eraseColor(0xFF2E7D32.toInt()) }

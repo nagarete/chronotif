@@ -2,6 +2,8 @@
 
 Superseded in part by [ADR 0012](0012-a-media-players-artwork-rests-large-on-the-lock-screen.md): a Media player with artwork rests with its artwork large above it.
 
+Superseded in part by [ADR 0018](0018-tapping-the-piles-card-opens-that-card.md): a tap on the Pile's card opens that card in place, and only its count unfolds the list.
+
 A Reddit user wakes the phone to see the time, and the lock-screen view covered the screen with notifications. So the view now wakes with the clock first and New resting at the bottom as a Pile: the newest card whole, up to two slivers behind it and a count for the rest. The Pile is the whole list scrolled to its top, with everything after the first card folded under it: scrolling up unfolds it under the finger, New then Earlier, and the list pushes the clock away only when it reaches it. Nothing is rebuilt mid-gesture, which is what makes it smooth. A tap on the Pile unfolds it too. The Pile collapses New, which the ordering rule normally forbids, so it is kept to a resting state: it holds all of New in time order, never groups by app, and opens into the same cards in the same order. Only the top card takes swipes and press-and-hold while it rests. Unlocking with the Pile in sight checks all of New. Each wake starts at the Pile.
 
 ## Considered Options
