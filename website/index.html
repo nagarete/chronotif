@@ -93,7 +93,8 @@
           <p class="lede">
             Chronotif shows your notifications in the order they arrived. Everything since you last
             checked appears in full under <strong>New</strong>. What you’ve already seen recedes
-            under <strong>Earlier</strong>, still in order and still there when you need it.
+            under <strong>Earlier</strong>, still in order and still there when you need it. Apps you
+            pick as <strong>Priority</strong> keep their notifications above New until you act on them.
           </p>
           <div class="cta">
             <a class="button button--primary" href="%CHRONOTIF_APK_URL%">
@@ -293,6 +294,14 @@
 
             <dl class="sections">
               <div>
+                <dt><span class="tag tag--priority">Priority</span></dt>
+                <dd>
+                  Notifications from apps you pick as Priority apps, like your bank or a work chat,
+                  newest first and shown in full. A check doesn’t move them: they stay here until
+                  you open, clear or snooze them.
+                </dd>
+              </div>
+              <div>
                 <dt><span class="tag tag--new">New</span></dt>
                 <dd>
                   Everything that arrived since your last check, newest first, shown in full. This is
@@ -312,6 +321,14 @@
                 <dd>
                   What you’ve already seen. It stays accessible but recedes: smaller, dimmer, and
                   still in order. A burst from one app folds into a stack. <em>Clear</em> sweeps it all away.
+                </dd>
+              </div>
+              <div>
+                <dt><span class="tag">Quiet apps</span></dt>
+                <dd>
+                  Notifications from apps you pick as Quiet apps never count as new. They go straight to
+                  Earlier. Chronotif can’t silence another app, so their sound and vibration stay as
+                  Android sets them.
                 </dd>
               </div>
             </dl>

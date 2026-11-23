@@ -721,6 +721,9 @@ q {
 .tag--earlier {
   color: var(--text-3);
 }
+.tag--priority {
+  color: var(--accent);
+}
 .model__copy h3 {
   margin-bottom: 1.25rem;
   font-family: var(--serif);
@@ -834,6 +837,9 @@ q {
 }
 .d-head:first-child {
   margin-top: 0;
+}
+.d-head--priority {
+  color: var(--accent-soft);
 }
 .d-head b {
   margin-left: 0.3rem;

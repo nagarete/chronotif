@@ -8,9 +8,11 @@ package app.chronotif.core
  * Every notification carries an [Meta.alertTime]: when it last *arrived* (first post, or an
  * update that genuinely brought new content). A single watermark, the time of the user's last
  * meaningful check, splits notifications into NEW (arrived after it) and EARLIER (already seen).
- * Both are in time order. In EARLIER, one app's cards that sit next to each other and arrived close
- * together fold into a stack ([appStacks]). A conversation's messages are split the same way as
- * notifications when it's drawn ([newMessages]).
+ * A Priority app's cards sit in PRIORITY, above NEW, until they're opened, and a Quiet app's go
+ * straight to EARLIER (ADR 0019): each app's [AppTier] moves the watermark its cards are split at
+ * ([since]). Every section is in time order. In EARLIER and PRIORITY, one app's cards that sit next
+ * to each other and arrived close together fold into a stack ([appStacks]). A conversation's messages
+ * are split the same way as notifications when it's drawn ([newMessages]).
  */
 interface Meta {
     val alertTime: Long
@@ -28,44 +30,94 @@ enum class Kind {
     RUNNING,
 }
 
+/** What the user made an app: a Priority app, a Quiet app, or neither (every app, until picked). */
+enum class Tier { PRIORITY, NORMAL, QUIET }
+
+/**
+ * An app's [tier], and the time it took effect: a Priority app's cards that arrived after [since] go
+ * to PRIORITY, and a Normal app's after it count as New, so cards already checked never come back up.
+ */
+data class AppTier(val tier: Tier, val since: Long = 0L) {
+    companion object {
+        val NORMAL = AppTier(Tier.NORMAL)
+    }
+}
+
 class Sections<T>(
     val calls: List<T>,
     val media: List<T>,
+    /** Priority apps' cards not yet opened, above NEW. */
+    val priority: List<T>,
     val fresh: List<T>,
     val earlier: List<T>,
     val running: List<T>,
 ) {
     /** Running work alone doesn't make the list non-empty in any way worth announcing. */
-    val isEmpty get() = calls.isEmpty() && media.isEmpty() && fresh.isEmpty() && earlier.isEmpty()
+    val isEmpty get() = calls.isEmpty() && media.isEmpty() && priority.isEmpty() && fresh.isEmpty() && earlier.isEmpty()
     val earlierCount get() = earlier.size
 }
 
 object Attention {
 
-    /** Newest first everywhere, EARLIER included; [appStacks] folds EARLIER only where that keeps time order. */
-    fun <T : Meta> sections(items: Collection<T>, lastCheck: Long): Sections<T> {
+    /**
+     * Newest first everywhere, EARLIER included; [appStacks] folds EARLIER and PRIORITY only where that
+     * keeps time order. [tier] is each item's app's setting, and [openedAt] when it was last opened.
+     */
+    fun <T : Meta> sections(
+        items: Collection<T>, lastCheck: Long,
+        tier: (T) -> AppTier = { AppTier.NORMAL }, openedAt: (T) -> Long = { 0L },
+    ): Sections<T> {
         val byRecent = items.sortedByDescending { it.alertTime }
         val calls = ArrayList<T>()
         val media = ArrayList<T>()
         val running = ArrayList<T>()
+        val priority = ArrayList<T>()
         val fresh = ArrayList<T>()
         val earlier = ArrayList<T>()
         for (item in byRecent) when (item.kind) {
             Kind.CALL -> calls += item
             Kind.MEDIA -> media += item
             Kind.RUNNING -> running += item
-            Kind.NOTIFICATION ->
-                if (item.alertTime > lastCheck) fresh += item
-                else earlier += item
+            Kind.NOTIFICATION -> {
+                val t = tier(item)
+                when {
+                    item.alertTime <= since(t, lastCheck, openedAt(item)) -> earlier += item
+                    t.tier == Tier.PRIORITY -> priority += item
+                    else -> fresh += item
+                }
+            }
         }
-        return Sections(calls, media, fresh, earlier, running)
+        return Sections(calls, media, priority, fresh, earlier, running)
+    }
+
+    /**
+     * The time a notification's arrivals are split at: after it, its cards (or a conversation's
+     * messages) sit in PRIORITY for a Priority app and in NEW otherwise; at or before it, in EARLIER.
+     * A Priority app's split moves when the notification is opened ([openedAt]), not at a check. A
+     * Quiet app's cards are never New.
+     */
+    fun since(tier: AppTier, lastCheck: Long, openedAt: Long = 0L): Long = when (tier.tier) {
+        Tier.PRIORITY -> maxOf(tier.since, openedAt)
+        Tier.NORMAL -> maxOf(lastCheck, tier.since)
+        Tier.QUIET -> Long.MAX_VALUE
+    }
+
+    /**
+     * [from] made [to] at [now]. Nothing already checked comes back up: a Normal app made Priority
+     * takes its New cards along, Earlier stays; leaving Priority, or going Quiet, counts as a check of
+     * that app's cards.
+     */
+    fun retier(from: AppTier, to: Tier, lastCheck: Long, now: Long): AppTier = when {
+        from.tier == to -> from
+        to == Tier.PRIORITY -> AppTier(to, if (from.tier == Tier.NORMAL) since(from, lastCheck) else now)
+        else -> AppTier(to, now)
     }
 
     /** How far behind an app stack's newest card another card from that app may be and still join it. */
     const val STACK_WINDOW = 30 * 60_000L
 
     /**
-     * Folds EARLIER's [cards] (newest first) into app stacks (ADR 0004). A card joins the stack above it
+     * Folds EARLIER's or PRIORITY's [cards] (newest first) into app stacks (ADR 0004). A card joins the stack above it
      * only when it comes straight after it, from the same [app], within [window] of the stack's newest
      * card, so a stack never holds an old card above a newer one from another app. A null [app] stands
      * alone (a conversation that is already its own stack).
@@ -84,7 +136,13 @@ object Attention {
         return stacks
     }
 
-    fun isNew(item: Meta, lastCheck: Long) = item.kind == Kind.NOTIFICATION && item.alertTime > lastCheck
+    /**
+     * Whether [item] arrived since the last check, for whatever announces arrivals (the lock-screen
+     * view, the edge handle's count): a New card, or a Priority card that came in since. A Quiet app's
+     * never did.
+     */
+    fun isNew(item: Meta, lastCheck: Long, tier: AppTier = AppTier.NORMAL) =
+        item.kind == Kind.NOTIFICATION && tier.tier != Tier.QUIET && item.alertTime > maxOf(lastCheck, tier.since)
 
     /**
      * How many of a New conversation's incoming messages (send times, oldest first) are New: those

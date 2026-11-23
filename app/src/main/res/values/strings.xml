@@ -7,7 +7,19 @@
     <string name="tile_off">Off</string>
 
     <!-- Panel / lock screen -->
+    <string name="section_priority">Priority</string>
     <string name="section_new">New</string>
+    <string name="tier_make_priority">Make Priority app</string>
+    <string name="tier_stop_priority">No longer a Priority app</string>
+    <string name="tier_make_quiet">Make Quiet app</string>
+    <string name="tier_stop_quiet">No longer a Quiet app</string>
+    <string name="tier_priority">Priority app</string>
+    <string name="tier_normal">Normal</string>
+    <string name="tier_quiet">Quiet app</string>
+    <string name="app_priority">App priority</string>
+    <string name="app_priority_add">Pick an app</string>
+    <string name="app_priority_add_desc">Make it a Priority app or a Quiet app</string>
+    <string name="app_priority_desc">A Priority app\'s notifications sit in Priority, above New, until you open, clear or snooze them. A Quiet app\'s go straight to Earlier and never bring up the lock-screen view. Chronotif can\'t silence an app: its sound and vibration are set in Android\'s notification settings. You can also choose from a card\'s Preview.</string>
     <string name="section_earlier">Earlier</string>
     <string name="section_running">Running</string>
     <string name="clear">Clear</string>
@@ -95,6 +107,10 @@
     <string name="tutorial_stack_body">Maya\'s messages sit in one stack, with a count. Tap it to see each message, then tap her name above them to close it again.</string>
     <string name="tutorial_preview_title">Preview</string>
     <string name="tutorial_preview_body">Press and hold a card to see all of it without opening the app. From there, reply to Maya, or snooze a card for later.</string>
+    <string name="tutorial_priority_title">Priority apps</string>
+    <string name="tutorial_priority_body">Parcelly just wrote again. Hold its card and tap Make Priority app. Its card moves up into Priority, above New, and stays there until you open, clear or snooze it, even after you\'ve looked.</string>
+    <string name="tutorial_quiet_title">Quiet apps</string>
+    <string name="tutorial_quiet_body">Daybook just reminded you again. Hold its card and tap Make Quiet app. Its card goes straight to Earlier, and its next ones won\'t count as New or bring up the lock screen. Chronotif can\'t silence an app; its sound stays in Android\'s settings. Choose any app in Settings → Panel → App priority.</string>
     <string name="tutorial_clear_title">Clear</string>
     <string name="tutorial_clear_body">Swipe a card sideways to clear it.</string>
     <string name="tutorial_close_title">Close the Panel</string>
@@ -157,6 +173,10 @@
     <string name="sample_daybook_text">Room 4B, with Ana, Joel and 3 more</string>
     <string name="sample_parcelly_title">Out for delivery</string>
     <string name="sample_parcelly_text">Your parcel arrives today between 14:00 and 16:00.</string>
+    <string name="sample_parcelly_2_title">Driver is 2 stops away</string>
+    <string name="sample_parcelly_2_text">Have your code ready: 4821.</string>
+    <string name="sample_daybook_2_title">Lunch moved to 13:30</string>
+    <string name="sample_daybook_2_text">Ana updated the event.</string>
     <string name="sample_fernbank_title">Money in</string>
     <string name="sample_fernbank_text">You received 250.00 from Joel Park.</string>
     <string name="sample_stride_title">8,000 steps</string>

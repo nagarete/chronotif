@@ -4,6 +4,8 @@ package app.chronotif
 
 import android.app.Notification
 import android.content.Context
+import app.chronotif.core.AppTier
+import app.chronotif.core.Tier
 import app.chronotif.core.Usage
 
 /**
@@ -29,6 +31,15 @@ interface CardSource {
 
     /** The Panel was seen up to [seenUpTo]: what arrived by then moves to Earlier. */
     fun markChecked(seenUpTo: Long)
+
+    /** What the user made [e]'s app: a Priority app, a Quiet app, or neither (ADR 0019). */
+    fun tier(e: Entry): AppTier = AppTier.NORMAL
+
+    /** When [e] was last opened from Chronotif: a Priority card stays up until it is. */
+    fun openedAt(e: Entry): Long = 0L
+
+    /** Makes [pkg] a [tier] app, from a card's Preview or Settings. */
+    fun setTier(pkg: String, tier: Tier) {}
 
     fun addListener(l: () -> Unit)
 
@@ -65,14 +76,36 @@ interface CardSource {
         override fun hiddenMessages(key: String) = NotifStore.hiddenMessages(key)
         override val lastCheck get() = Prefs.lastCheck
         override fun markChecked(seenUpTo: Long) = Prefs.markChecked(seenUpTo)
+        override fun tier(e: Entry) = Prefs.appTier(e.pkg)
+        override fun openedAt(e: Entry) = Prefs.openedAt(e.key)
+        override fun setTier(pkg: String, tier: Tier) {
+            Prefs.setAppTier(pkg, tier)
+            if (tier == Tier.PRIORITY) count(Usage.Count.PRIORITY_SET) else if (tier == Tier.QUIET) count(Usage.Count.QUIET_SET)
+        }
         override fun addListener(l: () -> Unit) = NotifStore.addListener(l)
         override fun removeListener(l: () -> Unit) = NotifStore.removeListener(l)
-        override fun open(context: Context, e: Entry) = Act.open(context, e).also { if (it) count(Usage.Count.NOTIFICATION_OPENED) }
+        // Opening a card, using one of its buttons or replying deals with it: a Priority card leaves Priority.
+        override fun open(context: Context, e: Entry) = Act.open(context, e).also {
+            if (it) {
+                Prefs.markOpened(e.key)
+                count(Usage.Count.NOTIFICATION_OPENED)
+            }
+        }
         // Act can't tell a sample by its button alone, so the backstop for buttons and replies is here.
-        override fun action(context: Context, e: Entry, a: Notification.Action) =
-            (!e.isSample && Act.action(context, a)).also { if (it) count(Usage.Count.ACTION_TAPPED) }
+        override fun action(context: Context, e: Entry, a: Notification.Action): Boolean {
+            if (e.isSample) return false
+            val launched = Act.action(context, a)
+            Prefs.markOpened(e.key)
+            if (launched) count(Usage.Count.ACTION_TAPPED)
+            return launched
+        }
         override fun reply(context: Context, e: Entry, a: Notification.Action, text: CharSequence) =
-            (!e.isSample && Act.reply(context, a, text)).also { if (it) count(Usage.Count.REPLY_SENT) }
+            (!e.isSample && Act.reply(context, a, text)).also {
+                if (it) {
+                    Prefs.markOpened(e.key)
+                    count(Usage.Count.REPLY_SENT)
+                }
+            }
         override fun dismissAll(entries: List<Entry>) {
             Act.dismissAll(entries)
             count(Usage.Count.CLEARED)

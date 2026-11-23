@@ -210,6 +210,87 @@ class NotificationBehaviorTest {
     }
 
     @Test
+    fun aPriorityAppsCardSitsAboveNewUntilOpenedAndAQuietAppsIsNeverNew() {
+        CardSource.Real.setTier("example.bank", app.chronotif.core.Tier.PRIORITY)
+        CardSource.Real.setTier("example.promo", app.chronotif.core.Tier.QUIET)
+        plain("Old news", 500, 1, "example.news")
+        Prefs.markChecked(1000)
+        plain("Your code is 4821", 2000, 2, "example.bank")
+        plain("Lunch?", 3000, 3, "example.chat")
+        plain("50% off", 4000, 4, "example.promo")
+        assertEquals("The bank's card and the chat are announced, the promo isn't", 2, NotifStore.newCount())
+
+        fun order() = withLockList { list, container ->
+            list.render()
+            shownTexts(container).filter {
+                it.startsWith("PRIORITY") || it.startsWith("NEW") || it == "EARLIER" ||
+                    it in setOf("Your code is 4821", "Lunch?", "50% off", "Old news")
+            }
+        }
+        assertEquals("Priority above New, though older; the Quiet card in Earlier at its own time",
+            listOf("PRIORITY  1", "Your code is 4821", "NEW  1", "Lunch?", "EARLIER", "50% off", "Old news"), order())
+
+        // A check moves New to Earlier, but the Priority card stays up, without being announced again.
+        Prefs.markChecked(5000)
+        assertEquals(listOf("PRIORITY  1", "Your code is 4821", "EARLIER", "50% off", "Lunch?", "Old news"), order())
+        assertEquals(0, NotifStore.newCount())
+
+        // Opening it deals with it.
+        Prefs.markOpened(NotifStore.visible().first { it.pkg == "example.bank" }.key, at = 6000)
+        assertEquals(listOf("EARLIER", "50% off", "Lunch?", "Your code is 4821", "Old news"), order())
+    }
+
+    @Test
+    fun anAppNoLongerPriorityTakesItsCardsToEarlierAndNothingCheckedComesBackUp() {
+        plain("Old bank news", 500, 1, "example.bank")
+        Prefs.markChecked(1000)
+        plain("Your code is 4821", 2000, 2, "example.bank")
+        CardSource.Real.setTier("example.bank", app.chronotif.core.Tier.PRIORITY)
+        fun priority() = withLockList { list, container ->
+            list.render()
+            val shown = shownTexts(container)
+            shown.takeWhile { it != "EARLIER" }.filter { it == "Old bank news" || it == "Your code is 4821" }
+        }
+        assertEquals("The New card went along; the checked one stayed in Earlier", listOf("Your code is 4821"), priority())
+        CardSource.Real.setTier("example.bank", app.chronotif.core.Tier.NORMAL)
+        assertEquals(emptyList<String>(), priority())
+        assertEquals("Leaving Priority counts as a check", 0, NotifStore.newCount())
+    }
+
+    @Test
+    fun onTheLockScreenAPriorityCardTopsThePileAboveNewerNewOnes() {
+        CardSource.Real.setTier("example.bank", app.chronotif.core.Tier.PRIORITY)
+        Prefs.markChecked(1000)
+        plain("Your code is 4821", 2000, 1, "example.bank")
+        plain("Lunch?", 3000, 2, "example.chat")
+        withLockView { activity ->
+            val shown = seen(activity.window.decorView)
+            assertTrue("The Priority card rests whole", shown.contains("Your code is 4821"))
+            assertFalse("New folds under it", shown.contains("Lunch?"))
+            assertTrue(shown.contains("1 more"))
+        }
+    }
+
+    @Test
+    fun aPriorityAppStackOnTopOfThePileOpensInPlace() {
+        CardSource.Real.setTier("example.bank", app.chronotif.core.Tier.PRIORITY)
+        Prefs.markChecked(1000)
+        plain("Payment sent", 2000, 1, "example.bank")
+        plain("Your code is 4821", 3000, 2, "example.bank")
+        plain("Lunch?", 4000, 3, "example.chat")
+        withLockList { list, container ->
+            list.render()
+            assertEquals("The bank's stack, then Lunch?", 2, list.pilePieces)
+            assertFalse(shownTexts(container).contains("Payment sent"))
+            assertTrue(list.openPileCard())
+            assertTrue(list.pileOpened)
+            assertTrue("Both of the stack's cards show", shownTexts(container).containsAll(listOf("Your code is 4821", "Payment sent")))
+            list.closePileCard()
+            assertFalse(list.pileOpened)
+        }
+    }
+
+    @Test
     fun withNothingNewTheLockScreenViewRestsAsTheClockAndAnEarlierLine() {
         plain("Old news", 500, 1, "example.news")
         plain("Older news", 400, 2, "example.mail")

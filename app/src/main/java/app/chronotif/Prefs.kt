@@ -4,7 +4,9 @@ package app.chronotif
 
 import android.content.Context
 import android.content.SharedPreferences
+import app.chronotif.core.AppTier
 import app.chronotif.core.Attention
+import app.chronotif.core.Tier
 
 /**
  * The only persisted state: the last-check watermark, when apps last notified, a handful of
@@ -39,6 +41,8 @@ object Prefs {
 
     fun init(context: Context) {
         sp = context.applicationContext.getSharedPreferences("chronotif", Context.MODE_PRIVATE)
+        tiers = null
+        opened = null
         keepOldDefaults(context)
     }
 
@@ -75,6 +79,56 @@ object Prefs {
             sp.edit().putLong("last_check", next).apply()
             NotifStore.changed()
         }
+    }
+
+    /**
+     * What the user made each app, by package (ADR 0019): a Priority app or a Quiet app, with when.
+     * An app that isn't here is Normal. Kept as "package=TIER:since;…", read once and then cached.
+     */
+    val appTiers: Map<String, AppTier>
+        get() = tiers ?: sp.getString("app_tiers", null).orEmpty().split(';').mapNotNull { pair ->
+            val pkg = pair.substringBefore('=', "")
+            val tier = runCatching { Tier.valueOf(pair.substringAfter('=').substringBefore(':')) }.getOrNull()
+            val since = pair.substringAfter(':', "").toLongOrNull() ?: 0L
+            if (pkg.isEmpty() || tier == null) null else pkg to AppTier(tier, since)
+        }.toMap().also { tiers = it }
+    private var tiers: Map<String, AppTier>? = null
+
+    fun appTier(pkg: String): AppTier = appTiers[pkg] ?: AppTier.NORMAL
+
+    /** Makes [pkg] a [tier] app now, moving its cards as [Attention.retier] says. */
+    fun setAppTier(pkg: String, tier: Tier, now: Long = System.currentTimeMillis()) {
+        val next = Attention.retier(appTier(pkg), tier, lastCheck, now)
+        // A Normal app's own split matters only until the next check passes it.
+        val kept = (appTiers + (pkg to next)).filter { (_, t) -> t.tier != Tier.NORMAL || t.since > lastCheck }
+        tiers = kept
+        sp.edit().putString("app_tiers", kept.entries.joinToString(";") { (p, t) -> "$p=${t.tier}:${t.since}" }).apply()
+        NotifStore.changed()
+    }
+
+    /**
+     * When each notification was last opened from Chronotif, as "time<TAB>key", kept across restarts:
+     * a Priority card stays up until it's opened (ADR 0019). Forgotten once the notification is gone.
+     */
+    private fun openedTimes(): Map<String, Long> = opened ?: sp.getStringSet("opened", null).orEmpty().mapNotNull { s ->
+        s.substringBefore('\t').toLongOrNull()?.let { s.substringAfter('\t') to it }
+    }.toMap().also { opened = it }
+    private var opened: Map<String, Long>? = null
+
+    fun openedAt(key: String): Long = openedTimes()[key] ?: 0L
+
+    fun markOpened(key: String, at: Long = System.currentTimeMillis()) = keepOpened(openedTimes() + (key to at))
+
+    /** Forgets every notification not in [active]. */
+    fun forgetOpened(active: Set<String>) {
+        val all = openedTimes()
+        if (all.keys.any { it !in active }) keepOpened(all.filterKeys { it in active })
+    }
+
+    private fun keepOpened(all: Map<String, Long>) {
+        opened = all
+        sp.edit().putStringSet("opened", all.entries.map { (k, t) -> "$t\t$k" }.toSet()).apply()
+        NotifStore.changed()
     }
 
     /** Off withholds the edge handle and lock-screen view without touching their settings. */

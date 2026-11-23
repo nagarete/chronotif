@@ -68,7 +68,7 @@ object LockPolicy {
         val shown = NotifStore.visible().filter { it.kind == Kind.NOTIFICATION && visibility(context, it) != Vis.HIDE }
         return when (mode) {
             Prefs.LOCK_ALWAYS -> shown.isNotEmpty()
-            else -> shown.any { Attention.isNew(it, lastCheck) }
+            else -> shown.any { Attention.isNew(it, lastCheck, Prefs.appTier(it.pkg)) }
         }
     }
 

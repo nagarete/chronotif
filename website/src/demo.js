@@ -1,8 +1,9 @@
 // An illustrative model of Chronotif's panel, mirroring core/Attention.kt in the app:
 // one "last check" watermark splits notifications into NEW (arrived after it) and EARLIER
 // (already checked, receded, still newest first; one app's neighbouring cards that arrived within
-// 30 minutes of the newest of them fold into a stack). Media players sit on top;
-// background work folds into a Running pill at the bottom.
+// 30 minutes of the newest of them fold into a stack). A Priority app's cards sit in PRIORITY above
+// NEW, stacked the same way, and a check doesn't move them; a Quiet app's go straight to EARLIER.
+// Media players sit on top; background work folds into a Running pill at the bottom.
 // Times are in minutes. All content is made up.
 
 const APPS = {
@@ -10,6 +11,8 @@ const APPS = {
   calendar: { name: "Calendar", color: "#e5484d", glyph: "17" },
   mail: { name: "Mail", color: "#3b82f6", glyph: "@" },
   weather: { name: "Weather", color: "#0e9fb5", glyph: "°" },
+  bank: { name: "Bank", color: "#d9822b", glyph: "€", tier: "priority" },
+  shop: { name: "Shop", color: "#c2410c", glyph: "%", tier: "quiet" },
   podcasts: { name: "Podcasts", color: "#8e4ec6", glyph: "♪\uFE0E" },
 };
 
@@ -28,8 +31,11 @@ function initialState() {
     running: 2,
     items: [
       { id: "maya", app: "messages", title: "Maya", body: "Running ten minutes late, save me a seat?", alert: 598 },
+      { id: "sale", app: "shop", title: "Flash sale", body: "Up to 40% off until midnight.", alert: 596 },
       { id: "review", app: "calendar", title: "Design review", body: "In 15 minutes · Room 4", alert: 594 },
       { id: "ship", app: "mail", title: "Order update", body: "Your package has shipped.", alert: 575 },
+      { id: "code", app: "bank", title: "Sign-in code", body: "Your code is 482 913. Valid for 10 minutes.", alert: 548 },
+      { id: "paid", app: "bank", title: "Card payment", body: "€12.40 at Corner Café.", alert: 532 },
       { id: "rain", app: "weather", title: "Rain this evening", body: "Light rain from 6 PM.", alert: 520 },
       { id: "ana", app: "messages", title: "Ana", body: "See you tomorrow!", alert: 470 },
       { id: "climb", app: "messages", title: "Climbing group", body: "Leo: Thursday works for me", alert: 410 },
@@ -53,12 +59,28 @@ function appStacks(cards) {
   return stacks;
 }
 
+// A Priority app's cards stay in PRIORITY whatever the last check (in the app, until opened); a Quiet
+// app's are never New.
+const tier = (item) => APPS[item.app].tier ?? "normal";
+
 function sections(state) {
   const byRecent = [...state.items].sort((a, b) => b.alert - a.alert);
+  const priority = byRecent.filter((item) => tier(item) === "priority");
+  const rest = byRecent.filter((item) => tier(item) !== "priority");
+  const isNew = (item) => tier(item) !== "quiet" && item.alert > state.lastCheck;
   return {
-    fresh: byRecent.filter((item) => item.alert > state.lastCheck),
-    earlier: appStacks(byRecent.filter((item) => item.alert <= state.lastCheck)),
+    priority: appStacks(priority),
+    fresh: rest.filter(isNew),
+    earlier: appStacks(rest.filter((item) => !isNew(item))),
   };
+}
+
+// A stack drawn as its newest card with slivers below; [cls] is "d-receded" in Earlier.
+function stackItem(state, stack, cls = "") {
+  const more = stack.length - 1;
+  if (!more) return `<div role="listitem" class="${cls}">${card(state, stack[0])}</div>`;
+  const label = `<span class="visually-hidden">, and ${more} more from ${APPS[stack[0].app].name}</span>`;
+  return `<div role="listitem" class="${cls} d-stack" data-count="${Math.min(stack.length, 3)}">${card(state, stack[0])}${label}</div>`;
 }
 
 function ago(state, t) {
@@ -108,12 +130,18 @@ function player(o) {
 }
 
 function render(state, list, fresh = new Set()) {
-  const { fresh: newItems, earlier } = sections(state);
+  const { priority, fresh: newItems, earlier } = sections(state);
   let html = "";
 
   html += `<div class="d-list" role="list">`;
   html += state.media.map((o) => player(o)).join("");
   html += `</div>`;
+
+  if (priority.length) {
+    const count = priority.reduce((n, stack) => n + stack.length, 0);
+    html += `<p class="d-head d-head--priority"><span>Priority<b>${count}</b></span></p>`;
+    html += `<div class="d-list" role="list">${priority.map((stack) => stackItem(state, stack)).join("")}</div>`;
+  }
 
   html += `<p class="d-head"><span>New<b>${newItems.length}</b></span></p>`;
   html += `<div class="d-list" role="list">`;
@@ -125,14 +153,7 @@ function render(state, list, fresh = new Set()) {
   if (earlier.length) {
     html += `<p class="d-head"><span>Earlier</span><span class="d-clear" aria-hidden="true">Clear</span></p>`;
     html += `<div class="d-list" role="list">`;
-    html += earlier
-      .map((stack) => {
-        const more = stack.length - 1;
-        if (!more) return `<div role="listitem" class="d-receded">${card(state, stack[0])}</div>`;
-        const label = `<span class="visually-hidden">, and ${more} more from ${APPS[stack[0].app].name}</span>`;
-        return `<div role="listitem" class="d-receded d-stack" data-count="${Math.min(stack.length, 3)}">${card(state, stack[0])}${label}</div>`;
-      })
-      .join("");
+    html += earlier.map((stack) => stackItem(state, stack, "d-receded")).join("");
     html += `</div>`;
   }
 
@@ -167,9 +188,10 @@ export function initDemo(root) {
           state.now += 1;
           state.lastCheck = state.now;
         },
-        moved
+        (moved
           ? `Panel closed. ${moved} notification${moved === 1 ? "" : "s"} moved to Earlier.`
-          : "Panel closed. Nothing was new.",
+          : "Panel closed. Nothing was new.") +
+          (sections(state).priority.length ? " Priority stays until opened." : ""),
       );
     },
     arrive() {

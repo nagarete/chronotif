@@ -226,7 +226,7 @@ class LockPile(
     }
 
     private fun decoHeight(): Int {
-        val n = list.newPieces
+        val n = list.pilePieces
         var h = when {
             n > 2 -> ctx.dp(14)
             n > 1 -> ctx.dp(7)
@@ -240,8 +240,8 @@ class LockPile(
     }
 
     private fun countLabel(): String? = when {
-        list.newPieces > 1 -> ctx.getString(R.string.more_in_stack, list.newPieces - 1)
-        list.newPieces == 0 && list.earlierPieces > 0 -> ctx.getString(R.string.earlier_count, list.earlierPieces)
+        list.pilePieces > 1 -> ctx.getString(R.string.more_in_stack, list.pilePieces - 1)
+        list.pilePieces == 0 && list.earlierPieces > 0 -> ctx.getString(R.string.earlier_count, list.earlierPieces)
         else -> null
     }
 
@@ -294,7 +294,7 @@ class LockPile(
 
         // Slivers and the count, under the Pile's card (or where Earlier folds), fading as it unfolds.
         val label = countLabel()
-        if (first == null || p >= 1f || (label == null && list.newPieces < 2)) {
+        if (first == null || p >= 1f || (label == null && list.pilePieces < 2)) {
             deco.visibility = View.GONE
         } else {
             deco.visibility = View.VISIBLE
@@ -312,7 +312,7 @@ class LockPile(
                 }
                 v.translationY = y.toFloat()
             }
-            val n = if (top != null) list.newPieces else 0
+            val n = if (top != null) list.pilePieces else 0
             place(sliver1, ctx.dp(14), base, n > 1)
             place(sliver2, ctx.dp(30), base + ctx.dp(7), n > 2)
             val slivers = if (n > 2) ctx.dp(14) else if (n > 1) ctx.dp(7) else 0

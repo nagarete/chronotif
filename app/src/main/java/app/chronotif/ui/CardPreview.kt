@@ -32,6 +32,7 @@ import app.chronotif.Viewable
 import app.chronotif.core.Kind
 import app.chronotif.core.Snooze
 import app.chronotif.core.SnoozeFor
+import app.chronotif.core.Tier
 import java.time.ZoneId
 
 /** Something laid over a window's content that Back closes first: the Preview, the image viewer. */
@@ -80,6 +81,10 @@ class CardPreview private constructor(
         fun clear()
         fun canSnooze(): Boolean
         fun snooze(until: Long)
+        /** What the card's app is (ADR 0019), or null for a call, player or Running, which it doesn't change. */
+        fun tier(): Tier?
+        /** Makes the card's app [tier]; on the lock screen, after an unlock. */
+        fun setTier(tier: Tier)
     }
 
     companion object {
@@ -209,7 +214,7 @@ class CardPreview private constructor(
         return box
     }
 
-    /** The app's buttons, then Snooze and Clear. */
+    /** The app's buttons, then Snooze and Clear, then making the app a Priority or Quiet app. */
     private fun showButtons() {
         buttons.removeAllViews()
         acts.forEachIndexed { i, a ->
@@ -232,6 +237,15 @@ class CardPreview private constructor(
             actions.clear()
             close()
         }
+        val tier = actions.tier() ?: return
+        fun tierButton(label: Int, to: Tier) = addButton(context.getString(label)) {
+            actions.setTier(to)
+            close()
+        }
+        if (tier == Tier.PRIORITY) tierButton(R.string.tier_stop_priority, Tier.NORMAL)
+        else tierButton(R.string.tier_make_priority, Tier.PRIORITY)
+        if (tier == Tier.QUIET) tierButton(R.string.tier_stop_quiet, Tier.NORMAL)
+        else tierButton(R.string.tier_make_quiet, Tier.QUIET)
     }
 
     /** Snooze opens into how long; it comes back as New (ADR 0010). */
