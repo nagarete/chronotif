@@ -224,15 +224,22 @@ class LockActivity : Activity(), NotifList.Host {
         if (practice) Tutorial.notice(TutorialSource.Event.PILE_TAPPED)
     }
 
-    /** Back folds the open list back into the Pile, then shows the stock lock screen. Not while dark. */
+    /**
+     * Back folds the open list back into the Pile, then closes the Pile's card if it was opened,
+     * then shows the stock lock screen. Not while dark.
+     */
     internal fun back() {
         if (dark != null) return
-        if (pile.resting) {
-            finish()
+        if (!pile.resting) {
+            scroll.smoothScrollTo(0, pile.restAt)
+            if (practice) Tutorial.notice(TutorialSource.Event.PILE_FOLDED)
             return
         }
-        scroll.smoothScrollTo(0, 0)
-        if (practice) Tutorial.notice(TutorialSource.Event.PILE_FOLDED)
+        if (list.pileOpened) {
+            list.closePileCard()
+            return
+        }
+        finish()
     }
 
     // Before Android 13, Back arrives as a key.
@@ -358,8 +365,10 @@ class LockActivity : Activity(), NotifList.Host {
     private var downY = 0f
     private var downAt = 0L
     private var onHint = false
-    /** The gesture started on the Pile's card while folded: a tap opens the Pile rather than the app. */
+    /** The gesture started on the Pile's card while folded: a tap opens that card rather than the app. */
     private var onPile = false
+    /** The gesture started on the count under the Pile: a tap unfolds it. */
+    private var onCount = false
     private var moved = false
     private val slop by lazy { android.view.ViewConfiguration.get(this).scaledTouchSlop }
 
@@ -411,7 +420,7 @@ class LockActivity : Activity(), NotifList.Host {
      * the Pile unfolds from is empty space.
      */
     private fun emptyAt(ev: MotionEvent): Boolean {
-        if (onHint || onPile) return false
+        if (onHint || onPile || onCount) return false
         val x = ev.rawX.toInt()
         val y = ev.rawY.toInt()
         val r = android.graphics.Rect()
@@ -511,7 +520,8 @@ class LockActivity : Activity(), NotifList.Host {
                 downY = ev.rawY
                 downAt = ev.eventTime
                 moved = false
-                onPile = pile.hits(ev)
+                onPile = pile.hitsCard(ev)
+                onCount = !onPile && pile.hitsCount(ev)
                 val r = android.graphics.Rect()
                 onHint = hint.getGlobalVisibleRect(r) && r.contains(ev.rawX.toInt(), ev.rawY.toInt())
                 downX = ev.rawX
@@ -535,10 +545,14 @@ class LockActivity : Activity(), NotifList.Host {
                 val vy = t?.yVelocity ?: 0f
                 t?.recycle()
                 tracker = null
-                // A plain tap on the folded Pile opens it; holding it still opens its Preview.
-                if (onPile && !moved && ev.eventTime - downAt < android.view.ViewConfiguration.getLongPressTimeout()) {
+                // A plain tap on the Pile's card opens that card in place, and one on the count
+                // unfolds the Pile. Once the card is open, taps reach it as in the open list.
+                // Holding the card still opens its Preview.
+                val tap = !moved && ev.eventTime - downAt < android.view.ViewConfiguration.getLongPressTimeout()
+                if (tap && (onCount || (onPile && !list.pileOpened))) {
                     cancelChildren(ev)
-                    openPile()
+                    // A card with nothing more to show unfolds the Pile instead.
+                    if (onCount || !list.openPileCard()) openPile()
                     return true
                 }
                 // Swiping up from Tap to unlock unlocks; swiping up on the list scrolls it.

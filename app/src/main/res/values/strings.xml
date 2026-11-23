@@ -127,8 +127,8 @@
     <string name="tutorial_slept">On the real lock screen, the display sleeps now.</string>
     <string name="tutorial_pile_title">The pile</string>
     <string name="tutorial_pile_body">Show the lock screen as it looks when the phone wakes: the clock, and New waiting at the bottom as a pile. Drag the list up to unfold it, then press Back to fold it again.</string>
-    <string name="tutorial_pile_tap_title">Tap the pile</string>
-    <string name="tutorial_pile_tap_body">Tap the pile to unfold it with New at the top.</string>
+    <string name="tutorial_pile_tap_title">Tap N more</string>
+    <string name="tutorial_pile_tap_body">Tap the count under the pile to unfold it with New at the top. Tapping the card itself opens just that card.</string>
     <string name="tutorial_lock_reply_title">Reply without unlocking</string>
     <string name="tutorial_lock_reply_body">Press and hold Maya\'s card and reply from its Preview. On the lock screen it sends without unlocking.</string>
     <string name="tutorial_lock_clock_title">Clock and date</string>
