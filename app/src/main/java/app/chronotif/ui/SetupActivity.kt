@@ -818,50 +818,40 @@ class SetupActivity : Activity() {
         }
     }
 
-    /** One corner's row: what it's set to, and a list to change it. */
+    /** One corner's row: what it's set to, with its icon, and a sheet to change it. */
     private fun slot(title: Int, left: Boolean, lens: Boolean) {
         val kind = if (left) Prefs.lockShortcutLeft else Prefs.lockShortcutRight
         val appKey = if (left) Prefs.lockShortcutLeftApp else Prefs.lockShortcutRightApp
+        val slotApp = if (kind == app.chronotif.core.LockShortcut.APP) app.chronotif.Launchables.find(this, appKey) else null
         val now = when {
             kind != app.chronotif.core.LockShortcut.APP -> getString(LockShortcuts.label(kind))
-            else -> app.chronotif.Launchables.find(this, appKey)?.label ?: getString(R.string.lock_shortcut_app_missing)
+            else -> slotApp?.label ?: getString(R.string.lock_shortcut_app_missing)
         }
-        val value = text(now, 14f, secondary = true)
+        val value = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            val icon = ImageView(context)
+            val res = ShortcutPicker.icon(kind)
+            if (res != null) {
+                icon.setImageResource(res)
+                icon.imageTintList = ColorStateList.valueOf(c.textSecondary)
+                icon.setPadding(dp(2), dp(2), dp(2), dp(2))
+            } else if (slotApp != null) {
+                app.chronotif.Launchables.icon(context, slotApp) { icon.setImageDrawable(RoundedIcon(it)) }
+            }
+            if (res != null || slotApp != null) addView(icon, LinearLayout.LayoutParams(dp(24), dp(24)).apply { marginEnd = dp(8) })
+            addView(text(now, 14f, secondary = true).apply { maxLines = 1 })
+        }
         item(title, trailing = value, onClick = {
             val other = if (left) Prefs.lockShortcutRight else Prefs.lockShortcutLeft
-            val choices = app.chronotif.core.LockShortcut.choicesBeside(other)
-            val labels = choices.map {
-                val name = getString(LockShortcuts.label(it))
-                if (it == app.chronotif.core.LockShortcut.QR_SCANNER && !lens) "$name · ${getString(R.string.qr_tile_needs_lens)}" else name
-            }.toTypedArray()
-            android.app.AlertDialog.Builder(this)
-                .setTitle(title)
-                .setSingleChoiceItems(labels, choices.indexOf(kind)) { d, i ->
-                    d.dismiss()
-                    val picked = choices[i]
-                    when {
-                        picked == app.chronotif.core.LockShortcut.QR_SCANNER && !lens ->
-                            showLensMissing(this, unlockFirst = { it() })
-                        picked == app.chronotif.core.LockShortcut.APP -> pickApp(left)
-                        else -> setSlot(left, picked, null)
-                    }
+            ShortcutPicker(this, c, getString(title), app.chronotif.core.LockShortcut.choicesBeside(other), kind, appKey, lens) { picked, chosen ->
+                when {
+                    picked == app.chronotif.core.LockShortcut.QR_SCANNER && !lens -> showLensMissing(this, unlockFirst = { it() })
+                    chosen != null -> setSlot(left, picked, app.chronotif.Launchables.key(this, chosen))
+                    else -> setSlot(left, picked, null)
                 }
-                .setNegativeButton(R.string.close, null)
-                .show()
+            }.show()
         })
-    }
-
-    private fun pickApp(left: Boolean) {
-        app.chronotif.Launchables.load(this) { apps ->
-            if (isFinishing) return@load
-            android.app.AlertDialog.Builder(this)
-                .setTitle(R.string.lock_shortcut_pick_app)
-                .setItems(apps.map { it.label }.toTypedArray()) { _, i ->
-                    setSlot(left, app.chronotif.core.LockShortcut.APP, app.chronotif.Launchables.key(this, apps[i]))
-                }
-                .setNegativeButton(R.string.close, null)
-                .show()
-        }
     }
 
     private fun setSlot(left: Boolean, kind: app.chronotif.core.LockShortcut, appKey: String?) {

@@ -430,7 +430,9 @@
     <string name="lock_shortcut_dnd">Do Not Disturb</string>
     <string name="lock_shortcut_app">An app…</string>
     <string name="lock_shortcut_app_missing">App not installed</string>
-    <string name="lock_shortcut_pick_app">Pick an app</string>
+    <string name="lock_shortcut_apps">Apps</string>
+    <string name="lock_shortcut_search_apps">Search apps</string>
+    <string name="lock_shortcut_no_apps">No apps match</string>
     <string name="lock_shortcut_hold">Hold to use</string>
     <string name="lock_shortcut_haptics_off">Haptic feedback is off</string>
     <string name="lock_shortcut_haptics_off_desc">Your phone\'s haptic feedback is off, so holding a shortcut doesn\'t vibrate. The button still grows while you hold it. To feel it, turn on Haptic feedback in your phone\'s Sound &amp; vibration settings.</string>
