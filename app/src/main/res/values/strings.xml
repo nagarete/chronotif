@@ -216,6 +216,7 @@
     <string name="theme_light">Light</string>
     <string name="theme_dark">Dark</string>
     <string name="settings_search_hint">Search settings</string>
+    <string name="settings_back_again">Press Back again to leave settings</string>
     <string name="settings_search_voice">Search settings by voice</string>
     <string name="settings_search_none">No settings match “%1$s”</string>
     <string name="settings_search_page">Page</string>
