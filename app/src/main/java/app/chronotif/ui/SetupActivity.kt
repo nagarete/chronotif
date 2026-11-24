@@ -764,17 +764,19 @@ class SetupActivity : Activity() {
             toggle(R.string.lock_double_tap, R.string.lock_double_tap_desc, { Prefs.lockDoubleTapSleep }) {
                 Prefs.lockDoubleTapSleep = it
             }
-            // Only phones with a sensor under the screen, or that were fitted to one.
-            if (Prefs.fingerprintTop > 0f || FingerprintSensor.present(this)) {
-                val fitted = Prefs.fingerprintTop > 0f
-                val fit = button(getString(if (fitted) R.string.fingerprint_fit_again else R.string.fingerprint_fit_button), filled = false) {
-                    open(Intent(this, FingerprintFitActivity::class.java))
-                }
-                item(R.string.fingerprint_fit, getString(if (fitted) R.string.fingerprint_fit_desc_fitted else R.string.fingerprint_fit_desc),
-                    trailing = fit)
-                // Back from fitting: show it as fitted.
-                refreshers += { if (current == Section.LOCK && fitted != Prefs.fingerprintTop > 0f) body.post { reshow() } }
+            // On every phone: some with a sensor under the screen don't say so (a Xiaomi 17T).
+            val fitted = Prefs.fingerprintTop > 0f
+            val fit = button(getString(if (fitted) R.string.fingerprint_fit_again else R.string.fingerprint_fit_button), filled = false) {
+                open(Intent(this, FingerprintFitActivity::class.java))
             }
+            val desc = when {
+                fitted -> R.string.fingerprint_fit_desc_fitted
+                FingerprintSensor.present(this) -> R.string.fingerprint_fit_desc
+                else -> R.string.fingerprint_fit_desc_unknown
+            }
+            item(R.string.fingerprint_fit, getString(desc), trailing = fit)
+            // Back from fitting or removing the fit: show which it is now.
+            refreshers += { if (current == Section.LOCK && fitted != Prefs.fingerprintTop > 0f) body.post { reshow() } }
         }
         lockShortcuts()
     }

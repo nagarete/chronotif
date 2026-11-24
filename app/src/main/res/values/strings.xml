@@ -449,12 +449,15 @@
     <string name="qr_tile_hint">Scan from Quick Settings too, with the Chronotif QR scanner tile.</string>
     <string name="fingerprint_fit">Fit to your fingerprint sensor</string>
     <string name="fingerprint_fit_desc">Your phone has its fingerprint sensor under the screen, so the lock screen keeps the pile and Tap to unlock above it. Touch the sensor once to fit that room to it exactly.</string>
+    <string name="fingerprint_fit_desc_unknown">If your fingerprint sensor is under the screen, touch it once so the lock screen keeps the pile and Tap to unlock above it. A sensor on the side or the back needs nothing.</string>
     <string name="fingerprint_fit_desc_fitted">The lock screen keeps the pile and Tap to unlock above your fingerprint sensor, fitted to where you touched it.</string>
     <string name="fingerprint_fit_button">Fit</string>
     <string name="fingerprint_fit_again">Fit again</string>
     <string name="fingerprint_fit_title">Touch your fingerprint sensor</string>
     <string name="fingerprint_fit_body">Rest your finger on it, the way you do to unlock, then lift it.</string>
     <string name="fingerprint_fit_too_high">That\'s too high for a fingerprint sensor. Touch the sensor near the bottom of the screen.</string>
+    <string name="fingerprint_fit_remove">My sensor isn\'t under the screen</string>
+    <string name="fingerprint_fit_removed">Fit removed</string>
     <string name="fingerprint_fit_done">Fitted</string>
     <string name="fingerprint_fit_done_body">The lock screen now keeps clear of your sensor.</string>
 
