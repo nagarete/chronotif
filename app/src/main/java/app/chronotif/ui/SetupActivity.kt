@@ -95,6 +95,8 @@ class SetupActivity : Activity() {
     private companion object {
         /** A listener the system is still binding looks disconnected for a moment after launch. */
         const val SETTLE_MS = 2000L
+        /** How long after the first Back a second one leaves settings; a short toast's length. */
+        const val LEAVE_WINDOW_MS = 2000L
         const val REQUEST_SEARCH_PERMISSION = 10
         const val REQUEST_SPEECH = 1
         /** Results shown at most; more means the query is too short to be useful. */
@@ -213,24 +215,62 @@ class SetupActivity : Activity() {
         super.onPause()
         body.removeCallbacks(settle)
         settled = false
+        // Coming back to settings starts over: one Back doesn't leave.
+        disarm()
         Updater.foreground = false
         // Settings changed here may change how the panel looks; the next open builds it afresh.
         Panel.drop()
     }
 
-    /** Back closes search, then the drawer over the page, before it leaves settings. */
+    /**
+     * Back closes search, then the drawer over the page. Leaving settings then takes a second
+     * Back: the first only says so, since one stray edge swipe shouldn't drop the user out.
+     */
     private val collapseOnBack = if (Build.VERSION.SDK_INT >= 33) android.window.OnBackInvokedCallback { back() } else null
     private var backRegistered = false
+    /** Within [LEAVE_WINDOW_MS] of the first Back, so the next one leaves. */
+    private var leaveArmed = false
+    private var leaveToast: android.widget.Toast? = null
+    private val disarmLeave = Runnable {
+        leaveArmed = false
+        updateBack()
+    }
 
     private fun backCloses() = searching || (!wide && expanded)
 
+    /** Back stays in settings: it closes something, or it's the first of the two that leave. */
+    private fun backStays() = backCloses() || !leaveArmed
+
     private fun back() {
-        if (searching) closeSearch() else expand(false)
+        when {
+            searching -> closeSearch()
+            !wide && expanded -> expand(false)
+            else -> armLeave()
+        }
+    }
+
+    private fun armLeave() {
+        leaveArmed = true
+        leaveToast?.cancel()
+        leaveToast = android.widget.Toast.makeText(this, R.string.settings_back_again, android.widget.Toast.LENGTH_SHORT)
+            .also { it.show() }
+        body.removeCallbacks(disarmLeave)
+        body.postDelayed(disarmLeave, LEAVE_WINDOW_MS)
+        // The second Back goes to Android, so it gets the predictive back-to-home animation.
+        updateBack()
+    }
+
+    private fun disarm() {
+        body.removeCallbacks(disarmLeave)
+        leaveToast?.cancel()
+        leaveToast = null
+        leaveArmed = false
+        updateBack()
     }
 
     private fun updateBack() {
         if (Build.VERSION.SDK_INT < 33) return
-        val want = backCloses()
+        val want = backStays()
         if (want == backRegistered) return
         backRegistered = want
         if (want) {
@@ -241,9 +281,9 @@ class SetupActivity : Activity() {
     }
 
     override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
-        // Before Android 13, Back arrives as a key.
-        if (Build.VERSION.SDK_INT < 33 && event.keyCode == android.view.KeyEvent.KEYCODE_BACK && backCloses()) {
-            if (event.action == android.view.KeyEvent.ACTION_UP) back()
+        // Before Android 13, and where the system still sends Back as a key, it arrives here.
+        if (event.keyCode == android.view.KeyEvent.KEYCODE_BACK && backStays()) {
+            if (event.action == android.view.KeyEvent.ACTION_UP && !event.isCanceled) back()
             return true
         }
         return super.dispatchKeyEvent(event)
