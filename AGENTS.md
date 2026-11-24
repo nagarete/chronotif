@@ -13,6 +13,10 @@ Each of these is changed together with the code it describes, in the same commit
 - **Release notes**: `website/src/releases.json`, rendered at chronotif.com/releases. A user-visible change adds a line to its `next` entry. The release steps are in `docs/guide.md`.
 - **Website demo**: `website/src/demo.js` mirrors `core/Attention.kt`, and `website/index.html` describes the same model. Update both when visible behaviour changes.
 
+## Build the known best way first
+
+Every change starts from the established best practice for that problem on Android, without being asked. Threading, memory, battery, start-up and frame time, and slow phones with long lists are requirements, even when the task and tests don't mention them. Never ship a simple version and wait for complaints. Example: icons and labels loaded on the main thread made the panel take seconds to open until #62 moved them off it, which is decade-old Android advice. When the best way costs something real (memory, complexity), say so and decide it with the user. When code you touch falls short, raise it instead of copying the pattern. See `CONTRIBUTING.md`.
+
 ## Ordering
 
 Time order is the product. Every section sorts newest first by the time its card shows. Only two groupings exist: a Conversation stack, and in Earlier an App stack of one app's neighbouring cards that arrived within 30 minutes of its newest card (ADR 0004). A stack never gathers an app's cards from across the list. Check any new grouping, sorting or collapsing against this before building it.

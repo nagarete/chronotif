@@ -7,6 +7,14 @@ translations and accessibility improvements are always welcome.
 
 ## Principles (please keep these true)
 
+- **Build the known best way first.** If there's an established right way to do something on
+  Android, the first version uses it. Don't leave it for a later fix. For example: no
+  PackageManager, bitmap or disk work on the main thread (show a placeholder and fill it in);
+  reuse views instead of rebuilding them; check speed on a slow phone with a long notification
+  list. Passing tests isn't enough if the code falls short of that. If the best way has a real
+  cost, say so in the PR instead of quietly shipping the simpler version. Going past the known
+  best later is welcome. If you touch older code that falls short, fix it or point it out;
+  don't copy it.
 - **Local-first and private.** No accounts, and nothing from the user's notifications,
   contacts, calendar or Search ever leaves the device. There are three pieces of network code.
   Two are download-only: the opt-in updater (`Updater.kt`), which reads public GitHub Releases, and
