@@ -23,7 +23,7 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
-/** Settings → Lock screen → Fit to your fingerprint sensor, on phones with one under the screen. */
+/** Settings → Lock screen → Fit to your fingerprint sensor, offered on every phone. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], application = Application::class)
 class FingerprintFitTest {
@@ -48,10 +48,38 @@ class FingerprintFitTest {
         return activity
     }
 
-    @Test fun onlyPhonesWithASensorUnderTheScreenOfferIt() {
-        assertFalse(texts(openLockPage().window.decorView).contains(context.getString(R.string.fingerprint_fit)))
+    @Test fun everyPhoneOffersItAndSaysWhetherItsSensorIsKnownToBeUnderTheScreen() {
+        // A Xiaomi 17T has its sensor under the screen but doesn't say so.
+        texts(openLockPage().window.decorView).let {
+            assertTrue(it.contains(context.getString(R.string.fingerprint_fit)))
+            assertTrue(it.contains(context.getString(R.string.fingerprint_fit_desc_unknown)))
+        }
         Settings.System.putString(context.contentResolver, "fod_animation_type", "14")
-        assertTrue(texts(openLockPage().window.decorView).contains(context.getString(R.string.fingerprint_fit)))
+        assertTrue(texts(openLockPage().window.decorView).contains(context.getString(R.string.fingerprint_fit_desc)))
+        Prefs.fingerprintTop = 0.86f
+        assertTrue(texts(openLockPage().window.decorView).contains(context.getString(R.string.fingerprint_fit_desc_fitted)))
+    }
+
+    @Test fun aFitOnAPhoneThatDoesntSayItHasASensorThereCanBeTakenBack() {
+        val remove = context.getString(R.string.fingerprint_fit_remove)
+        assertFalse("Nothing to take back before a fit",
+            texts(Robolectric.buildActivity(FingerprintFitActivity::class.java).setup().get().window.decorView).contains(remove))
+
+        Prefs.fingerprintTop = 0.86f
+        val activity = Robolectric.buildActivity(FingerprintFitActivity::class.java).setup().get()
+        val button = all(activity.window.decorView).filterIsInstance<TextView>().first { it.text.toString() == remove }
+        val at = IntArray(2).also { button.getLocationOnScreen(it) }
+        val (x, y) = at[0] + button.width / 2f to at[1] + button.height / 2f
+        activity.dispatchTouchEvent(MotionEvent.obtain(0, 0, MotionEvent.ACTION_DOWN, x, y, 0))
+        activity.dispatchTouchEvent(MotionEvent.obtain(0, 10, MotionEvent.ACTION_UP, x, y, 0))
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+        assertEquals("The fit is gone, not moved to the button", 0f, Prefs.fingerprintTop)
+        assertTrue(texts(activity.window.decorView).contains(context.getString(R.string.fingerprint_fit_removed)))
+
+        // A phone that says its sensor is under the screen only fits again.
+        Settings.System.putString(context.contentResolver, "fod_animation_type", "14")
+        Prefs.fingerprintTop = 0.86f
+        assertFalse(texts(Robolectric.buildActivity(FingerprintFitActivity::class.java).setup().get().window.decorView).contains(remove))
     }
 
     @Test fun aTouchOnTheSensorFitsItAndOneHighUpDoesnt() {
