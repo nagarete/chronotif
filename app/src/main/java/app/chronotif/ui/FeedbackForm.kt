@@ -127,7 +127,13 @@ class FeedbackForm(private val context: Context, private val c: M3, private val 
 
     /** Problem, Idea or Other as chips; optional, and tapping the picked one unpicks it. */
     private fun kinds(): View {
-        val row = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
+        val row = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            // Baseline alignment drops a chip whose text sits differently (no check, one line
+            // shorter) below the others; chips line up by their middles instead.
+            isBaselineAligned = false
+        }
         val names = mapOf(
             FeedbackMessage.Kind.PROBLEM to R.string.feedback_kind_problem,
             FeedbackMessage.Kind.IDEA to R.string.feedback_kind_idea,
