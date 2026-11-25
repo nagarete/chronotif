@@ -1146,8 +1146,10 @@ class SetupActivity : Activity() {
         try {
             @Suppress("DEPRECATION")
             startActivityForResult(speech, REQUEST_SPEECH)
-        } catch (_: ActivityNotFoundException) {
-        } catch (_: SecurityException) {
+        } catch (e: RuntimeException) {
+            // ActivityNotFoundException, or a SecurityException from a speech app that isn't exported.
+            android.util.Log.w("SetupActivity", "Couldn't start voice input", e)
+            android.widget.Toast.makeText(this, R.string.voice_unavailable, android.widget.Toast.LENGTH_SHORT).show()
         }
     }
 

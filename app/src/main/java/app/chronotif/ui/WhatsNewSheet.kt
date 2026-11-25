@@ -9,6 +9,7 @@ import android.graphics.Typeface
 import android.net.Uri
 import android.text.SpannableStringBuilder
 import android.text.style.BulletSpan
+import android.util.Log
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -16,6 +17,7 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import android.widget.Toast
 import app.chronotif.BuildConfig
 import app.chronotif.Prefs
 import app.chronotif.R
@@ -145,7 +147,9 @@ class WhatsNewSheet private constructor(
                     try {
                         host.context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(NOTES_URL)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                         host.launched()
-                    } catch (_: RuntimeException) {
+                    } catch (e: RuntimeException) {
+                        Log.w("WhatsNewSheet", "Couldn't open the release notes", e)
+                        Toast.makeText(host.context, R.string.link_open_failed, Toast.LENGTH_SHORT).show()
                     }
                 })
                 addView(button(context.getString(R.string.whats_new_done), filled = true) { close() },
