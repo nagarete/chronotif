@@ -310,8 +310,8 @@ To publish a specific commit as a nightly, commit it and push a tag with an unus
 number greater than previous nightlies for the same version:
 
 ```sh
-git tag nightly-0.2.8-1
-git push origin nightly-0.2.8-1
+git tag nightly-0.3.1-1
+git push origin nightly-0.3.1-1
 ```
 
 To build that nightly locally:
@@ -336,13 +336,13 @@ only when it's worth showing again.
 To publish stable, push a tag matching `versionName`:
 
 ```sh
-git tag v0.2.8
-git push origin v0.2.8
+git tag v0.3.1
+git push origin v0.3.1
 ```
 
 Stable releases are marked as GitHub's latest release, including 0.x versions. Nightlies are
 prereleases and never replace that link. After publishing stable, bump `versionName` to the
-next patch version before publishing more nightlies. v0.2.7 is the current stable release.
+next patch version before publishing more nightlies. v0.3.0 is the current stable release.
 
 ## Code map
 
