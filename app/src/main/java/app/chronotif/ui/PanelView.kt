@@ -96,6 +96,8 @@ class PanelView(
     private var held = false
     /** What's new is looked for once per open, once the cards are on screen and the panel is open. */
     private var whatsNewLooked = false
+    /** Counts opens, so What's new found after one has closed doesn't show over the next. */
+    private var opens = 0
     private var closing = false
     private var blankDownX = 0f
     private var blankDownY = 0f
@@ -201,6 +203,7 @@ class PanelView(
             insets
         }
         list = NotifList(host, content, onLock = false, source = source)
+        if (source === CardSource.Real) WhatsNewSheet.prepare(context)
     }
 
     /** Scrolls the focused reply box above the keyboard; the scroll view's bottom padding is the keyboard. */
@@ -286,22 +289,27 @@ class PanelView(
         if (list.source !== CardSource.Real) return
         if (whatsNewLooked || !settled || cardsAt == 0L) return
         whatsNewLooked = true
-        val releases = WhatsNewSheet.pending(context) ?: return
-        held = true
-        seenSince = 0L
-        val shown = WhatsNewSheet.show(this, host, releases) {
-            held = false
-            interacted = false
-            if (showing && settled && cardsAt != 0L) seenSince = android.os.SystemClock.uptimeMillis()
-        }
-        if (!shown) {
-            held = false
-            startSeen()
+        val open = opens
+        WhatsNewSheet.pending(context) { releases ->
+            // The notes are read off the main thread the first time; this open may be over by then.
+            if (releases == null || open != opens || !showing || !settled || closing) return@pending
+            held = true
+            seenSince = 0L
+            val shown = WhatsNewSheet.show(this, host, releases) {
+                held = false
+                interacted = false
+                if (showing && settled && cardsAt != 0L) seenSince = android.os.SystemClock.uptimeMillis()
+            }
+            if (!shown) {
+                held = false
+                startSeen()
+            }
         }
     }
 
     /** Ready to open again. A panel kept between opens starts each one the way a new one would. */
     fun reset() {
+        opens++
         closing = false
         interacted = false
         held = false
