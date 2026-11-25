@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Typeface
 import android.net.Uri
+import android.os.Build
 import android.text.SpannableStringBuilder
 import android.text.style.BulletSpan
 import android.util.Log
@@ -19,6 +20,8 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import app.chronotif.Background
+import android.window.OnBackInvokedCallback
+import android.window.OnBackInvokedDispatcher
 import app.chronotif.BuildConfig
 import app.chronotif.Prefs
 import app.chronotif.R
@@ -135,6 +138,8 @@ class WhatsNewSheet private constructor(
     private val card: LinearLayout
     private var closed = false
 
+    private val back = if (Build.VERSION.SDK_INT >= 33) OnBackInvokedCallback { close() } else null
+
     init {
         setBackgroundColor(0x66000000)
         // Taps beside the sheet close it, and never reach the cards under it.
@@ -216,6 +221,20 @@ class WhatsNewSheet private constructor(
         setTextColor(if (filled) 0xFFFFFFFF.toInt() else pal.text)
         background = Ui.pressable(if (filled) pal.accent else pal.chip, dp(20).toFloat(), pal.ripple)
         setOnClickListener { onClick() }
+    }
+
+    // From Android 13, Back reaches callbacks rather than key events; above the Panel's own
+    // callback, this one closes the sheet first.
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        if (Build.VERSION.SDK_INT >= 33) {
+            findOnBackInvokedDispatcher()?.registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_OVERLAY, back!!)
+        }
+    }
+
+    override fun onDetachedFromWindow() {
+        if (Build.VERSION.SDK_INT >= 33) findOnBackInvokedDispatcher()?.unregisterOnBackInvokedCallback(back!!)
+        super.onDetachedFromWindow()
     }
 
     override fun close() {

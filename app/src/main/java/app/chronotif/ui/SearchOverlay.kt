@@ -101,6 +101,8 @@ class SearchOverlay private constructor(
     private var appsShown = AppMatch.SHOWN
     private var shownQuery = ""
     private var closing = false
+    /** Data arrived while off screen; shown once back on it. */
+    private var stale = false
 
     private class AppKey(val app: Launchable, val key: AppMatch.Key)
     private class ContactKey(val contact: Contact, val key: AppMatch.Key, val digits: List<String>)
@@ -219,23 +221,35 @@ class SearchOverlay private constructor(
         val app = context.applicationContext
         // Settings pages are looked up before the first letter, not on it.
         lane.run { runCatching { SettingsPages.prepare(app) } }
-        Launchables.load(context) { list ->
-            apps = list
-            lane.run({ appKeys = list.map { AppKey(it, AppMatch.Key(it.label)) } }) { refresh() }
-        }
+        loadApps()
         PersonalData.contacts(context) { list ->
             if (list.isEmpty()) return@contacts
             lane.run({
                 contactKeys = list.map { c -> ContactKey(c, AppMatch.Key(c.name), c.numbers.map { n -> n.filter(Char::isDigit) }) }
-            }) { refresh() }
+            }) { refreshWhenShown() }
         }
         PersonalData.events(context) { list ->
             if (list.isEmpty()) return@events
-            lane.run({ eventKeys = list.map { EventKey(it, AppMatch.Key(it.title)) } }) { refresh() }
+            lane.run({ eventKeys = list.map { EventKey(it, AppMatch.Key(it.title)) } }) { refreshWhenShown() }
         }
     }
 
     private fun locked(c: Context) = c.getSystemService(android.app.KeyguardManager::class.java).isKeyguardLocked
+
+    private fun locked() = locked(context)
+
+    private fun loadApps() = Launchables.load(context) { list ->
+        apps = list
+        lane.run({ appKeys = list.map { AppKey(it, AppMatch.Key(it.label)) } }) { refreshWhenShown() }
+    }
+
+    /**
+     * For data that arrives later: its window may have gone (the lock-screen view finished, the
+     * Panel closed) with Search still in it, and rebuilding the results then is wasted work.
+     */
+    private fun refreshWhenShown() {
+        if (isAttachedToWindow) refresh() else stale = true
+    }
 
     private fun refresh() {
         if (closing) return
@@ -388,13 +402,9 @@ class SearchOverlay private constructor(
         val amount = numbers.money(q.amount, Money.fractionDigits(q.from)) + " " + q.from + " ="
         if (!Prefs.currencyRates) {
             return resultCard(amount, context.getString(R.string.search_currency_off_title),
-                context.getString(R.string.search_currency_off_desc)) {
-                Prefs.currencyRates = true
-                ExchangeRates.refreshIfStale(::refresh)
-                refresh()
-            }
+                context.getString(R.string.search_currency_off_desc)) { turnOnRates() }
         }
-        ExchangeRates.refreshIfStale(::refresh)
+        ExchangeRates.refreshIfStale(::refreshWhenShown)
         val rates = ExchangeRates.rates
         if (rates == null) {
             val state = if (ExchangeRates.failed) R.string.search_currency_failed else R.string.search_currency_loading
@@ -405,6 +415,25 @@ class SearchOverlay private constructor(
         val date = rates.date.format(java.time.format.DateTimeFormatter.ofLocalizedDate(java.time.format.FormatStyle.MEDIUM).withLocale(numbers.locale))
         return resultCard(amount, numbers.money(result, digits) + " " + to,
             context.getString(R.string.search_currency_note, date)) { copy(numbers.plainMoney(result, digits)) }
+    }
+
+    /**
+     * Turning on Currency rates changes a setting and starts downloads, so on the lock screen it
+     * waits for an unlock, like Settings. Search then shows the rate: in its own window right
+     * away, or reopened when the lock-screen view closes on unlock.
+     */
+    private fun turnOnRates() {
+        if (!locked()) {
+            Prefs.currencyRates = true
+            refresh()
+            return
+        }
+        val query = field.text.toString()
+        hideKeyboard()
+        host.guarded {
+            Prefs.currencyRates = true
+            if (host.keepsSearchAfterUnlock) refresh() else SearchActivity.open(host.context, query)
+        }
     }
 
     private fun timeDifference(minutes: Int): String {
@@ -568,12 +597,15 @@ class SearchOverlay private constructor(
      * Search says what would have ([what]) instead. [kind] is what Usage data counts: which sort of
      * result was opened, never which one.
      */
-    private fun launch(kind: Usage.Count, what: CharSequence, action: () -> Unit) {
+    private fun launch(kind: Usage.Count, what: CharSequence, action: () -> Unit) = launchIf(kind, what) { action(); true }
+
+    /** As [launch], for an [action] that may find nothing to open; then nothing is counted and Search doesn't close for it. */
+    private fun launchIf(kind: Usage.Count, what: CharSequence, action: () -> Boolean) {
         hideKeyboard()
         if (app.chronotif.Tutorial.holdsLaunch(context, what)) return
         host.guarded {
+            if (!action()) return@guarded
             app.chronotif.UsageData.count(kind)
-            action()
             host.launched()
         }
     }
@@ -638,7 +670,14 @@ class SearchOverlay private constructor(
         setOnClickListener { open(a) }
     }
 
-    private fun open(a: Launchable) = launch(Usage.Count.SEARCH_APP, a.label) { Launchables.launch(host.context, a) }
+    private fun open(a: Launchable) = launchIf(Usage.Count.SEARCH_APP, a.label) {
+        Launchables.launch(host.context, a).also { opened ->
+            if (!opened) {
+                android.widget.Toast.makeText(context, R.string.search_app_gone, android.widget.Toast.LENGTH_SHORT).show()
+                loadApps()
+            }
+        }
+    }
 
     private fun focusField() {
         field.requestFocus()
@@ -684,6 +723,10 @@ class SearchOverlay private constructor(
         }
         // The keyboard only comes up once the field is in a focused window.
         post(::focusField)
+        if (stale) {
+            stale = false
+            refresh()
+        }
     }
 
     override fun onDetachedFromWindow() {

@@ -3,7 +3,6 @@
 package app.chronotif.ui
 
 import android.annotation.SuppressLint
-import android.app.Notification
 import android.content.Context
 import android.content.res.ColorStateList
 import android.graphics.Bitmap
@@ -11,9 +10,7 @@ import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import android.media.MediaMetadata
 import android.media.session.MediaController
-import android.media.session.MediaSession
 import android.media.session.PlaybackState
-import android.os.Build
 import android.os.SystemClock
 import android.text.format.DateUtils
 import android.view.Gravity
@@ -210,12 +207,7 @@ class MediaPlayerView(context: Context, private val cb: CardCallbacks) : LinearL
         if (entry?.n !== e.n) playSignal = null
         entry = e
         content = c
-        val token = if (Build.VERSION.SDK_INT >= 33) {
-            e.n.extras.getParcelable(Notification.EXTRA_MEDIA_SESSION, MediaSession.Token::class.java)
-        } else {
-            @Suppress("DEPRECATION")
-            e.n.extras.getParcelable(Notification.EXTRA_MEDIA_SESSION)
-        }
+        val token = MediaDismiss.mediaToken(e.n)
         if (controller?.sessionToken != token) {
             if (listening) controller?.unregisterCallback(callback)
             controller = token?.let { runCatching { MediaController(context, it) }.getOrNull() }

@@ -66,9 +66,13 @@ class LockActivity : Activity(), NotifList.Host {
     private lateinit var pile: LockPile
     private lateinit var list: NotifList
     private val main = Handler(Looper.getMainLooper())
-    private val render: () -> Unit = { list.render() }
+    private val render: () -> Unit = {
+        list.render()
+        dwell()
+    }
     private var unlocking = false
-    private val markSeen = Runnable { LockSession.seen(list.shownUpTo) }
+    /** Unlocked, and staying up until an action that finishes later hands off (see [guardedUntil]). */
+    private var handingOff = false
     private val shortcuts by lazy { LockShortcuts(this, practice) { then -> unlock(then) } }
 
     /**
@@ -260,21 +264,31 @@ class LockActivity : Activity(), NotifList.Host {
 
     override fun onResume() {
         super.onResume()
-        if (!practice && !unlocking && !getSystemService(KeyguardManager::class.java).isKeyguardLocked) {
+        if (!practice && !unlocking && !handingOff && !getSystemService(KeyguardManager::class.java).isKeyguardLocked) {
             finish()
             return
         }
         list.source.addListener(render)
         list.render()
         if (!practice) app.chronotif.UsageData.count(app.chronotif.core.Usage.Count.LOCK_SHOWN)
-        // Seen long enough to count — committed only if the user goes on to unlock.
-        if (!practice) main.postDelayed(markSeen, 1200)
+        dwell()
+    }
+
+    /**
+     * What's on screen now counts as seen once it has stayed a moment, committed only if the user
+     * goes on to unlock. Each render starts its own wait, so a card that arrives later counts too,
+     * whichever way the phone is unlocked.
+     */
+    private fun dwell() {
+        if (practice) return
+        val upTo = list.shownUpTo
+        main.postDelayed({ LockSession.seen(upTo) }, SEEN_TOKEN, SEEN_AFTER_MS)
     }
 
     override fun onPause() {
         super.onPause()
         list.source.removeListener(render)
-        main.removeCallbacks(markSeen)
+        main.removeCallbacksAndMessages(SEEN_TOKEN)
         // Unlocked (any method) while we were up: what was shown has now been seen.
         if (!practice && !getSystemService(KeyguardManager::class.java).isKeyguardLocked) LockSession.unlocked()
     }
@@ -298,6 +312,16 @@ class LockActivity : Activity(), NotifList.Host {
     override fun launched() = finish()
 
     override fun guarded(action: () -> Unit) = unlock(action)
+
+    // Finishing right after the unlock would take the image viewer with it before its copy is
+    // ready, and a share sheet can only start from a window that's still up.
+    override fun guardedUntil(action: (finished: (launched: Boolean) -> Unit) -> Unit) = unlock(stay = true) {
+        handingOff = true
+        action {
+            handingOff = false
+            finish()
+        }
+    }
 
     override fun replyElsewhere(e: Entry, actionIndex: Int) {
         Panel.open(this, e.key, actionIndex)
@@ -327,8 +351,13 @@ class LockActivity : Activity(), NotifList.Host {
         }
     }
 
-    /** Asks the system to unlock (PIN/pattern/biometric bouncer), then runs [then]. */
-    private fun unlock(then: (() -> Unit)?) {
+    /**
+     * Asks the system to unlock (PIN/pattern/biometric bouncer), then runs [then] and finishes,
+     * unless [stay]: then [then] finishes it.
+     */
+    private fun unlock(then: (() -> Unit)?) = unlock(stay = false, then)
+
+    private fun unlock(stay: Boolean, then: (() -> Unit)?) {
         if (practice) {
             // The phone is unlocked already: say what the real lock screen would do.
             android.widget.Toast.makeText(this, if (then != null) R.string.tutorial_after_unlock else R.string.tutorial_unlock_here,
@@ -339,7 +368,7 @@ class LockActivity : Activity(), NotifList.Host {
         val km = getSystemService(KeyguardManager::class.java)
         if (!km.isKeyguardLocked) {
             then?.invoke()
-            finish()
+            if (!stay) finish()
             return
         }
         unlocking = true
@@ -349,7 +378,7 @@ class LockActivity : Activity(), NotifList.Host {
                 LockSession.seen(list.shownUpTo)
                 LockSession.unlocked()
                 then?.invoke()
-                finish()
+                if (!stay) finish()
             }
 
             override fun onDismissCancelled() {
@@ -591,6 +620,9 @@ class LockActivity : Activity(), NotifList.Host {
         private const val EXTRA_PRACTICE = "practice"
         /** How long a practice double tap keeps the screen black. */
         private const val PRACTICE_DARK_MS = 1200L
+        /** How long a card stays on screen before unlocking checks it. */
+        private const val SEEN_AFTER_MS = 1200L
+        private val SEEN_TOKEN = Any()
 
         /**
          * The lock-screen view as a stand-in for the Tutorial's Lock screen part, while the phone is

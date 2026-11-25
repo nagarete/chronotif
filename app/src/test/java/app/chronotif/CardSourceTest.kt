@@ -151,4 +151,15 @@ class CardSourceTest {
             .addRemoteInput(android.app.RemoteInput.Builder("text").build()).build()
         assertFalse(Act.reply(context, noIntent, "hi"))
     }
+
+    /** Delivery is told apart from opening, so a button that works in the background still counts as tapped. */
+    @Test
+    fun aButtonThatWorksInTheBackgroundIsSentWithoutOpeningAnything() {
+        fun button(pi: PendingIntent) = Notification.Action.Builder(null, "Mark as read", pi).build()
+        val background = PendingIntent.getBroadcast(context, 1, Intent("test.read"), PendingIntent.FLAG_IMMUTABLE)
+        assertEquals(Act.Sent.SENT, Act.action(context, button(background)))
+        assertEquals(Act.Sent.OPENS, Act.action(context, button(opens())))
+        background.cancel()
+        assertEquals(Act.Sent.FAILED, Act.action(context, button(background)))
+    }
 }

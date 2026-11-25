@@ -45,6 +45,12 @@ class NotifList(
         fun launched()
         /** Run [action] now, or after the user unlocks (lock screen). */
         fun guarded(action: () -> Unit)
+        /**
+         * As [guarded], for an [action] that finishes later, such as a copy before a share sheet:
+         * the host stays up until the action says it's finished, and closes if it launched something.
+         */
+        fun guardedUntil(action: (finished: (launched: Boolean) -> Unit) -> Unit) =
+            guarded { action { opened -> if (opened) launched() } }
         /** Still showing once [guarded] has unlocked, so Search can stay open rather than reopen. */
         val keepsSearchAfterUnlock: Boolean get() = false
         /** Lock screen only: a reply the app wants unlocked first continues in the panel. */
@@ -632,9 +638,7 @@ class NotifList(
 
     override fun onViewImages(anchor: View, e: Entry, items: List<Viewable>, start: Int) {
         val viewer = ImageViewer.show(anchor, items, start, object : ImageViewer.Actions {
-            override fun share(start: () -> Unit) = host.guarded(start)
-
-            override fun launched() = host.launched()
+            override fun share(start: (finished: (launched: Boolean) -> Unit) -> Unit) = host.guardedUntil(start)
 
             override fun openInApp() = host.guarded { if (source.open(host.context, live(e))) host.launched() }
         }) ?: return

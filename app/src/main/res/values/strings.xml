@@ -228,6 +228,7 @@
     <string name="handle_look">Look</string>
     <string name="handle_colours">Colour</string>
     <string name="handle_placement">Placement</string>
+    <string name="search_app_gone">That app isn\'t available any more.</string>
     <string name="search_setup">Set up Search</string>
     <string name="search_setup_next">Next: %1$s</string>
     <string name="search_setup_done">Each step is on or put off. The switches below change any of it.</string>
@@ -444,6 +445,7 @@
     <string name="lock_shortcut_no_flashlight">The flashlight can\'t turn on while the camera is in use.</string>
     <string name="lock_shortcut_no_camera">No camera app opens over the lock screen.</string>
     <string name="lock_shortcut_no_dnd">Do Not Disturb needs Chronotif\'s notification access.</string>
+    <string name="lock_shortcut_dnd_not_ours">Another mode is keeping Do Not Disturb on. Turn it off in Settings.</string>
     <string name="lock_shortcut_app_gone">That app isn\'t installed any more. Pick another in Settings → Lock screen.</string>
     <string name="qr_scanner">QR scanner</string>
     <string name="qr_needs_lens">Not available without Google Lens. Chronotif scans with Lens, which reads codes better than any other scanner on Android.</string>
