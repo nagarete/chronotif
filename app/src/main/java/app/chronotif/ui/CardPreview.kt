@@ -263,7 +263,7 @@ class CardPreview private constructor(
         picker.setIs24HourView(android.text.format.DateFormat.is24HourFormat(context))
         picker.hour = start.hour
         picker.minute = start.minute
-        // Scrolling only: the keyboard can't come up on the lock screen.
+        // Scrolling only: a tap on a number would otherwise bring up the keyboard.
         picker.descendantFocusability = FOCUS_BLOCK_DESCENDANTS
         buttons.addView(FrameLayout(context).apply {
             background = Ui.rounded(pal.card or 0xFF000000.toInt(), dp(22).toFloat())

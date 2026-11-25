@@ -95,8 +95,8 @@ object MediaDismiss {
 }
 
 /**
- * Preserve the original clearable-player gesture: only PLAYING/BUFFERING/CONNECTING
- * block it. Protected players require a real inactive state or a positive action hint.
+ * A clearable player swipes away unless it's PLAYING, BUFFERING or CONNECTING. A protected
+ * player needs a real inactive state or a positive action hint.
  */
 internal object MediaSwipePolicy {
     fun canAttempt(

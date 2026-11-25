@@ -32,7 +32,7 @@ class Entry(
     val isSample: Boolean get() = pkg.startsWith(SAMPLE_PREFIX)
 
     companion object {
-        /** The package prefix of made-up notifications; no installed app has it. */
+        /** The package prefix of made-up notifications. */
         const val SAMPLE_PREFIX = "app.chronotif.sample."
     }
 }
@@ -40,7 +40,8 @@ class Entry(
 /**
  * In-memory mirror of the active notifications, fed by [ListenerService].
  * Everything runs on the main thread (listener callbacks are delivered there).
- * Nothing here is persisted.
+ * The entries live only in memory; [put] keeps when each app last notified, and reads returning
+ * snoozes, through [Prefs].
  */
 object NotifStore {
     private val entries = LinkedHashMap<String, Entry>()

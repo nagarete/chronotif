@@ -25,7 +25,10 @@ import android.util.LruCache
 import app.chronotif.core.Kind
 import app.chronotif.core.MessageStamp
 
-/** What a card displays, extracted from a notification's extras (no foreign RemoteViews). */
+/**
+ * What a card displays, extracted from a notification's extras. A custom layout's RemoteViews are
+ * only inflated to find its photo ([biggestPhoto]).
+ */
 class Content(
     val appName: CharSequence,
     val title: CharSequence,

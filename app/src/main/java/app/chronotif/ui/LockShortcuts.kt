@@ -265,10 +265,8 @@ internal class LockShortcuts(
         private class Look(val fill: Int, val rim: Int, val pressed: Int)
 
         /**
-         * Picked by eye on the phones, for now: on HyperOS (a build number starting "OS") a light fill
-         * sits best; on the MIUI phone, with a dark wallpaper, it nearly vanished, so elsewhere a darker
-         * fill and a light rim keep it visible. The light fill vanishes on any dark wallpaper; a frosted
-         * glass button that reads on both is the better fix.
+         * On HyperOS (a build number starting "OS") a light fill sits best. On MIUI over a dark
+         * wallpaper it nearly vanishes, so elsewhere a darker fill and a light rim keep it visible.
          */
         private val look: Look = if (android.os.Build.VERSION.INCREMENTAL.startsWith("OS")) {
             Look(fill = 0x40000000, rim = 0, pressed = 0x40FFFFFF)

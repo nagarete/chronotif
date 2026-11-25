@@ -12,7 +12,8 @@ import app.chronotif.ui.ScanActivity
 /**
  * The Chronotif QR scanner tile: opens Google Lens (ADR 0017). Without Lens it still shows, and
  * tapping it says why it can't scan; Android's unavailable state would take no tap to say so.
- * On the lock screen, Android asks to unlock before anything opens.
+ * On the lock screen [ScanActivity] shows over the keyguard; whether Lens opens there is up to
+ * Lens (ADR 0017).
  */
 class QrTile : TileService() {
     override fun onTileAdded() {

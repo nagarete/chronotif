@@ -15,8 +15,7 @@ import android.service.notification.StatusBarNotification
 import app.chronotif.ui.LockActivity
 
 /**
- * The only long-lived component. Bound by the system while notification access is granted;
- * purely event-driven (no polling, timers, wakelocks or foreground service).
+ * Bound by the system while notification access is granted; purely event-driven (no polling, timers, wakelocks or foreground service).
  */
 class ListenerService : NotificationListenerService() {
 

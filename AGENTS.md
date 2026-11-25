@@ -21,6 +21,12 @@ Every change starts from the established best practice for that problem on Andro
 
 Time order is the product. Every section sorts newest first by the time its card shows. Only two groupings exist: a Conversation stack, and in Earlier an App stack of one app's neighbouring cards that arrived within 30 minutes of its newest card (ADR 0004). A stack never gathers an app's cards from across the list. Check any new grouping, sorting or collapsing against this before building it.
 
+## Comments
+
+A comment says why: the platform quirk, the OEM workaround, the ADR it follows. It sits directly above the line it explains. Describe the code as it is now. History belongs in git and the ADRs, and a pending fix belongs in an issue.
+
+A comment is a claim the code has to keep true. When you change behaviour, search for comments that describe it, especially absolutes (*only*, *never*, *nothing*, *always*), and fix them in the same commit.
+
 ## Verifying
 
 - `./gradlew testDebugUnitTest lintDebug assembleDebug` must pass. Changes to `core/Attention.kt` update `AttentionTest`. Visible list changes get a Robolectric case in `NotificationBehaviorTest`.

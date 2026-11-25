@@ -11,7 +11,7 @@ import app.chronotif.ui.SearchActivity
 
 /**
  * A home-screen search bar, 2 to 5 cells wide: tapping it opens Search with the keyboard up. It
- * shows nothing that changes, so it never updates.
+ * shows nothing that changes, so it asks for no periodic updates.
  */
 open class SearchWidget(private val layout: Int = R.layout.search_widget) : AppWidgetProvider() {
     override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) {

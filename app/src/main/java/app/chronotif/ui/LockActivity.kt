@@ -47,8 +47,9 @@ import kotlin.math.abs
 /**
  * Shown over the (still locked) keyguard when the screen turns on. It rests with the clock big
  * and New as a Pile at the bottom (ADR 0011), and a Media player's artwork large between them (ADR 0012); scrolling up unfolds the list, New then Earlier,
- * and a tap on the Pile does the same ([LockPile]). Content follows the lock-screen privacy
- * rules, and anything beyond dismissing goes through the system unlock first. Tap outside a card,
+ * and a tap on the Pile's card opens that card in place (ADR 0018, [LockPile]). Content follows the
+ * lock-screen privacy rules. Replies and background buttons work while locked; anything that opens
+ * an app goes through the system unlock first (ADR 0013). Tap outside a card,
  * swipe up from Tap to unlock (or unlock with fingerprint/face) to continue to the phone, or tap the
  * clock or the date to unlock into the alarms or the calendar; back
  * folds the list back into the Pile, then reveals the system lock screen. Pulling down opens Search. Left alone, the display sleeps after the keyguard's short timeout, with

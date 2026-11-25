@@ -475,7 +475,6 @@ class SetupActivity : Activity() {
         page.scrollTo(0, 0)
     }
 
-    /** Adds [s]'s settings to [body]. */
     private fun build(s: Section) {
         when (s) {
             Section.GENERAL -> general()
@@ -624,7 +623,6 @@ class SetupActivity : Activity() {
         }
     }
 
-    /** The gestures nobody can see: a row each, always a tap away in the drawer. */
     /** The Tutorial's parts, each with how far it got and a button to start, continue or redo it. */
     private fun tutorial() {
         footnote(getString(R.string.tutorial_intro), top = 6)
@@ -678,6 +676,7 @@ class SetupActivity : Activity() {
         }
     }
 
+    /** The gestures nobody can see: a row each, always a tap away in the drawer. */
     private fun tips() {
         group {
             listOf(

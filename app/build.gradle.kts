@@ -73,12 +73,12 @@ android {
         unitTests.isIncludeAndroidResources = true
     }
 
-    // No Google-encrypted dependency metadata blob in the APK.
     lint {
         // Target 36 on purpose until 37's behaviour changes are tested on real devices.
         disable += setOf("OldTargetApi", "GradleDependency")
     }
 
+    // No Google-encrypted dependency metadata blob in the APK.
     dependenciesInfo {
         includeInApk = false
         includeInBundle = false

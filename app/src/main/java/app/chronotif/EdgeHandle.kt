@@ -33,7 +33,7 @@ import kotlin.math.abs
  * circle outline by default). Tap it, or swipe down or inward on it, to open the panel; hold it to open
  * Search. Hold it and drag to move it: it snaps to the nearer side at the height it's let go.
  * What's drawn spans the area that takes touches, so it's easy to hit and never catches a touch
- * where nothing shows; the original thin line stays a choice, in its wider touch area. It lights up
+ * where nothing shows, except the thin line, which sits in a wider touch area. It lights up
  * while anything is NEW, in the accent colour unless another (or none) is picked.
  *
  * It steps aside while a fullscreen app hides the status bar (the keyboard can't be followed: Android
@@ -238,7 +238,6 @@ class EdgeHandle(service: Context) {
                     invalidate()
                 }
             }
-        /** [Prefs.handleShape]. */
         var shape = Prefs.SHAPE_HALF_SMALL
             set(v) {
                 if (field != v) {
@@ -246,7 +245,6 @@ class EdgeHandle(service: Context) {
                     invalidate()
                 }
             }
-        /** [Prefs.handleLook]. */
         var look = Prefs.LOOK_FROSTED
             set(v) {
                 if (field != v) {
@@ -330,7 +328,7 @@ class EdgeHandle(service: Context) {
             canvas.drawRoundRect(cx - gw / 2, cy - gh / 2, cx + gw / 2, cy + gh / 2, gw / 2, gw / 2, fill)
         }
 
-        /** The original look, kept for those who like it: a slim line, lit while anything is New. */
+        /** A slim line, lit while anything is New. */
         private fun drawLine(canvas: Canvas) {
             val w = context.dp(if (on) 5 else 4).toFloat()
             val h = height * 0.62f
