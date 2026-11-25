@@ -9,7 +9,7 @@ Chronotif's notification screen, opened on demand on top of whatever is in use. 
 _Avoid_: Shade (the system's), drawer
 
 **New**:
-Notifications that brought new activity since the user's last meaningful check. For a conversation, only its messages that arrived since that check are New.
+Notifications that brought new activity since the user's last meaningful check. For a conversation, only its messages that arrived since that check are New. A conversation whose New messages were all swiped away isn't New, even if checked messages remain.
 
 **Earlier**:
 Still-active notifications the user has already checked, receded but still newest first. A conversation folds into a Conversation stack, and one app's neighbouring cards fold into an App stack. A conversation can sit in New and Earlier at once, split by message.
