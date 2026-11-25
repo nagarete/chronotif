@@ -59,10 +59,6 @@ object Usage {
     fun encodeCounts(counts: Map<String, Int>): String =
         counts.filterValues { it > 0 }.entries.joinToString(";") { "${it.key}=${it.value}" }
 
-    /** [all] less what was [sent], for counts that grew while a batch was on its way. */
-    fun minus(all: Map<String, Int>, sent: Map<String, Int>): Map<String, Int> =
-        all.mapValues { (k, v) -> v - (sent[k] ?: 0) }.filterValues { it > 0 }
-
     // --- Panel speed samples, kept as "at:ms:bucket:kept:pulled;..." ---
 
     /** One timed Panel open: when, how many ms until its cards were drawn, and how it opened. */

@@ -32,6 +32,8 @@ object ExchangeRates {
     private val main = Handler(Looper.getMainLooper())
     private var fetching = false
     private var failedAt = 0L
+    /** Everyone to tell when the download under way ends; a second Search may ask while it runs. */
+    private val waiting = LinkedHashSet<() -> Unit>()
 
     val rates: Money.Rates? get() = Money.decode(Prefs.exchangeRates)
     val loading: Boolean get() = fetching
@@ -39,17 +41,22 @@ object ExchangeRates {
     val failed: Boolean get() = failedAt != 0L && rates == null
 
     /**
-     * Downloads fresh rates if they're on, the ECB should have newer ones, and they're not already
-     * coming. [done] runs on
-     * the main thread when a download ends, whether it worked or not.
+     * Downloads fresh rates if they're on and the ECB should have newer ones. [done] runs on the
+     * main thread when a download ends, whether it worked or not, and also when one already under
+     * way ends. Main thread only.
      */
     fun refreshIfStale(done: () -> Unit) {
-        if (!Prefs.currencyRates || fetching) return
+        if (!Prefs.currencyRates) return
+        if (fetching) {
+            waiting += done
+            return
+        }
         val now = System.currentTimeMillis()
         val saved = rates
         if (saved != null && (!Money.isStale(saved, Instant.ofEpochMilli(now)) || now - Prefs.exchangeRatesFetchedAt < RECHECK_MS)) return
         if (now - failedAt < RETRY_MS) return
         fetching = true
+        waiting += done
         thread(name = "exchange-rates") {
             val got = runCatching { download() }.onFailure { Log.w(TAG, "Couldn't download exchange rates", it) }.getOrNull()
             main.post {
@@ -61,7 +68,9 @@ object ExchangeRates {
                 } else {
                     failedAt = System.currentTimeMillis()
                 }
-                done()
+                val tell = waiting.toList()
+                waiting.clear()
+                tell.forEach { it() }
             }
         }
     }

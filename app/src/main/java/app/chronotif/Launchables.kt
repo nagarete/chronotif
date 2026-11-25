@@ -82,7 +82,14 @@ object Launchables {
         return Launchable(info.label?.toString().orEmpty(), info)
     }
 
-    fun launch(context: Context, a: Launchable) {
+    /**
+     * Opens [a]; false when it can't. A result read earlier may be gone by the tap: once its app
+     * is uninstalled or disabled, Android refuses with a SecurityException.
+     */
+    fun launch(context: Context, a: Launchable): Boolean = try {
         context.getSystemService(LauncherApps::class.java).startMainActivity(a.component, a.user, null, null)
+        true
+    } catch (_: SecurityException) {
+        false
     }
 }

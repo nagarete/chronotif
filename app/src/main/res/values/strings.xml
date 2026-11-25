@@ -37,6 +37,9 @@
     <string name="save">Save</string>
     <string name="saved">Saved</string>
     <string name="save_failed">Couldn\'t save</string>
+    <string name="settings_page_open_failed">Couldn\'t open that settings page</string>
+    <string name="link_open_failed">No app here can open this link</string>
+    <string name="voice_unavailable">Voice input isn\'t available</string>
     <string name="share">Share</string>
     <string name="open_in_app">Open in app</string>
     <string name="video">Video</string>
@@ -225,6 +228,7 @@
     <string name="handle_look">Look</string>
     <string name="handle_colours">Colour</string>
     <string name="handle_placement">Placement</string>
+    <string name="search_app_gone">That app isn\'t available any more.</string>
     <string name="search_setup">Set up Search</string>
     <string name="search_setup_next">Next: %1$s</string>
     <string name="search_setup_done">Each step is on or put off. The switches below change any of it.</string>
@@ -441,6 +445,7 @@
     <string name="lock_shortcut_no_flashlight">The flashlight can\'t turn on while the camera is in use.</string>
     <string name="lock_shortcut_no_camera">No camera app opens over the lock screen.</string>
     <string name="lock_shortcut_no_dnd">Do Not Disturb needs Chronotif\'s notification access.</string>
+    <string name="lock_shortcut_dnd_not_ours">Another mode is keeping Do Not Disturb on. Turn it off in Settings.</string>
     <string name="lock_shortcut_app_gone">That app isn\'t installed any more. Pick another in Settings → Lock screen.</string>
     <string name="qr_scanner">QR scanner</string>
     <string name="qr_needs_lens">Not available without Google Lens. Chronotif scans with Lens, which reads codes better than any other scanner on Android.</string>
@@ -475,12 +480,11 @@
 
     <string name="setup_updates">Updates</string>
     <string name="update_auto">Update automatically</string>
-    <string name="update_auto_desc">Once a day, check GitHub Releases for a new version and install it. Android asks you to confirm unless “Install unknown apps” is allowed for Chronotif.</string>
+    <string name="update_auto_desc">Once a day, when you\'re on Wi-Fi and the battery isn\'t low, check GitHub Releases for a new version and install it. Android asks you to confirm unless “Install unknown apps” is allowed for Chronotif.</string>
     <string name="perm_install">Install unknown apps</string>
     <string name="perm_install_desc">Lets updates install without asking each time (Android 12+).</string>
     <string name="update_check_now">Check for updates</string>
     <string name="update_channel">Updates</string>
-    <string name="update_busy">Already checking…</string>
     <string name="update_checking">Checking for updates…</string>
     <string name="update_none">You\'re up to date (%s).</string>
     <string name="update_skipped">%s failed to install before. Tap “Check for updates” to retry.</string>

@@ -7,8 +7,10 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Typeface
 import android.net.Uri
+import android.os.Build
 import android.text.SpannableStringBuilder
 import android.text.style.BulletSpan
+import android.util.Log
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -16,6 +18,10 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import android.widget.Toast
+import app.chronotif.Background
+import android.window.OnBackInvokedCallback
+import android.window.OnBackInvokedDispatcher
 import app.chronotif.BuildConfig
 import app.chronotif.Prefs
 import app.chronotif.R
@@ -38,31 +44,65 @@ class WhatsNewSheet private constructor(
     companion object {
         const val NOTES_URL = "https://chronotif.com/releases"
 
-        /** The notes this update brings that haven't been shown; null if none, or already looked at. */
-        fun pending(context: Context): List<WhatsNew.Release>? {
-            val code = BuildConfig.VERSION_CODE.toLong()
-            if (Prefs.whatsNewCode == code) return null
-            val releases = read(context)
-            val current = BuildConfig.VERSION_NAME
-            val info = context.packageManager.getPackageInfo(context.packageName, 0)
-            val fresh = info.firstInstallTime == info.lastUpdateTime
-            if (Prefs.whatsNewSeen == null && fresh) {
-                // A new install has nothing to catch up on.
-                Prefs.whatsNewSeen = WhatsNew.allKeys(releases, current)
-                Prefs.whatsNewCode = code
-                return null
-            }
-            val unseen = WhatsNew.unseen(releases, current, Prefs.whatsNewSeen)
-            if (unseen.isEmpty()) {
-                Prefs.whatsNewCode = code
-                return null
-            }
-            return unseen
+        /** The bundled notes and whether this is a new install: fixed for the life of the process. */
+        private class Bundled(val releases: List<WhatsNew.Release>, val fresh: Boolean)
+
+        @Volatile private var bundled: Bundled? = null
+
+        /** Starts reading the notes when What's new is due, so they're ready by the time the panel opens. */
+        fun prepare(context: Context) {
+            if (Prefs.whatsNewCode == BuildConfig.VERSION_CODE.toLong() || bundled != null) return
+            load(context) {}
         }
 
+        /**
+         * Hands [done] the notes this update brings that haven't been shown, on the main thread;
+         * null if none, or already looked at. Reading the notes and the install time happens on
+         * [Background], once per process, since the first panel open after an update is waiting.
+         */
+        fun pending(context: Context, done: (List<WhatsNew.Release>?) -> Unit) {
+            val code = BuildConfig.VERSION_CODE.toLong()
+            if (Prefs.whatsNewCode == code) return done(null)
+            val b = bundled ?: return load(context) { pending(context, done) }
+            val current = BuildConfig.VERSION_NAME
+            if (Prefs.whatsNewSeen == null && b.fresh) {
+                // A new install has nothing to catch up on.
+                Prefs.whatsNewSeen = WhatsNew.allKeys(b.releases, current)
+                Prefs.whatsNewCode = code
+                return done(null)
+            }
+            val unseen = WhatsNew.unseen(b.releases, current, Prefs.whatsNewSeen)
+            if (unseen.isEmpty()) {
+                Prefs.whatsNewCode = code
+                return done(null)
+            }
+            done(unseen)
+        }
+
+        /** Reads the notes and install time again on next use; a test changes them within one process. */
+        internal fun forget() {
+            forgets++
+            bundled = null
+        }
+
+        @Volatile private var forgets = 0
+
+        private fun load(context: Context, done: () -> Unit) {
+            val app = context.applicationContext
+            val since = forgets
+            Background.run({
+                if (bundled == null) Bundled(read(app), fresh(app)).let { if (since == forgets) bundled = it }
+            }) { if (since == forgets) done() }
+        }
+
+        private fun fresh(context: Context): Boolean = runCatching {
+            val info = context.packageManager.getPackageInfo(context.packageName, 0)
+            info.firstInstallTime == info.lastUpdateTime
+        }.getOrDefault(false)
+
         /** Records everything this version has as seen, so it shows once. */
-        private fun markSeen(context: Context) {
-            val all = WhatsNew.allKeys(read(context), BuildConfig.VERSION_NAME)
+        private fun markSeen(releases: List<WhatsNew.Release>) {
+            val all = WhatsNew.allKeys(releases, BuildConfig.VERSION_NAME)
             Prefs.whatsNewSeen = Prefs.whatsNewSeen.orEmpty() + all
             Prefs.whatsNewCode = BuildConfig.VERSION_CODE.toLong()
         }
@@ -88,7 +128,7 @@ class WhatsNewSheet private constructor(
         fun show(anchor: View, host: NotifList.Host, releases: List<WhatsNew.Release>, onClosed: () -> Unit): Boolean {
             val root = anchor.rootView as? ViewGroup ?: return false
             if ((0 until root.childCount).any { root.getChildAt(it) is Overlay }) return false
-            markSeen(anchor.context)
+            markSeen(bundled?.releases ?: releases)
             root.addView(WhatsNewSheet(anchor.context, host, releases, onClosed), ViewGroup.LayoutParams(-1, -1))
             return true
         }
@@ -97,6 +137,8 @@ class WhatsNewSheet private constructor(
     private val pal = Palette(context)
     private val card: LinearLayout
     private var closed = false
+
+    private val back = if (Build.VERSION.SDK_INT >= 33) OnBackInvokedCallback { close() } else null
 
     init {
         setBackgroundColor(0x66000000)
@@ -145,7 +187,9 @@ class WhatsNewSheet private constructor(
                     try {
                         host.context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(NOTES_URL)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                         host.launched()
-                    } catch (_: RuntimeException) {
+                    } catch (e: RuntimeException) {
+                        Log.w("WhatsNewSheet", "Couldn't open the release notes", e)
+                        Toast.makeText(host.context, R.string.link_open_failed, Toast.LENGTH_SHORT).show()
                     }
                 })
                 addView(button(context.getString(R.string.whats_new_done), filled = true) { close() },
@@ -177,6 +221,20 @@ class WhatsNewSheet private constructor(
         setTextColor(if (filled) 0xFFFFFFFF.toInt() else pal.text)
         background = Ui.pressable(if (filled) pal.accent else pal.chip, dp(20).toFloat(), pal.ripple)
         setOnClickListener { onClick() }
+    }
+
+    // From Android 13, Back reaches callbacks rather than key events; above the Panel's own
+    // callback, this one closes the sheet first.
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        if (Build.VERSION.SDK_INT >= 33) {
+            findOnBackInvokedDispatcher()?.registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_OVERLAY, back!!)
+        }
+    }
+
+    override fun onDetachedFromWindow() {
+        if (Build.VERSION.SDK_INT >= 33) findOnBackInvokedDispatcher()?.unregisterOnBackInvokedCallback(back!!)
+        super.onDetachedFromWindow()
     }
 
     override fun close() {

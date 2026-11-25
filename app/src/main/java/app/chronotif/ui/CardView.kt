@@ -289,7 +289,7 @@ class CardView(context: Context, private val cb: CardCallbacks) : LinearLayout(c
         }
         lines.visibility = if (lines.childCount > 0) VISIBLE else GONE
 
-        val pic = if (expanded && !c.redacted) Content.picture(context, e) else null
+        val pic = if (expanded && !c.redacted) Apps.picture(context, e) else null
         bindImage(picture, pic)
         picture.setOnClickListener(if (pic == null) null else OnClickListener {
             cb.onViewImages(this, e, listOf(Viewable(null, pic)), 0)

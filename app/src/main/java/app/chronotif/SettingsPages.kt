@@ -7,6 +7,8 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.Settings
+import android.util.Log
+import android.widget.Toast
 import app.chronotif.core.AppMatch
 
 /**
@@ -61,12 +63,32 @@ object SettingsPages {
         page(R.string.settings_all, Settings.ACTION_SETTINGS, "settings", "pengaturan", "setelan"),
     )
 
-    /** The pages this phone has, cached: resolving them all on every keystroke would be slow. */
-    private var available: List<Page>? = null
+    /** A page this phone has, with its name and words folded once. */
+    private class Found(val page: Page, val keys: List<AppMatch.Key>)
 
-    private fun available(context: Context): List<Page> = available ?: all.filter {
-        context.packageManager.resolveActivity(it.intent, PackageManager.MATCH_DEFAULT_ONLY) != null
-    }.also { available = it }
+    /** The pages this phone has, for the language they were folded in. */
+    private class Available(val locale: java.util.Locale, val pages: List<Found>)
+
+    @Volatile private var available: Available? = null
+
+    /**
+     * The pages this phone has, made once per language: finding them asks the package manager
+     * about each page, so this runs on a background thread, never the main one.
+     */
+    private fun available(context: Context): List<Found> {
+        val locale = context.resources.configuration.locales[0]
+        available?.takeIf { it.locale == locale }?.let { return it.pages }
+        val pages = all.filter {
+            runCatching { context.packageManager.resolveActivity(it.intent, PackageManager.MATCH_DEFAULT_ONLY) }.getOrNull() != null
+        }.map { p -> Found(p, (listOf(context.getString(p.label)) + p.keywords).map(AppMatch::Key)) }
+        available = Available(locale, pages)
+        return pages
+    }
+
+    /** Finds the pages ahead of the first letter typed. Call off the main thread. */
+    fun prepare(context: Context) {
+        available(context)
+    }
 
     /** Shown at most; a short query matches many pages, and the rest of the list is apps and the web. */
     const val SHOWN = 4
@@ -74,16 +96,22 @@ object SettingsPages {
     /**
      * Pages whose name or words start with [query] (or have a word that does), best match first,
      * then in the list's order. A match in the middle of a word doesn't count: "s" would find them all.
+     * Call off the main thread: the first call finds the pages (see [available]).
      */
     fun search(context: Context, query: String): List<Page> {
-        if (AppMatch.fold(query).isEmpty()) return emptyList()
-        return available(context).mapNotNull { p ->
-            val tiers = (listOf(context.getString(p.label)) + p.keywords).mapNotNull { AppMatch.tier(it, query) }
-            tiers.filter { it < 2 }.minOrNull()?.let { it to p }
+        val q = AppMatch.fold(query)
+        if (q.isEmpty()) return emptyList()
+        return available(context).mapNotNull { f ->
+            f.keys.mapNotNull { AppMatch.tier(it, q) }.filter { it < 2 }.minOrNull()?.let { it to f.page }
         }.sortedBy { it.first }.map { it.second }.take(SHOWN)
     }
 
     fun open(context: Context, page: Page) {
-        runCatching { context.startActivity(Intent(page.intent).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+        try {
+            context.startActivity(Intent(page.intent).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        } catch (e: RuntimeException) {
+            Log.w("SettingsPages", "Couldn't open a settings page", e)
+            Toast.makeText(context, R.string.settings_page_open_failed, Toast.LENGTH_SHORT).show()
+        }
     }
 }

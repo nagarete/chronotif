@@ -10,7 +10,7 @@ package app.chronotif.core
  * meaningful check, splits notifications into NEW (arrived after it) and EARLIER (already seen).
  * Both are in time order. In EARLIER, one app's cards that sit next to each other and arrived close
  * together fold into a stack ([appStacks]). A conversation's messages are split the same way as
- * notifications when it's drawn ([newMessages]).
+ * notifications ([split]).
  */
 interface Meta {
     val alertTime: Long
@@ -93,9 +93,34 @@ object Attention {
     fun newMessages(times: List<Long>, lastCheck: Long): Int =
         times.count { it > lastCheck }.coerceIn(minOf(1, times.size), times.size)
 
+    /**
+     * A conversation's incoming [messages] (oldest first) split at the check (ADR 0002), with the
+     * [hidden] ones left out of both parts. Only a [New][isNew] conversation has New messages, and
+     * which ones they are ([newMessages]) is decided before hiding: swiping away the only New
+     * message leaves nothing New rather than moving a checked message up into New.
+     */
+    fun <M> split(
+        item: Meta, lastCheck: Long, messages: List<M>, time: (M) -> Long, hidden: (M) -> Boolean,
+    ): Split<M> {
+        val newCount = if (isNew(item, lastCheck)) newMessages(messages.map(time), lastCheck) else 0
+        val cut = messages.size - newCount
+        return Split(messages.subList(cut, messages.size).filterNot(hidden), messages.subList(0, cut).filterNot(hidden))
+    }
+
+    /**
+     * Whether [item] shows anything in New: a New notification without incoming [messages], or a
+     * New conversation with one of its New messages still shown ([split]). The list, the edge
+     * handle, the tile and the lock screen's wake all ask this, so they agree on what is New.
+     */
+    fun <M> showsNew(item: Meta, lastCheck: Long, messages: List<M>, time: (M) -> Long, hidden: (M) -> Boolean): Boolean =
+        isNew(item, lastCheck) && (messages.isEmpty() || split(item, lastCheck, messages, time, hidden).new.isNotEmpty())
+
     /** A check never moves the watermark backwards. */
     fun advance(lastCheck: Long, seenUpTo: Long) = maxOf(lastCheck, seenUpTo)
 }
+
+/** A conversation's shown messages in New and in Earlier, both oldest first: see [Attention.split]. */
+class Split<M>(val new: List<M>, val earlier: List<M>)
 
 /** Identity of the latest incoming message; zero time means the app supplied only plain text. */
 data class MessageStamp(val time: Long, val signature: Int)

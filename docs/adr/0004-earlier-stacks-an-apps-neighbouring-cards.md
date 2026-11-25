@@ -1,5 +1,7 @@
 # Earlier stacks one app's neighbouring cards that arrived close together
 
+Superseded in part by [ADR 0019](0019-clearing-earlier-keeps-a-conversations-new-messages.md): clearing an app stack hides the checked message of a conversation that is also in New instead of clearing that notification.
+
 ADR 0003 gave every Earlier notification its own card. On the phone, Earlier then showed long runs of near-identical cards, for example three T3 Code "Done" cards from the last two minutes, or four TikTok messages that all arrived at the same minute. The user wanted those runs folded together the way iOS does. They did not want a T3 card from 4 hours ago folded in with them. We chose to stack only cards from one app that sit next to each other in Earlier's time order, where each card arrived within 30 minutes of the stack's newest card. A stack sits where its newest card would sit, and opening it shows its cards in that same place. So a stack never puts an old card above a newer one from another app, which was the reason for ADR 0003.
 
 ## Considered Options
