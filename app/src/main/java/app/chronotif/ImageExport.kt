@@ -57,16 +57,15 @@ object ImageExport {
                 put(MediaStore.Images.Media.RELATIVE_PATH, "${Environment.DIRECTORY_PICTURES}/$ALBUM")
                 put(MediaStore.Images.Media.IS_PENDING, 1)
             }
-            val ok = runCatching {
-                val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)!!
-                val written = resolver.openOutputStream(uri)!!.use { write(app, v, it) }
-                if (written) {
-                    resolver.update(uri, ContentValues().apply { put(MediaStore.Images.Media.IS_PENDING, 0) }, null, null)
-                } else {
-                    resolver.delete(uri, null, null)
-                }
-                written
+            val uri = runCatching { resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values) }.getOrNull()
+            // Saved only once the image is written and published; anything less removes the
+            // pending entry, which the gallery would otherwise hide for a week before Android
+            // clears it.
+            val ok = uri != null && runCatching {
+                val written = resolver.openOutputStream(uri)?.use { write(app, v, it) } == true
+                written && resolver.update(uri, ContentValues().apply { put(MediaStore.Images.Media.IS_PENDING, 0) }, null, null) > 0
             }.getOrDefault(false)
+            if (uri != null && !ok) runCatching { resolver.delete(uri, null, null) }
             main.post { done(ok) }
         }
     }
@@ -80,6 +79,7 @@ object ImageExport {
             dir.listFiles()?.filter { it.lastModified() < week }?.forEach { it.delete() }
             val file = File(dir, fileName(v))
             val ok = runCatching { file.outputStream().use { write(app, v, it) } }.getOrDefault(false)
+            if (!ok) file.delete()
             val intent = if (!ok) null else {
                 val uri = ShareProvider.uri(app, file)
                 val send = Intent(Intent.ACTION_SEND)

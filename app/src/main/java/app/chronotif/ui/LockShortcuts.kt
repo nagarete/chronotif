@@ -35,7 +35,8 @@ import app.chronotif.core.Usage
 /**
  * The two Lock-screen shortcuts, either side of Tap to unlock. Holding one uses it, with the long
  * press's haptic; a tap only says to hold, since a tap on the lock-screen view otherwise unlocks
- * and a pocket shouldn't turn the flashlight on. The flashlight and Do Not Disturb light up while on.
+ * and a pocket shouldn't turn the flashlight on. The flashlight lights up while on, and Do Not
+ * Disturb while any mode is on, whoever turned it on.
  * On the Tutorial's stand-in, holding one says what it would do and does nothing.
  */
 internal class LockShortcuts(
@@ -204,10 +205,18 @@ internal class LockShortcuts(
             LockShortcut.CAMERA -> camera()
             LockShortcut.QR_SCANNER ->
                 if (GoogleLens.installed(activity)) unlock { GoogleLens.open(activity) } else showLensMissing(activity, unlock)
-            LockShortcut.DO_NOT_DISTURB -> if (QuietMode.toggle(activity)) paint() else say(R.string.lock_shortcut_no_dnd)
+            LockShortcut.DO_NOT_DISTURB -> when (QuietMode.toggle(activity)) {
+                QuietMode.Toggle.CHANGED -> paint()
+                QuietMode.Toggle.NO_ACCESS -> say(R.string.lock_shortcut_no_dnd)
+                QuietMode.Toggle.NOT_OURS -> {
+                    paint()
+                    say(R.string.lock_shortcut_dnd_not_ours)
+                    unlock { QuietMode.openSettings(activity) }
+                }
+            }
             LockShortcut.APP -> {
                 val app = Launchables.find(activity, if (onLeft) Prefs.lockShortcutLeftApp else Prefs.lockShortcutRightApp)
-                if (app == null) say(R.string.lock_shortcut_app_gone) else unlock { runCatching { Launchables.launch(activity, app) } }
+                if (app == null) say(R.string.lock_shortcut_app_gone) else unlock { if (!Launchables.launch(activity, app)) say(R.string.lock_shortcut_app_gone) }
             }
         }
         UsageData.count(when (kind) {

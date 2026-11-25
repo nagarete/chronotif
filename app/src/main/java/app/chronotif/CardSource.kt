@@ -69,8 +69,12 @@ interface CardSource {
         override fun removeListener(l: () -> Unit) = NotifStore.removeListener(l)
         override fun open(context: Context, e: Entry) = Act.open(context, e).also { if (it) count(Usage.Count.NOTIFICATION_OPENED) }
         // Act can't tell a sample by its button alone, so the backstop for buttons and replies is here.
-        override fun action(context: Context, e: Entry, a: Notification.Action) =
-            (!e.isSample && Act.action(context, a)).also { if (it) count(Usage.Count.ACTION_TAPPED) }
+        override fun action(context: Context, e: Entry, a: Notification.Action): Boolean {
+            if (e.isSample) return false
+            val sent = Act.action(context, a)
+            if (sent != Act.Sent.FAILED) count(Usage.Count.ACTION_TAPPED)
+            return sent == Act.Sent.OPENS
+        }
         override fun reply(context: Context, e: Entry, a: Notification.Action, text: CharSequence) =
             (!e.isSample && Act.reply(context, a, text)).also { if (it) count(Usage.Count.REPLY_SENT) }
         override fun dismissAll(entries: List<Entry>) {

@@ -43,11 +43,12 @@ class ImageViewer private constructor(
 ) : FrameLayout(context), Overlay {
 
     interface Actions {
-        /** Share needs another app on screen, so it may ask to unlock first. */
-        fun share(start: () -> Unit)
+        /**
+         * Share needs another app on screen, so it may ask to unlock first. [start] says when it's
+         * finished: true once the share sheet is up, false when it won't be.
+         */
+        fun share(start: (finished: (launched: Boolean) -> Unit) -> Unit)
         fun openInApp()
-        /** Another app is on screen now; get out of the way. */
-        fun launched()
     }
 
     companion object {
@@ -74,6 +75,8 @@ class ImageViewer private constructor(
     private val open = button(R.string.open_in_app)
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
     private var closing = false
+    /** A share waiting for its copy; told it won't happen if the viewer closes first. */
+    private var sharing: ((Boolean) -> Unit)? = null
 
     private val back = if (Build.VERSION.SDK_INT >= 33) OnBackInvokedCallback { close() } else null
 
@@ -126,14 +129,17 @@ class ImageViewer private constructor(
             }
         }
         share.setOnClickListener {
+            if (sharing != null) return@setOnClickListener
             val item = items[index]
-            actions.share {
+            actions.share { finished ->
+                if (closing || !isAttachedToWindow) return@share finished(false)
+                sharing = finished
                 ImageExport.share(context, item) { intent ->
-                    // The copy can outlast the viewer; don't pop a share sheet over whatever came next.
-                    if (intent != null && isAttachedToWindow && !closing) {
-                        context.startActivity(intent)
-                        actions.launched()
-                    }
+                    // The copy can outlast the viewer: closing it cancels the share, so no share
+                    // sheet pops up over whatever came next.
+                    val waiting = sharing ?: return@share
+                    sharing = null
+                    waiting(intent != null && runCatching { context.startActivity(intent) }.isSuccess)
                 }
             }
         }
@@ -173,14 +179,33 @@ class ImageViewer private constructor(
         open.visibility = if (item.isVideo) VISIBLE else GONE
     }
 
+    private var chromeShown = true
+
+    /** Hidden chrome is INVISIBLE, not only transparent, so its buttons take no taps. */
     private fun toggleChrome() {
-        val show = top.alpha < 1f
-        for (v in listOf(top, bottom)) v.animate().alpha(if (show) 1f else 0f).setDuration(150).start()
+        chromeShown = !chromeShown
+        val show = chromeShown
+        for (v in listOf(top, bottom)) {
+            v.animate().cancel()
+            if (show) {
+                v.visibility = VISIBLE
+                v.animate().alpha(1f).setDuration(150).start()
+            } else {
+                v.animate().alpha(0f).setDuration(150).withEndAction { v.visibility = INVISIBLE }.start()
+            }
+        }
+    }
+
+    private fun cancelShare() {
+        val waiting = sharing ?: return
+        sharing = null
+        waiting(false)
     }
 
     override fun close() {
         if (closing) return
         closing = true
+        cancelShare()
         animate().alpha(0f).setDuration(150).withEndAction { (parent as? ViewGroup)?.removeView(this) }.start()
     }
 
@@ -196,6 +221,7 @@ class ImageViewer private constructor(
 
     override fun onDetachedFromWindow() {
         if (Build.VERSION.SDK_INT >= 33) findOnBackInvokedDispatcher()?.unregisterOnBackInvokedCallback(back!!)
+        cancelShare()
         super.onDetachedFromWindow()
     }
 

@@ -1808,4 +1808,208 @@ class NotificationBehaviorTest {
             assertNull("Nothing opens", shadowOf(activity).nextStartedActivity)
         }
     }
+
+    @Test
+    @Config(sdk = [35], application = Application::class, shadows = [QuietModeTest.ScheduleKeepsItOn::class])
+    fun holdingDoNotDisturbWhileAnotherOwnersModeIsOnSendsTheUserToSettings() {
+        Prefs.lockShortcutRight = app.chronotif.core.LockShortcut.DO_NOT_DISTURB
+        val nm = context.getSystemService(android.app.NotificationManager::class.java)
+        shadowOf(nm).setNotificationPolicyAccessGranted(true)
+        nm.setInterruptionFilter(android.app.NotificationManager.INTERRUPTION_FILTER_ALL)
+        try {
+            withLockView { activity ->
+                val button = activity.shortcut(R.string.lock_shortcut_dnd)!!
+                button.performLongClick()
+                assertTrue("Chronotif's own turns on and lights the button", button.isActivated)
+                button.performLongClick()
+                assertFalse(button.isActivated)
+
+                QuietModeTest.ScheduleKeepsItOn.on = true
+                button.performLongClick()
+                assertTrue("A schedule's mode still lights it", button.isActivated)
+                assertEquals(context.getString(R.string.lock_shortcut_dnd_not_ours),
+                    org.robolectric.shadows.ShadowToast.getTextOfLatestToast())
+                assertNull("Settings wait for the unlock", shadowOf(activity).nextStartedActivity)
+                shadowOf(context.getSystemService(KeyguardManager::class.java)).setKeyguardLocked(false)
+                shadowOf(Looper.getMainLooper()).idle()
+                assertEquals(android.provider.Settings.ACTION_ZEN_MODE_PRIORITY_SETTINGS,
+                    shadowOf(activity).nextStartedActivity?.action)
+            }
+        } finally {
+            QuietModeTest.ScheduleKeepsItOn.on = false
+        }
+    }
+
+    // --- Seen on the lock screen ---
+
+    @Test
+    fun aCardThatArrivesWhileTheLockScreenViewIsUpIsCheckedByAnyUnlock() {
+        // An update another test left queued on its own looper would hold back every later one.
+        ReflectionHelpers.setStaticField(NotifStore::class.java, "pending", false)
+        plain("Parcel", 2000, 1, "example.shop")
+        val km = shadowOf(context.getSystemService(KeyguardManager::class.java))
+        km.setKeyguardLocked(true)
+        val controller = Robolectric.buildActivity(LockActivity::class.java).setup()
+        try {
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(2))
+            plain("Lunch?", 5000, 2, "example.chat")
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(2))
+            plain("Just now", 7000, 3, "example.mail")
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(300))
+            // A fingerprint on the stock lock screen: Chronotif only sees itself paused, unlocked.
+            km.setKeyguardLocked(false)
+            controller.pause()
+            assertEquals("On screen for a moment before the unlock", 5000, Prefs.lastCheck)
+        } finally {
+            controller.stop().destroy()
+        }
+    }
+
+    // --- Image viewer ---
+
+    private fun picture() = Viewable(null, android.graphics.drawable.BitmapDrawable(context.resources,
+        android.graphics.Bitmap.createBitmap(4, 4, android.graphics.Bitmap.Config.ARGB_8888)))
+
+    /** Runs the main looper until [done], while the export's own thread works. */
+    private fun waitFor(done: () -> Boolean) {
+        val until = System.currentTimeMillis() + 5000
+        while (!done() && System.currentTimeMillis() < until) {
+            Thread.sleep(10)
+            shadowOf(Looper.getMainLooper()).idle()
+        }
+    }
+
+    private fun withViewer(share: (start: (finished: (Boolean) -> Unit) -> Unit) -> Unit, block: (Activity, app.chronotif.ui.ImageViewer) -> Unit) {
+        val controller = Robolectric.buildActivity(Activity::class.java).setup()
+        try {
+            val activity = controller.get()
+            val viewer = app.chronotif.ui.ImageViewer.show(activity.window.decorView, listOf(picture()), 0,
+                object : app.chronotif.ui.ImageViewer.Actions {
+                    override fun share(start: (finished: (launched: Boolean) -> Unit) -> Unit) = share(start)
+                    override fun openInApp() {}
+                })!!
+            shadowOf(Looper.getMainLooper()).idle()
+            block(activity, viewer)
+        } finally {
+            controller.pause().stop().destroy()
+        }
+    }
+
+    private fun button(root: View, label: Int) =
+        views(root).filterIsInstance<TextView>().first { it.text.toString() == context.getString(label) }
+
+    @Test
+    fun shareFromTheImageViewerOpensTheShareSheetOnceTheCopyIsReady() {
+        val results = mutableListOf<Boolean>()
+        withViewer({ start -> start { results += it } }) { activity, viewer ->
+            button(viewer, R.string.share).performClick()
+            waitFor { results.isNotEmpty() }
+            assertEquals(listOf(true), results)
+            assertEquals(Intent.ACTION_CHOOSER, shadowOf(activity).nextStartedActivity?.action)
+        }
+    }
+
+    @Test
+    fun closingTheImageViewerCancelsAShareStillCopying() {
+        val results = mutableListOf<Boolean>()
+        withViewer({ start -> start { results += it } }) { activity, viewer ->
+            button(viewer, R.string.share).performClick()
+            viewer.close()
+            assertEquals("Told at once that no share sheet comes", listOf(false), results)
+            Thread.sleep(300)
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(1))
+            assertEquals(listOf(false), results)
+            assertNull("Nothing pops up over what came next", shadowOf(activity).nextStartedActivity)
+        }
+    }
+
+    @Test
+    fun hiddenImageViewerButtonsTakeNoTaps() {
+        withViewer({}) { _, viewer ->
+            val save = button(viewer, R.string.save)
+            ReflectionHelpers.callInstanceMethod<Unit>(viewer, "toggleChrome")
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(300))
+            assertFalse("Hidden, not just transparent", save.isShown)
+            ReflectionHelpers.callInstanceMethod<Unit>(viewer, "toggleChrome")
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(300))
+            assertTrue(save.isShown)
+        }
+    }
+
+    @Test
+    fun unlockingToShareKeepsTheLockScreenViewUpUntilTheShareSheet() {
+        withLockView { activity ->
+            var finished: ((Boolean) -> Unit)? = null
+            activity.guardedUntil { finished = it }
+            assertNull("Waits for the unlock", finished)
+            shadowOf(context.getSystemService(KeyguardManager::class.java)).setKeyguardLocked(false)
+            shadowOf(Looper.getMainLooper()).idle()
+            assertNotNull(finished)
+            assertFalse("Still up for the share sheet to start from", activity.isFinishing)
+            finished!!(true)
+            assertTrue(activity.isFinishing)
+        }
+    }
+
+    // --- Search over the lock screen ---
+
+    @Test
+    fun currencyRatesWaitForAnUnlockOnTheLockScreen() {
+        Prefs.currencyRates = false
+        withLockView { activity ->
+            val search = app.chronotif.ui.SearchOverlay.show(activity.window.decorView, activity, "100 usd to eur")!!
+            shadowOf(Looper.getMainLooper()).idle()
+            val offer = views(search).filterIsInstance<TextView>()
+                .first { it.text.toString() == context.getString(R.string.search_currency_off_title) }
+            (offer.parent as View).performClick()
+            assertFalse("Not turned on while locked", Prefs.currencyRates)
+            shadowOf(context.getSystemService(KeyguardManager::class.java)).setKeyguardLocked(false)
+            shadowOf(Looper.getMainLooper()).idle()
+            assertTrue(Prefs.currencyRates)
+            assertEquals("Search reopens unlocked with the same question",
+                "app.chronotif.ui.SearchActivity", shadowOf(activity).nextStartedActivity?.component?.className)
+        }
+    }
+
+    // --- What's new ---
+
+    /** Back as Android 16 sends it to an app targeting it: to callbacks, not as a key. */
+    private fun <T> withPredictiveBack(block: () -> T): T {
+        val shadow = org.robolectric.shadows.ShadowWindowOnBackInvokedDispatcher::class.java
+        ReflectionHelpers.callStaticMethod<Unit>(shadow, "setEnablePredictiveBack",
+            ReflectionHelpers.ClassParameter.from(Boolean::class.javaPrimitiveType, true))
+        ReflectionHelpers.callInstanceMethod<Unit>(context.applicationInfo, "setEnableOnBackInvokedCallback",
+            ReflectionHelpers.ClassParameter.from(Boolean::class.javaPrimitiveType, true))
+        try {
+            return block()
+        } finally {
+            ReflectionHelpers.callInstanceMethod<Unit>(context.applicationInfo, "setEnableOnBackInvokedCallback",
+                ReflectionHelpers.ClassParameter.from(Boolean::class.javaPrimitiveType, false))
+            org.robolectric.shadows.ShadowWindowOnBackInvokedDispatcher.reset()
+        }
+    }
+
+    @Test
+    fun backClosesWhatsNewBeforeThePanel() = withPredictiveBack {
+        post(notification("hi"), time = 1000)
+        pretendUpdated()
+        var panelClosed = false
+        withPanelView { panel ->
+            val activity = panel.context as Activity
+            activity.onBackInvokedDispatcher.registerOnBackInvokedCallback(
+                android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT) { panelClosed = true }
+            panel.shown()
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(3))
+            assertNotNull(gotIt(panel.rootView))
+            val dispatcher = ReflectionHelpers.callInstanceMethod<Any>(
+                ReflectionHelpers.callInstanceMethod<Any>(activity.window.decorView, "getViewRootImpl"),
+                "getOnBackInvokedDispatcher")
+            val top = ReflectionHelpers.callInstanceMethod<android.window.OnBackInvokedCallback>(dispatcher, "getTopCallback")
+            top.onBackInvoked()
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(500))
+            assertNull("The sheet closed", gotIt(panel.rootView))
+            assertFalse("The Panel stayed", panelClosed)
+            panel.dismissed()
+        }
+    }
 }
