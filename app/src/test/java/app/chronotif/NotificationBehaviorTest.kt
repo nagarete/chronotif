@@ -226,6 +226,27 @@ class NotificationBehaviorTest {
     }
 
     @Test
+    fun aCardShowsWhatItsNotificationSaysNowAfterARepostOrWhenTheLockScreenHidesIt() {
+        Prefs.markChecked(1000)
+        plain("Parcel", 2000, 1, "example.shop")
+        withLockList { list, container ->
+            list.render()
+            shadowOf(Looper.getMainLooper()).idle()
+            assertTrue(shownTexts(container).contains("Parcel"))
+            plain("Parcel delivered", 3000, 1, "example.shop")
+            list.render()
+            shadowOf(Looper.getMainLooper()).idle()
+            var shown = shownTexts(container)
+            assertTrue("A repost shows its new text", shown.contains("Parcel delivered") && !shown.contains("Parcel"))
+            Prefs.lockHideContent = true
+            list.render()
+            shadowOf(Looper.getMainLooper()).idle()
+            shown = shownTexts(container)
+            assertFalse("Hidden on the lock screen, its text goes", shown.contains("Parcel delivered"))
+        }
+    }
+
+    @Test
     fun withNothingNewTheLockScreenViewRestsAsTheClockAndAnEarlierLine() {
         plain("Old news", 500, 1, "example.news")
         plain("Older news", 400, 2, "example.mail")

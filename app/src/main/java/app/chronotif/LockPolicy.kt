@@ -21,11 +21,13 @@ object LockPolicy {
      * restrictive of the app's notification visibility and the channel override wins; the
      * system "hide sensitive content" setting (or ours) redacts everything not marked public.
      */
-    fun visibility(context: Context, e: Entry): Vis {
+    fun visibility(context: Context, e: Entry): Vis = visibility(e, Snapshot(context))
+
+    /** [visibility] for one of many notifications, with what it reads from the system read once in [lock]. */
+    fun visibility(e: Entry, lock: Snapshot): Vis {
         // The Tutorial's samples are made up: nothing in them is private.
         if (e.isSample) return Vis.SHOW
-        val secure = context.getSystemService(KeyguardManager::class.java).isDeviceSecure
-        if (!secure) return if (Prefs.lockHideContent) Vis.REDACT else Vis.SHOW
+        if (!lock.secure) return if (lock.hideContent) Vis.REDACT else Vis.SHOW
 
         var v = e.n.visibility
         val overrides = listOf(
@@ -35,7 +37,18 @@ object LockPolicy {
         for (o in overrides) if (o != null && o != Ranking.VISIBILITY_NO_OVERRIDE) v = minOf(v, o)
         if (v == Notification.VISIBILITY_SECRET) return Vis.HIDE
         if (v == Notification.VISIBILITY_PUBLIC) return Vis.SHOW
-        return if (Prefs.lockHideContent || !systemAllowsPrivate(context)) Vis.REDACT else Vis.SHOW
+        return if (lock.hideContent || !lock.allowsPrivate) Vis.REDACT else Vis.SHOW
+    }
+
+    /**
+     * What [visibility] reads from the system and settings, read once for a whole list rather than
+     * per card: whether the device is secure is a call into another process.
+     */
+    class Snapshot(context: Context) {
+        val secure = context.getSystemService(KeyguardManager::class.java).isDeviceSecure
+        val hideContent = Prefs.lockHideContent
+        /** Read only if a card needs it. */
+        val allowsPrivate by lazy(LazyThreadSafetyMode.NONE) { systemAllowsPrivate(context) }
     }
 
     /**

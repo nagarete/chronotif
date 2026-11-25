@@ -99,17 +99,25 @@ object Ui {
     fun lp(w: Int = ViewGroup.LayoutParams.MATCH_PARENT, h: Int = ViewGroup.LayoutParams.WRAP_CONTENT) =
         LinearLayout.LayoutParams(w, h)
 
-    fun relTime(context: Context, t: Long, now: Long = System.currentTimeMillis()): String {
-        val startOfToday = Calendar.getInstance().apply {
+    /**
+     * The time as one pass over a list sees it: [now], the start of today and the date format,
+     * worked out once for every card rather than per card.
+     */
+    class Today(val now: Long = System.currentTimeMillis()) {
+        val start: Long = Calendar.getInstance().apply {
+            timeInMillis = now
             set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0)
             set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
         }.timeInMillis
-        return when (val l = RelTime.of(now, t, startOfToday)) {
+        val dates: DateFormat by lazy(LazyThreadSafetyMode.NONE) { DateFormat.getDateInstance(DateFormat.SHORT) }
+    }
+
+    fun relTime(context: Context, t: Long, today: Today = Today()): String =
+        when (val l = RelTime.of(today.now, t, today.start)) {
             RelTime.Label.Now -> context.getString(R.string.time_now)
             is RelTime.Label.Minutes -> context.getString(R.string.time_min, l.m)
             is RelTime.Label.Hours -> context.getString(R.string.time_hour, l.h)
             RelTime.Label.Yesterday -> context.getString(R.string.time_yesterday)
-            RelTime.Label.Older -> DateFormat.getDateInstance(DateFormat.SHORT).format(Date(t))
+            RelTime.Label.Older -> today.dates.format(Date(t))
         }
-    }
 }
