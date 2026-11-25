@@ -12,7 +12,9 @@
       "Swiping away a chat's only new message turns the edge handle off again, and the lock screen no longer wakes for it.",
       "Two photos sent at once in a chat now show as two messages instead of one.",
       "Automatic updates now download only on Wi-Fi and when the battery isn’t low, so they never use your mobile data. Check for updates in Settings still works on any network.",
-      "When a settings page, a link or voice input can’t open, Chronotif now says so instead of doing nothing."
+      "When a settings page, a link or voice input can’t open, Chronotif now says so instead of doing nothing.",
+      "Music playing with the panel closed no longer wakes Chronotif every second, so it uses less battery.",
+      "Big pictures, contact photos and button icons load without holding up the panel, and app names and icons update after you change the language or update an app."
     ]
   },
   "stable": [
