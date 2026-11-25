@@ -3,7 +3,6 @@
 package app.chronotif.ui
 
 import android.annotation.SuppressLint
-import android.app.Notification
 import android.content.Context
 import android.content.res.ColorStateList
 import android.graphics.Bitmap
@@ -11,9 +10,7 @@ import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import android.media.MediaMetadata
 import android.media.session.MediaController
-import android.media.session.MediaSession
 import android.media.session.PlaybackState
-import android.os.Build
 import android.os.SystemClock
 import android.text.format.DateUtils
 import android.view.Gravity
