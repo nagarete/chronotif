@@ -191,6 +191,12 @@ internal class LockShortcuts(
         }
     }
 
+    // After a tap, which already asked Android to change it: the button shows the answer at once.
+    private fun quietNow() {
+        dndOn = runCatching { QuietMode.on(appContext) }.getOrDefault(false)
+        paint()
+    }
+
     /** Hidden while a Preview, the image viewer or Search is over the view. */
     fun cover(on: Boolean) {
         if (covered == on) return
@@ -273,10 +279,10 @@ internal class LockShortcuts(
             LockShortcut.QR_SCANNER ->
                 if (GoogleLens.installed(activity)) unlock { GoogleLens.open(activity) } else showLensMissing(activity, unlock)
             LockShortcut.DO_NOT_DISTURB -> when (QuietMode.toggle(activity)) {
-                QuietMode.Toggle.CHANGED -> readQuiet()
+                QuietMode.Toggle.CHANGED -> quietNow()
                 QuietMode.Toggle.NO_ACCESS -> say(R.string.lock_shortcut_no_dnd)
                 QuietMode.Toggle.NOT_OURS -> {
-                    readQuiet()
+                    quietNow()
                     say(R.string.lock_shortcut_dnd_not_ours)
                     unlock { QuietMode.openSettings(activity) }
                 }
