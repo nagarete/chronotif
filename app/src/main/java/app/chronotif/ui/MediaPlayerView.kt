@@ -26,6 +26,7 @@ import android.widget.SeekBar
 import app.chronotif.Apps
 import app.chronotif.Content
 import app.chronotif.Entry
+import app.chronotif.MediaActionSignal
 import app.chronotif.MediaDismiss
 import app.chronotif.R
 import kotlin.math.abs
@@ -68,16 +69,40 @@ class MediaPlayerView(context: Context, private val cb: CardCallbacks) : LinearL
     private var entry: Entry? = null
     private var content: Content? = null
     private var controller: MediaController? = null
+    /** The session's last state and track, as its callback reported them, so drawing and touch don't ask it again. */
+    private var playback: PlaybackState? = null
+    private var meta: MediaMetadata? = null
+    /** Whether the callback and ticker run: only while the player can be seen (ADR 0009 keeps a hidden Panel). */
+    private var listening = false
+    /** [MediaActionSignal]'s answer for this notification, worked out on the first swipe that needs it. */
+    private var playSignal: Boolean? = null
     private var seeking = false
     private var swipeInterceptArmed = false
     private var swipeDownX = 0f
     private var swipeDownY = 0f
 
-    val swipe = SwipeDismiss({ entry?.let { MediaDismiss.canSwipe(it, controller?.playbackState, context) } == true }, { entry?.let(cb::onDismiss) })
+    val swipe = SwipeDismiss(::canSwipe, { entry?.let(cb::onDismiss) })
+
+    /**
+     * Runs on every touch move, so it reads only what this view already holds. Dismissal itself
+     * re-reads the live notification and playback state ([MediaDismiss.dismiss]).
+     */
+    private fun canSwipe(): Boolean {
+        val e = entry ?: return false
+        return MediaDismiss.canSwipe(e, playback, context) {
+            playSignal ?: MediaActionSignal.hasPlayWithoutPause(e.n, context).also { playSignal = it }
+        }
+    }
 
     private val callback = object : MediaController.Callback() {
-        override fun onPlaybackStateChanged(state: PlaybackState?) = refresh()
-        override fun onMetadataChanged(metadata: MediaMetadata?) = refresh()
+        override fun onPlaybackStateChanged(state: PlaybackState?) {
+            playback = state
+            refresh()
+        }
+        override fun onMetadataChanged(metadata: MediaMetadata?) {
+            meta = metadata
+            refresh()
+        }
     }
 
     private val ticker = object : Runnable {
@@ -156,15 +181,11 @@ class MediaPlayerView(context: Context, private val cb: CardCallbacks) : LinearL
             MotionEvent.ACTION_DOWN -> {
                 swipeDownX = event.rawX
                 swipeDownY = event.rawY
-                swipeInterceptArmed = !swipe.dismissing &&
-                    entry?.let { MediaDismiss.canSwipe(it, controller?.playbackState, context) } == true &&
-                    !touchesSeekBar(event)
+                swipeInterceptArmed = !swipe.dismissing && canSwipe() && !touchesSeekBar(event)
                 if (swipeInterceptArmed) swipe.onTouch(this, event)
             }
             MotionEvent.ACTION_MOVE -> {
-                if (swipeInterceptArmed &&
-                    entry?.let { MediaDismiss.canSwipe(it, controller?.playbackState, context) } == true
-                ) {
+                if (swipeInterceptArmed && canSwipe()) {
                     val dx = event.rawX - swipeDownX
                     val dy = event.rawY - swipeDownY
                     val slop = ViewConfiguration.get(context).scaledTouchSlop
@@ -186,6 +207,7 @@ class MediaPlayerView(context: Context, private val cb: CardCallbacks) : LinearL
 
     fun bind(e: Entry, c: Content) {
         if (entry?.key != e.key) swipe.reset(this)
+        if (entry?.n !== e.n) playSignal = null
         entry = e
         content = c
         val token = if (Build.VERSION.SDK_INT >= 33) {
@@ -195,29 +217,58 @@ class MediaPlayerView(context: Context, private val cb: CardCallbacks) : LinearL
             e.n.extras.getParcelable(Notification.EXTRA_MEDIA_SESSION)
         }
         if (controller?.sessionToken != token) {
-            controller?.unregisterCallback(callback)
+            if (listening) controller?.unregisterCallback(callback)
             controller = token?.let { runCatching { MediaController(context, it) }.getOrNull() }
-            if (isAttachedToWindow) controller?.registerCallback(callback)
+            if (listening) controller?.registerCallback(callback)
+            // The same session keeps these current through its callback.
+            readSession()
         }
         refresh()
     }
 
-    override fun onAttachedToWindow() {
-        super.onAttachedToWindow()
-        controller?.registerCallback(callback)
-        refresh()
+    private fun readSession() {
+        playback = controller?.playbackState
+        meta = controller?.metadata
+    }
+
+    /**
+     * Seen or not, counting its window and every parent: a closed Panel is kept but hidden
+     * (ADR 0009) and never detaches this view, and the lock screen's window hides when the
+     * screen goes off. Hidden, the player stops its ticker and its session callback.
+     */
+    override fun onVisibilityAggregated(isVisible: Boolean) {
+        super.onVisibilityAggregated(isVisible)
+        if (isVisible) listen() else stopListening()
     }
 
     override fun onDetachedFromWindow() {
-        controller?.unregisterCallback(callback)
-        removeCallbacks(ticker)
+        stopListening()
         super.onDetachedFromWindow()
     }
+
+    private fun listen() {
+        if (listening) return
+        listening = true
+        controller?.registerCallback(callback)
+        // What changed while it was hidden.
+        readSession()
+        refresh()
+    }
+
+    private fun stopListening() {
+        if (!listening) return
+        listening = false
+        controller?.unregisterCallback(callback)
+        removeCallbacks(ticker)
+    }
+
+    /** For tests: whether the session callback and ticker are running. */
+    internal val isListening get() = listening
 
     private fun refresh() {
         val e = entry ?: return
         val c = content ?: return
-        val meta = controller?.metadata
+        val meta = meta
         val redacted = c.redacted
 
         badge.setImageDrawable(Apps.icon(context, e))
@@ -239,12 +290,12 @@ class MediaPlayerView(context: Context, private val cb: CardCallbacks) : LinearL
         val duration = meta?.getLong(MediaMetadata.METADATA_KEY_DURATION) ?: 0L
         seekRow.visibility = if (duration > 0 && !redacted) VISIBLE else GONE
         seek.max = duration.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
-        seek.isEnabled = (controller?.playbackState?.actions ?: 0L) and PlaybackState.ACTION_SEEK_TO != 0L
+        seek.isEnabled = (playback?.actions ?: 0L) and PlaybackState.ACTION_SEEK_TO != 0L
         total.text = clock(duration)
         tick()
 
         removeCallbacks(ticker)
-        if (playing() && isAttachedToWindow) postDelayed(ticker, 1000)
+        if (playing() && listening) postDelayed(ticker, 1000)
     }
 
     private fun bindControls(e: Entry) {
@@ -266,7 +317,7 @@ class MediaPlayerView(context: Context, private val cb: CardCallbacks) : LinearL
             return
         }
         controls.visibility = VISIBLE
-        val actions = ctl.playbackState?.actions ?: 0L
+        val actions = playback?.actions ?: 0L
         val playing = playing()
         playPause.setImageResource(if (playing) R.drawable.ic_media_pause else R.drawable.ic_media_play)
         playPause.contentDescription = context.getString(if (playing) R.string.media_pause else R.string.media_play)
@@ -285,7 +336,7 @@ class MediaPlayerView(context: Context, private val cb: CardCallbacks) : LinearL
     /** Moves the seek bar along without re-reading everything else. */
     private fun tick() {
         if (seeking) return
-        val state = controller?.playbackState ?: return
+        val state = playback ?: return
         val duration = seek.max.toLong()
         var position = state.position
         if (state.state == PlaybackState.STATE_PLAYING && state.lastPositionUpdateTime > 0) {
@@ -296,7 +347,7 @@ class MediaPlayerView(context: Context, private val cb: CardCallbacks) : LinearL
         elapsed.text = clock(position)
     }
 
-    private fun playing(): Boolean = when (controller?.playbackState?.state) {
+    private fun playing(): Boolean = when (playback?.state) {
         PlaybackState.STATE_PLAYING, PlaybackState.STATE_BUFFERING, PlaybackState.STATE_CONNECTING -> true
         else -> false
     }
