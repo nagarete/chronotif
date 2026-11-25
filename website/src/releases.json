@@ -8,7 +8,8 @@
       "On the lock screen, tapping the top notification opens just that one in place, with a conversation’s messages and its Reply button, instead of unfolding everything. Tap the count under it to see the rest.",
       "Fit to your fingerprint sensor is now under Settings → Lock screen on every phone, for in-screen sensors your phone doesn't tell Chronotif about.",
       "Leaving Settings takes a second Back, so one stray edge swipe doesn't drop you out of it.",
-      "Music playing with the panel closed no longer wakes Chronotif every second, so it uses less battery."
+      "Music playing with the panel closed no longer wakes Chronotif every second, so it uses less battery.",
+      "Big pictures, contact photos and button icons load without holding up the panel, and app names and icons update after you change the language or update an app."
     ]
   },
   "stable": [

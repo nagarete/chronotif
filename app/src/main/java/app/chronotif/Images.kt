@@ -53,6 +53,9 @@ object Images {
         }
     }
 
+    /** Memory is short: lets go of decoded attachments, which decode again when shown. */
+    fun trim() = cache.evictAll()
+
     /** Off the main thread: the original bytes, for saving and sharing. */
     fun copy(context: Context, a: Attachment, out: java.io.OutputStream): Boolean = runCatching {
         context.contentResolver.openInputStream(a.uri)!!.use { it.copyTo(out) }
