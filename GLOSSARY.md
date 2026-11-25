@@ -106,3 +106,7 @@ _Avoid_: Changelog, update dialog
 **Usage data**:
 Anonymous counts, speeds, settings and crash reports Chronotif sends to improve the app, tied to a random install ID and the country, never to anything from notifications, contacts, calendar or Search. On unless turned off; turning it off sends one last note that it was turned off, then nothing.
 _Avoid_: Telemetry, Analytics, Tracking
+
+**Feedback**:
+A message a user writes and sends on purpose, from the app or the website, to the maintainer privately. It is never public; the maintainer files an issue from it when it needs work. It is not Usage data: nothing is sent until the user taps Send.
+_Avoid_: Bug report, Issue (an issue is public and lives on GitHub)

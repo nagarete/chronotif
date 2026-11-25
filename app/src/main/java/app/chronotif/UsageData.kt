@@ -356,7 +356,7 @@ object UsageData {
         )
     }
 
-    private fun systemProperty(name: String): String? = runCatching {
+    internal fun systemProperty(name: String): String? = runCatching {
         val p = ProcessBuilder("getprop", name).redirectErrorStream(true).start()
         // Waited for before reading: a read would block for as long as getprop hangs. One
         // property's value fits in the pipe's buffer, so getprop can finish before it's read.

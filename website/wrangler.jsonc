@@ -15,6 +15,11 @@
     { "pattern": "chronotif.com", "custom_domain": true },
     { "pattern": "www.chronotif.com", "custom_domain": true }
   ],
+  // Feedback (worker/feedback.js) is emailed to FEEDBACK_TO, a verified Email Routing destination
+  // kept as a Worker secret with TURNSTILE_SECRET; docs/guide.md says how to set both.
+  "send_email": [{ "name": "FEEDBACK_MAIL" }],
+  // Three posts a minute per IP address; 10 and 60 seconds are the only periods Workers offer.
+  "ratelimits": [{ "name": "FEEDBACK_LIMIT", "namespace_id": "1001", "simple": { "limit": 3, "period": 60 } }],
   "workers_dev": false,
   "observability": { "enabled": false }
 }

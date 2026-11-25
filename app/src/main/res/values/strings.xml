@@ -185,6 +185,27 @@
     <string name="settings_sections">Sections</string>
     <string name="settings_group_features">Features</string>
     <string name="settings_group_app">App</string>
+    <string name="setup_feedback">Send feedback</string>
+    <string name="settings_keywords_feedback">feedback bug report problem idea suggestion contact email support help developer</string>
+    <string name="feedback_intro">Tell the developer about a problem, an idea or anything else. Only the developer reads it; it\'s never posted publicly. Write in any language.</string>
+    <string name="feedback_kind">What it\'s about</string>
+    <string name="feedback_kind_problem">Problem</string>
+    <string name="feedback_kind_idea">Idea</string>
+    <string name="feedback_kind_other">Other</string>
+    <string name="feedback_text">Message</string>
+    <string name="feedback_text_hint">What happened, or what would you like?</string>
+    <string name="feedback_contact">How to reach you (optional)</string>
+    <string name="feedback_contact_hint">Email, or any way to reach you</string>
+    <string name="feedback_contact_desc">Only used to reply. Leave it empty to stay anonymous.</string>
+    <string name="feedback_details">Include phone details</string>
+    <string name="feedback_details_loading">Reading this phone\'s details…</string>
+    <string name="feedback_send">Send</string>
+    <string name="feedback_sending">Sending…</string>
+    <string name="feedback_sent">Sent. Thank you!</string>
+    <string name="feedback_offline">Couldn\'t send. Check your connection and try again; your message is still here.</string>
+    <string name="feedback_too_many">Too many messages from this network. Try again in a minute.</string>
+    <string name="feedback_failed">Couldn\'t send right now. Try again later, or email feedback@chronotif.com.</string>
+    <string name="feedback_github">Prefer GitHub? Open an issue</string>
     <string name="style_count_short">With count</string>
     <string name="perm_listener">Notification access</string>
     <string name="perm_listener_desc">Read, open, dismiss and act on notifications.</string>
@@ -489,7 +510,7 @@
     <string name="fingerprint_fit_done_body">The lock screen now keeps clear of your sensor.</string>
 
     <string name="setup_privacy">Privacy</string>
-    <string name="privacy_body">No accounts. Notifications never leave this device. Stored on it: the time of your last check, when the last few apps notified (never what they said), these settings, and Usage data waiting to be sent. Chronotif goes online for three things: the update check below, off until you turn it on; Search\'s currency rates, downloaded from the European Central Bank when you type a currency; and Usage data, which you can turn off here.</string>
+    <string name="privacy_body">No accounts. Notifications never leave this device. Stored on it: the time of your last check, when the last few apps notified (never what they said), these settings, and Usage data waiting to be sent. Chronotif goes online for four things: the update check, off until you turn it on; Search\'s currency rates, downloaded from the European Central Bank when you type a currency; Usage data, which you can turn off here; and Feedback, only when you send it.</string>
     <string name="usage_data">Usage data</string>
     <string name="usage_data_desc">Send anonymous counts, Panel speeds, settings and crash reports, so Chronotif can be improved from how it\'s really used. Never anything from your notifications, contacts, calendar or Search. Turning it off sends one last note that it was turned off, then nothing.</string>
     <string name="usage_data_whats_sent">What\'s sent</string>

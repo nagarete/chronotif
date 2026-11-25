@@ -16,14 +16,16 @@ translations and accessibility improvements are always welcome.
   best later is welcome. If you touch older code that falls short, fix it or point it out;
   don't copy it.
 - **Local-first and private.** No accounts, and nothing from the user's notifications,
-  contacts, calendar or Search ever leaves the device. There are three pieces of network code.
+  contacts, calendar or Search ever leaves the device. There are four pieces of network code.
   Two are download-only: the opt-in updater (`Updater.kt`), which reads public GitHub Releases, and
   Search's currency rates (`ExchangeRates.kt`), on by default for new installs, which download the
   European Central Bank's public daily rates when a currency is typed (ADR 0008, ADR 0015).
   The third is Usage data (`UsageData.kt`, ADR 0016): anonymous counts, Panel speeds, settings and
   crash reports sent to PostHog, on unless turned off. A new Usage data field is added to
   `docs/usage-data.md` in the same commit, and must not reveal a notification's content or which
-  app sent it. A PR that adds other network use won't be merged.
+  app sent it. The fourth is Feedback (`Feedback.kt`): a message the user writes under
+  *Settings → Send feedback*, posted to chronotif.com only when they tap Send, and emailed privately
+  to the maintainer. A PR that adds other network use won't be merged.
 - **Lightweight.** No polling, wakelocks, alarms or foreground services. Work happens in
   response to system events. The one exception is the opt-in daily update job. Avoid
   dependencies; the app currently has none.
@@ -63,7 +65,11 @@ Please make sure tests and lint pass before opening a PR (CI runs the same check
 
 ## Reporting bugs
 
-Use the bug report template. For notification problems, the device model, OS version
+Use the bug report template. People without a GitHub account can use *Settings → Send feedback* in
+the app or [chronotif.com/feedback](https://chronotif.com/feedback) instead. That Feedback is emailed
+privately to the maintainer, who files an issue from it when something needs work. It isn't turned
+into issues automatically, because people write private things into it; anything copied into an
+issue leaves out what the sender would want private. For notification problems, the device model, OS version
 (e.g. HyperOS 3 / Android 16) and the app that posted the notification matter most.
 Please don't paste notification contents; they're private.
 

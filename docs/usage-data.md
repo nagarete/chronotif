@@ -101,3 +101,14 @@ Chronotif keeps a batch on the phone until PostHog has it. If a send fails, it t
 ## Builds that send nothing
 
 The debug build (`app.chronotif.debug`) has no PostHog key and never sends.
+
+## Feedback is separate
+
+**Settings → Send feedback** isn't Usage data, and turning Usage data off doesn't affect it. Nothing goes until you write a message and tap Send. It goes to chronotif.com, whose Worker ([`worker/feedback.js`](../website/worker/feedback.js)) emails it privately to the developer; it isn't stored there or posted anywhere. It carries:
+
+- what it's about (Problem, Idea or Other), if you pick one;
+- your message;
+- how to reach you, only if you fill it in;
+- the phone's details, unless you switch them off before sending: app version and channel, Android version, the phone's maker and model, and its system (e.g. HyperOS 3.0).
+
+Your IP address is used only to limit how many messages one network can send a minute (and, on the website, for Cloudflare's Turnstile bot check). It isn't kept or put in the email. The debug build sends Feedback too, since it's only sent when you ask.

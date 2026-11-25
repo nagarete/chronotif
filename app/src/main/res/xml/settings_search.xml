@@ -126,4 +126,7 @@
             <setting title="@string/usage_data_whats_sent" summary="@string/usage_data_whats_sent_desc" />
         </group>
     </section>
+
+    <!-- The form's fields aren't settings, so only the page itself is found. -->
+    <section name="FEEDBACK" keywords="@string/settings_keywords_feedback" />
 </settings>

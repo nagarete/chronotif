@@ -4,6 +4,9 @@ import { defineConfig } from "vite";
 import { esc, releasesHtml, releaseTeaser } from "./releases.mjs";
 
 const REPO = "nagarete/chronotif";
+// The feedback form's Turnstile widget (Cloudflare dashboard → Turnstile). A site key is public by
+// design; its secret is the Worker's TURNSTILE_SECRET.
+const TURNSTILE_SITE_KEY = "0x4AAAAAAGSNOjQrkSZzuN1e";
 const RELEASES = `https://github.com/${REPO}/releases`;
 
 // Resolve both channels at build time, so visitors never call GitHub's API.
@@ -134,6 +137,7 @@ export default defineConfig(async () => {
     APK_URL: stable.apkUrl,
     NIGHTLY_APK_URL: nightly.apkUrl,
     NIGHTLY_RELEASE_URL: nightly.releaseUrl,
+    TURNSTILE_SITE_KEY,
   };
   const markup = {
     APK_SIZE: esc(stable.apkSize).replace(" ", "&nbsp;"),
@@ -143,7 +147,7 @@ export default defineConfig(async () => {
   let outDir;
   return {
     build: {
-      rollupOptions: { input: { main: "index.html", releases: "releases.html" } },
+      rollupOptions: { input: { main: "index.html", releases: "releases.html", feedback: "feedback.html" } },
     },
     plugins: [
       {

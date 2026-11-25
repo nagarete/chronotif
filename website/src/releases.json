@@ -1,4 +1,11 @@
 {
+  "next": {
+    "version": "0.3.1",
+    "headline": "Tell the developer what you think, right from Settings.",
+    "notes": [
+      "Send a problem or an idea from Settings → Send feedback, no GitHub account needed. Only the developer reads it, a way to reach you is optional, and your phone's details can go with it. The same form is at chronotif.com/feedback."
+    ]
+  },
   "stable": [
     {
       "version": "0.3.0",

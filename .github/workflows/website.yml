@@ -50,6 +50,8 @@ jobs:
 
       - run: npm ci
 
+      - run: npm test
+
       - name: Build
         env:
           # The build reads the newest stable and nightly from GitHub's API; the token avoids its rate limit.
