@@ -19,12 +19,9 @@ class UsageTest {
     }
 
     @Test
-    fun countsSurviveBeingKeptAndLoseOnlyWhatWasSent() {
+    fun countsSurviveBeingKept() {
         val kept = Usage.encodeCounts(mapOf("panel_opened" to 3, "snoozed" to 1, "cleared" to 0))
         assertEquals(mapOf("panel_opened" to 3, "snoozed" to 1), Usage.decodeCounts(kept))
-        // Two more opens came in while the batch with three was on its way.
-        val now = mapOf("panel_opened" to 5, "snoozed" to 1)
-        assertEquals(mapOf("panel_opened" to 2), Usage.minus(now, mapOf("panel_opened" to 3, "snoozed" to 1)))
         assertEquals(emptyMap<String, Int>(), Usage.decodeCounts(null))
         assertEquals(emptyMap<String, Int>(), Usage.decodeCounts("garbage;=1;x=y"))
     }

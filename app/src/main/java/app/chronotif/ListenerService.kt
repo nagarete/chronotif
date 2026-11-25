@@ -37,7 +37,10 @@ class ListenerService : NotificationListenerService() {
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
                 Intent.ACTION_SCREEN_ON -> if (LockPolicy.shouldShow(context)) showLockView()
-                Intent.ACTION_SCREEN_OFF -> LockSession.reset()
+                Intent.ACTION_SCREEN_OFF -> {
+                    LockSession.reset()
+                    UsageData.flush()
+                }
                 Intent.ACTION_USER_PRESENT -> LockSession.unlocked()
             }
         }
