@@ -7,6 +7,8 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.Settings
+import android.util.Log
+import android.widget.Toast
 import app.chronotif.core.AppMatch
 
 /**
@@ -105,6 +107,11 @@ object SettingsPages {
     }
 
     fun open(context: Context, page: Page) {
-        runCatching { context.startActivity(Intent(page.intent).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+        try {
+            context.startActivity(Intent(page.intent).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        } catch (e: RuntimeException) {
+            Log.w("SettingsPages", "Couldn't open a settings page", e)
+            Toast.makeText(context, R.string.settings_page_open_failed, Toast.LENGTH_SHORT).show()
+        }
     }
 }

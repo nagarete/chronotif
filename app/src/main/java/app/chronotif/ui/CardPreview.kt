@@ -24,6 +24,7 @@ import android.widget.ScrollView
 import android.window.OnBackInvokedCallback
 import android.window.OnBackInvokedDispatcher
 import app.chronotif.Act
+import app.chronotif.Apps
 import app.chronotif.Content
 import app.chronotif.Entry
 import app.chronotif.Images
@@ -178,8 +179,7 @@ class CardPreview private constructor(
     private fun image(): View? {
         if (c.redacted) return null
         val a = c.attachments.lastOrNull { it != null }
-        val pic = if (a == null) Content.picture(context, e) else null
-        if (a == null && pic == null) return null
+        if (a == null && !Apps.hasPicture(e)) return null
         val image = ImageView(context).apply {
             adjustViewBounds = true
             scaleType = ImageView.ScaleType.FIT_CENTER
@@ -200,12 +200,17 @@ class CardPreview private constructor(
                     val all = c.gallery
                     actions.viewImages(this@CardPreview, all.map { Viewable(it, null) }, all.indexOf(a))
                 } else {
+                    val pic = image.drawable ?: return@setOnClickListener
                     actions.viewImages(this@CardPreview, listOf(Viewable(null, pic)), 0)
                 }
             }
         }
         if (a != null) Images.into(image, a, Images.VIEWER_PX) { ok -> if (!ok) box.visibility = GONE }
-        else image.setImageDrawable(pic)
+        else {
+            // Loaded in the background when it's not already in memory; it's this Preview's own view.
+            val pic = Apps.picture(context, e) { d -> if (d == null) box.visibility = GONE else image.setImageDrawable(d) }
+            if (pic != null) image.setImageDrawable(pic)
+        }
         return box
     }
 

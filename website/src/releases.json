@@ -8,6 +8,13 @@
       "On the lock screen, tapping the top notification opens just that one in place, with a conversation’s messages and its Reply button, instead of unfolding everything. Tap the count under it to see the rest.",
       "Fit to your fingerprint sensor is now under Settings → Lock screen on every phone, for in-screen sensors your phone doesn't tell Chronotif about.",
       "Leaving Settings takes a second Back, so one stray edge swipe doesn't drop you out of it.",
+      "Clearing Earlier no longer throws away a chat's new messages: only the messages you'd already seen go, and Earlier's Clear now takes those too.",
+      "Swiping away a chat's only new message turns the edge handle off again, and the lock screen no longer wakes for it.",
+      "Two photos sent at once in a chat now show as two messages instead of one.",
+      "Automatic updates now download only on Wi-Fi and when the battery isn’t low, so they never use your mobile data. Check for updates in Settings still works on any network.",
+      "When a settings page, a link or voice input can’t open, Chronotif now says so instead of doing nothing.",
+      "Music playing with the panel closed no longer wakes Chronotif every second, so it uses less battery.",
+      "Big pictures, contact photos and button icons load without holding up the panel, and app names and icons update after you change the language or update an app.",
       "Search keeps up with your typing on phones with many apps and contacts. When a short search matches lots of apps, the best six show, with Show more for the rest.",
       "The lock screen and the first panel after an update open faster."
     ]
