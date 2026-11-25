@@ -39,6 +39,9 @@ object Prefs {
 
     fun init(context: Context) {
         sp = context.applicationContext.getSharedPreferences("chronotif", Context.MODE_PRIVATE)
+        notifiedMemo = null
+        if (notifiedDirty) main.removeCallbacks(notifiedWrite)
+        notifiedDirty = false
         keepOldDefaults(context)
     }
 
@@ -339,18 +342,47 @@ object Prefs {
      * When each app last notified, for Search's suggestion row: app id (package|user) to
      * arrival time. Times only, never content, and only the most recent few apps are kept.
      */
-    val lastNotified: Map<String, Long>
-        get() = sp.getString("last_notified", null).orEmpty().split(';').mapNotNull { pair ->
+    val lastNotified: Map<String, Long> get() = HashMap(notifiedNow())
+
+    /**
+     * [lastNotified] as it stands. Every arrival updates it here, and [flushNotified] writes it out
+     * later, so a burst of notifications doesn't parse and rewrite the preferences file each time.
+     * A process killed before the write loses only those last few seconds of recency.
+     */
+    private var notifiedMemo: MutableMap<String, Long>? = null
+    private var notifiedDirty = false
+    private val main by lazy { android.os.Handler(android.os.Looper.getMainLooper()) }
+    private val notifiedWrite = Runnable { flushNotified() }
+
+    private fun notifiedNow(): MutableMap<String, Long> = notifiedMemo
+        ?: sp.getString("last_notified", null).orEmpty().split(';').mapNotNull { pair ->
             val i = pair.lastIndexOf('=')
             if (i <= 0) null else pair.substring(i + 1).toLongOrNull()?.let { pair.substring(0, i) to it }
-        }.toMap()
+        }.toMap(HashMap()).also { notifiedMemo = it }
 
+    /** Called on the main thread, as each notification arrives. */
     fun notified(appId: String, at: Long) {
-        val all = lastNotified
+        val all = notifiedNow()
         if ((all[appId] ?: 0L) >= at) return
-        val kept = (all + (appId to at)).entries.sortedByDescending { it.value }.take(LAST_NOTIFIED_KEPT)
+        all[appId] = at
+        if (all.size > LAST_NOTIFIED_KEPT) all.remove(all.minBy { it.value }.key)
+        if (!notifiedDirty) {
+            notifiedDirty = true
+            main.postDelayed(notifiedWrite, NOTIFIED_WRITE_DELAY_MS)
+        }
+    }
+
+    /** Writes [lastNotified] out now, if it changed: a while after an arrival, when the screen goes off, and when the listener stops. */
+    fun flushNotified() {
+        if (!notifiedDirty) return
+        notifiedDirty = false
+        main.removeCallbacks(notifiedWrite)
+        val kept = notifiedNow().entries.sortedByDescending { it.value }
         sp.edit().putString("last_notified", kept.joinToString(";") { "${it.key}=${it.value}" }).apply()
     }
+
+    /** How long arrivals gather before [lastNotified] is written. */
+    private const val NOTIFIED_WRITE_DELAY_MS = 10_000L
 
     /** Enough to fill the row when some of them can't be launched (uninstalled, no launcher entry). */
     private const val LAST_NOTIFIED_KEPT = 16

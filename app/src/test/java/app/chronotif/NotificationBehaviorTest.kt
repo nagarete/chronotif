@@ -122,6 +122,22 @@ class NotificationBehaviorTest {
     }
 
     @Test
+    fun whenAppsNotifiedIsWrittenOnceABurstSettlesAndKeptAcrossARestart() {
+        val saved = context.getSharedPreferences("chronotif", Context.MODE_PRIVATE)
+        val chat = plain("hi", 1000, 1, "example.chat")
+        val mail = plain("hello", 2000, 2, "example.mail")
+        assertEquals("Search sees each arrival at once", setOf(chat.appId, mail.appId), Prefs.lastNotified.keys)
+        assertNull("but the file isn't rewritten per arrival", saved.getString("last_notified", null))
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(10))
+        assertNotNull("It's written once the burst settles", saved.getString("last_notified", null))
+
+        val shop = plain("parcel", 3000, 3, "example.shop")
+        Prefs.flushNotified()
+        Prefs.init(context)
+        assertEquals("A restart reads back what was flushed", setOf(chat.appId, mail.appId, shop.appId), Prefs.lastNotified.keys)
+    }
+
+    @Test
     fun demoModeShowsOnlyTheMadeUpDemoAppsAndStaysOnAfterARestart() {
         val real = post(notification("real chat"), time = 1000, id = 1, pkg = "example.chat")
         post(notification("demo chat"), time = 2000, id = 2, pkg = DemoMode.PREFIX + "chat")
