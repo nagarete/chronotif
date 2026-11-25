@@ -55,6 +55,8 @@ class NotificationBehaviorTest {
     fun setup() {
         context.getSharedPreferences("chronotif", Context.MODE_PRIVATE).edit().clear().commit()
         Prefs.init(context)
+        // What's new keeps the notes and install time it read for the process; each test installs afresh.
+        app.chronotif.ui.WhatsNewSheet.forget()
         LockSession.reset()
         ranking = ReflectionHelpers.callConstructor(RankingMap::class.java,
             ReflectionHelpers.ClassParameter.from(Array<Ranking>::class.java, emptyArray<Ranking>()))
@@ -1524,6 +1526,7 @@ class NotificationBehaviorTest {
         info.firstInstallTime = 1
         info.lastUpdateTime = 2
         Prefs.whatsNewSeen = emptySet()
+        app.chronotif.ui.WhatsNewSheet.forget()
     }
 
     private fun gotIt(root: View): View? {
@@ -1536,6 +1539,15 @@ class NotificationBehaviorTest {
         return find(root)
     }
 
+    /** Idles the main thread until [done], while work handed to a background thread finishes. */
+    private fun idleUntil(done: () -> Boolean) {
+        repeat(200) {
+            shadowOf(Looper.getMainLooper()).idle()
+            if (done()) return
+            Thread.sleep(10)
+        }
+    }
+
     @Test
     fun whatsNewOverTheCardsIsNoCheck() {
         post(notification("hi"), time = 1000)
@@ -1544,11 +1556,16 @@ class NotificationBehaviorTest {
         withPanelView { panel ->
             panel.shown()
             shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(3))
+            // The notes are read on a background thread.
+            idleUntil { gotIt(panel.rootView) != null }
             assertNotNull("The first open after an update shows What's new", gotIt(panel.rootView))
             panel.dismissed()
         }
         assertEquals("Closed while What's new covered the cards", before, Prefs.lastCheck)
-        assertNull("It shows once", app.chronotif.ui.WhatsNewSheet.pending(context))
+        var again: List<app.chronotif.core.WhatsNew.Release>? = emptyList()
+        app.chronotif.ui.WhatsNewSheet.pending(context) { again = it }
+        idleUntil { again == null }
+        assertNull("It shows once", again)
     }
 
     @Test
@@ -1559,6 +1576,7 @@ class NotificationBehaviorTest {
         withPanelView { panel ->
             panel.shown()
             shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(3))
+            idleUntil { gotIt(panel.rootView) != null }
             gotIt(panel.rootView)!!.performClick()
             shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(500))
             panel.dismissed()
