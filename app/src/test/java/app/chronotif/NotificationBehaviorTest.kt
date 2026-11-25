@@ -226,6 +226,31 @@ class NotificationBehaviorTest {
     }
 
     @Test
+    fun aLongListStaysFoldedUnderThePileUntilItUnfoldsAndFoldsAgain() {
+        val older = (1..40).map { "Earlier $it" }
+        older.forEachIndexed { i, title -> plain(title, 500L - i, 100 + i, "example.app$i") }
+        Prefs.markChecked(1000)
+        plain("Lunch?", 4000, 1, "example.chat")
+        withLockView { activity ->
+            var shown = seen(activity.window.decorView)
+            assertTrue(shown.contains("Lunch?"))
+            assertTrue("Nothing in Earlier shows at rest, on screen or off", older.none { it in shown })
+
+            val scroll = activity.scroll()
+            scroll.scrollTo(0, 100_000)
+            shadowOf(Looper.getMainLooper()).idle()
+            shown = seen(activity.window.decorView)
+            assertEquals("Unfolded, every card shows, newest first", listOf("Lunch?") + older, shown.filter { it == "Lunch?" || it in older })
+
+            scroll.scrollTo(0, 0)
+            shadowOf(Looper.getMainLooper()).idle()
+            shown = seen(activity.window.decorView)
+            assertTrue(shown.contains("Lunch?"))
+            assertTrue("Back at rest, it all folds again", older.none { it in shown })
+        }
+    }
+
+    @Test
     fun aCardShowsWhatItsNotificationSaysNowAfterARepostOrWhenTheLockScreenHidesIt() {
         Prefs.markChecked(1000)
         plain("Parcel", 2000, 1, "example.shop")

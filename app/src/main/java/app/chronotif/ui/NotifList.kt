@@ -787,6 +787,13 @@ class NotifList(
     /** Rows still to be placed by [place], on a later frame. */
     private var resume: Runnable? = null
 
+    /**
+     * Goes up each time rows are placed, so the lock-screen view's Pile works out which rows it
+     * folds only when they may have changed, not on every frame.
+     */
+    var placed = 0
+        private set
+
     /** Keyed diff: reuse views by id, insert/move/remove only what changed. */
     private fun reconcile(rows: List<Row>) {
         resume?.let(container::removeCallbacks)
@@ -813,6 +820,7 @@ class NotifList(
      * down keep what they showed before.
      */
     private fun place(rows: List<Row>, from: Int) {
+        placed++
         val start = SystemClock.uptimeMillis()
         for (i in from until rows.size) {
             val r = rows[i]
