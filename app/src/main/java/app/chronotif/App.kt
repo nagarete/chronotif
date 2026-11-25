@@ -36,11 +36,11 @@ class App : Application() {
         })
     }
 
-    // The panel kept between opens (ADR 0009) goes when memory is short or its look may be stale.
-    // So do decoded pictures when memory is short, and app names and icons when their look may be stale.
-
+    /** The configuration last seen, to tell which parts of a change matter to cached app names and icons. */
     private var config: Configuration? = null
 
+    // The panel kept between opens (ADR 0009) goes when memory is short or its look may be stale.
+    // So do decoded pictures when memory is short, and app names and icons when their look may be stale.
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
         // Hidden activities aren't a shortage, just the settings screen closing.

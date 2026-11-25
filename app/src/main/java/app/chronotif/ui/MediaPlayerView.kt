@@ -210,14 +210,7 @@ class MediaPlayerView(context: Context, private val cb: CardCallbacks) : LinearL
         if (entry?.n !== e.n) playSignal = null
         entry = e
         content = c
-        val token = if (Build.VERSION.SDK_INT >= 33) {
-            e.n.extras.getParcelable(Notification.EXTRA_MEDIA_SESSION, MediaSession.Token::class.java)
-        } else {
-            // The untyped read takes whatever the app put there; a token of another type would
-            // fail a cast to MediaSession.Token, so it's checked, as the typed read does from Android 13.
-            @Suppress("DEPRECATION")
-            runCatching { e.n.extras.getParcelable<android.os.Parcelable>(Notification.EXTRA_MEDIA_SESSION) }.getOrNull() as? MediaSession.Token
-        }
+        val token = MediaDismiss.mediaToken(e.n)
         if (controller?.sessionToken != token) {
             if (listening) controller?.unregisterCallback(callback)
             controller = token?.let { runCatching { MediaController(context, it) }.getOrNull() }

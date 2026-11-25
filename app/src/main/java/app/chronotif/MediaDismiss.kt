@@ -96,8 +96,10 @@ object MediaDismiss {
         if (Build.VERSION.SDK_INT >= 33) {
             notification.extras.getParcelable(Notification.EXTRA_MEDIA_SESSION, MediaSession.Token::class.java)
         } else {
+            // The untyped read takes whatever the app put there; a token of another type would
+            // fail a cast to MediaSession.Token, so it's checked, as the typed read does from Android 13.
             @Suppress("DEPRECATION")
-            notification.extras.getParcelable(Notification.EXTRA_MEDIA_SESSION)
+            runCatching { notification.extras.getParcelable<android.os.Parcelable>(Notification.EXTRA_MEDIA_SESSION) }.getOrNull() as? MediaSession.Token
         }
 }
 
