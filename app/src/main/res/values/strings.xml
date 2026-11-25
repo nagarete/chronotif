@@ -220,6 +220,27 @@
     <string name="settings_search_voice">Search settings by voice</string>
     <string name="settings_search_none">No settings match “%1$s”</string>
     <string name="settings_search_page">Page</string>
+    <!-- Words people type in Settings' search for a setting that its name and description don't contain. Translate as the words people would type, separated by spaces; they're never shown. -->
+    <string name="settings_keywords_enabled">on off disable pause</string>
+    <string name="settings_keywords_perm_listener">permission notification listener</string>
+    <string name="settings_keywords_perm_overlay">permission overlay draw</string>
+    <string name="settings_keywords_handle_enabled">handle tab button</string>
+    <string name="settings_keywords_handle_colour">color</string>
+    <string name="settings_keywords_handle_new_colour">color light glow</string>
+    <string name="settings_keywords_handle_fill">count number frosted solid</string>
+    <string name="settings_keywords_handle_position">height move</string>
+    <string name="settings_keywords_header_clock_size">font text big small</string>
+    <string name="settings_keywords_swipe_to_clear">dismiss delete remove</string>
+    <string name="settings_keywords_lock_mode">lockscreen keyguard</string>
+    <string name="settings_keywords_lock_privacy">private hide privacy</string>
+    <string name="settings_keywords_lock_double_tap">screen off turn off gesture wake</string>
+    <string name="settings_keywords_fingerprint_fit">fingerprint sensor fod overlap covered bottom unlock</string>
+    <string name="settings_keywords_search_setup_widget">home screen bar launcher</string>
+    <string name="settings_keywords_search_setup_tile">quick settings</string>
+    <string name="settings_keywords_setup_tutorial">learn guide how practice try</string>
+    <string name="settings_keywords_search_engine">google duckduckgo bing brave web browser</string>
+    <string name="settings_keywords_update_auto">upgrade install</string>
+    <string name="settings_keywords_update_channel_label">beta nightly stable</string>
     <string name="value_on">On</string>
     <string name="value_off">Off</string>
     <string name="handle_look">Look</string>

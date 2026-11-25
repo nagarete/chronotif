@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    What Settings' search finds (SetupActivity): every row a page shows with a title, in the order
+    the page shows them, under its section and group heading. A section's page is found by its
+    name too, with its keywords. "when" marks a row a page only shows sometimes. SettingsSearchTest
+    builds every page and checks this list against it.
+-->
+<settings>
+    <section name="GENERAL">
+        <setting title="@string/enabled" summary="@string/enabled_desc" keywords="@string/settings_keywords_enabled" />
+        <group heading="@string/setup_permissions">
+            <setting title="@string/perm_listener" summary="@string/perm_listener_desc" keywords="@string/settings_keywords_perm_listener" />
+            <setting title="@string/perm_overlay" summary="@string/perm_overlay_desc" keywords="@string/settings_keywords_perm_overlay" />
+        </group>
+        <group heading="@string/setup_xiaomi" when="xiaomi">
+            <setting title="@string/perm_autostart" summary="@string/perm_autostart_desc" />
+            <setting title="@string/perm_xiaomi" summary="@string/perm_xiaomi_desc" />
+        </group>
+        <setting title="@string/settings_theme" />
+        <setting title="@string/usage_notice_title" summary="@string/usage_notice_body" when="usage_notice" />
+    </section>
+
+    <section name="TUTORIAL" keywords="@string/settings_keywords_setup_tutorial">
+        <setting title="@string/tutorial_notifications" summary="@string/tutorial_notifications_desc" />
+        <setting title="@string/tutorial_search" summary="@string/tutorial_search_desc" />
+        <setting title="@string/tutorial_lock" summary="@string/tutorial_lock_desc" />
+    </section>
+
+    <section name="TIPS">
+        <setting title="@string/tip_open_title" summary="@string/tip_open_body" />
+        <setting title="@string/tip_check_title" summary="@string/tip_check_body" />
+        <setting title="@string/tip_search_title" summary="@string/tip_search_body" />
+        <setting title="@string/tip_preview_title" summary="@string/tip_preview_body" />
+        <setting title="@string/tip_stacks_title" summary="@string/tip_stacks_body" />
+        <setting title="@string/tip_pictures_title" summary="@string/tip_pictures_body" />
+        <setting title="@string/tip_move_title" summary="@string/tip_move_body" />
+        <setting title="@string/tip_close_title" summary="@string/tip_close_body" />
+        <setting title="@string/tip_lock_title" summary="@string/tip_lock_body" />
+    </section>
+
+    <section name="PANEL">
+        <group heading="@string/header_title">
+            <setting title="@string/header_clock" />
+            <setting title="@string/header_clock_size" keywords="@string/settings_keywords_header_clock_size" />
+            <setting title="@string/header_date_position" />
+            <setting title="@string/header_date_align" />
+            <setting title="@string/header_weekday" />
+            <setting title="@string/header_year" />
+            <setting title="@string/header_short_names" />
+            <setting title="@string/header_settings" />
+        </group>
+        <setting title="@string/swipe_to_clear" summary="@string/swipe_to_clear_desc" keywords="@string/settings_keywords_swipe_to_clear" />
+    </section>
+
+    <section name="HANDLE">
+        <setting title="@string/handle_enabled" summary="@string/handle_enabled_desc" keywords="@string/settings_keywords_handle_enabled" />
+        <group heading="@string/handle_look">
+            <setting title="@string/handle_side" />
+            <setting title="@string/handle_shape" />
+            <setting title="@string/handle_fill" summary="@string/fill_count_desc" keywords="@string/settings_keywords_handle_fill" />
+        </group>
+        <group heading="@string/handle_colours">
+            <setting title="@string/handle_colour" keywords="@string/settings_keywords_handle_colour" />
+            <setting title="@string/handle_new_colour" keywords="@string/settings_keywords_handle_new_colour" />
+        </group>
+        <group heading="@string/handle_placement">
+            <setting title="@string/handle_position" keywords="@string/settings_keywords_handle_position" />
+            <setting title="@string/handle_landscape" />
+        </group>
+    </section>
+
+    <section name="SWIPE">
+        <setting title="@string/status_swipe_title" summary="@string/status_swipe_desc" />
+        <setting title="@string/status_swipe_enabled" />
+    </section>
+
+    <section name="LOCK">
+        <setting title="@string/lock_mode" keywords="@string/settings_keywords_lock_mode" />
+        <setting title="@string/lock_privacy" summary="@string/lock_privacy_desc" keywords="@string/settings_keywords_lock_privacy" />
+        <setting title="@string/lock_double_tap" summary="@string/lock_double_tap_desc" keywords="@string/settings_keywords_lock_double_tap" />
+        <!-- Its description depends on the phone and the fit; SetupActivity supplies it. -->
+        <setting title="@string/fingerprint_fit" keywords="@string/settings_keywords_fingerprint_fit" />
+        <group heading="@string/lock_shortcuts">
+            <setting title="@string/lock_shortcut_left" />
+            <setting title="@string/lock_shortcut_right" />
+            <setting title="@string/lock_shortcut_haptics_off" summary="@string/lock_shortcut_haptics_off_desc" when="haptics_off" />
+            <setting title="@string/qr_scanner" summary="@string/qr_needs_lens" when="lens_missing" />
+        </group>
+    </section>
+
+    <section name="SEARCH">
+        <group heading="@string/search_setup">
+            <setting title="@string/search_setup_widget" summary="@string/search_setup_widget_desc" keywords="@string/settings_keywords_search_setup_widget" />
+            <setting title="@string/search_setup_tile" summary="@string/search_setup_tile_desc" keywords="@string/settings_keywords_search_setup_tile" />
+        </group>
+        <setting title="@string/search_pull_down" summary="@string/search_pull_down_desc" />
+        <setting title="@string/search_engine" summary="@string/search_engine_desc" keywords="@string/settings_keywords_search_engine" />
+        <group heading="@string/search_finds">
+            <setting title="@string/search_find_contacts" summary="@string/search_find_contacts_desc" />
+            <setting title="@string/search_calls" summary="@string/search_calls_desc" />
+            <setting title="@string/search_currency_rates" summary="@string/search_currency_rates_desc" />
+            <setting title="@string/search_find_calendar" summary="@string/search_find_calendar_desc" />
+        </group>
+        <group heading="@string/search_can_do">
+            <setting title="@string/search_can_apps" summary="@string/search_can_apps_desc" />
+            <setting title="@string/search_can_math" summary="@string/search_can_math_desc" />
+            <setting title="@string/search_can_units" summary="@string/search_can_units_desc" />
+            <setting title="@string/search_can_time" summary="@string/search_can_time_desc" />
+            <setting title="@string/search_can_currency" summary="@string/search_can_currency_desc" />
+            <setting title="@string/search_can_contacts" summary="@string/search_can_contacts_desc" />
+            <setting title="@string/search_can_calendar" summary="@string/search_can_calendar_desc" />
+            <setting title="@string/search_can_settings" summary="@string/search_can_settings_desc" />
+            <setting title="@string/search_can_web" summary="@string/search_can_web_desc" />
+        </group>
+    </section>
+
+    <section name="UPDATES">
+        <setting title="@string/update_channel_label" summary="@string/update_channel_desc" keywords="@string/settings_keywords_update_channel_label" />
+        <setting title="@string/update_auto" summary="@string/update_auto_desc" keywords="@string/settings_keywords_update_auto" />
+        <setting title="@string/perm_install" summary="@string/perm_install_desc" />
+    </section>
+
+    <section name="ABOUT">
+        <group heading="@string/setup_privacy">
+            <setting title="@string/usage_data" summary="@string/usage_data_desc" />
+            <setting title="@string/usage_data_whats_sent" summary="@string/usage_data_whats_sent_desc" />
+        </group>
+    </section>
+</settings>
