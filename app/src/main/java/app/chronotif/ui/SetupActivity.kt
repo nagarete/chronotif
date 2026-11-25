@@ -200,6 +200,9 @@ class SetupActivity : Activity() {
         applyExpanded(animate = false)
     }
 
+    /** The Updates page follows the updater only while Settings is in front, so a download never holds its views. */
+    private val onUpdater = { if (current == Section.UPDATES) refreshAll() }
+
     override fun onResume() {
         super.onResume()
         // Back from Android's settings, a permission may have changed.
@@ -208,6 +211,7 @@ class SetupActivity : Activity() {
         // Back from granting a permission (e.g. display over other apps): let the strip re-check.
         StatusBarSwipe.instance?.refresh()
         Updater.foreground = true
+        Updater.watch(onUpdater)
         body.postDelayed(settle, SETTLE_MS)
     }
 
@@ -218,6 +222,7 @@ class SetupActivity : Activity() {
         // Coming back to settings starts over: one Back doesn't leave.
         disarm()
         Updater.foreground = false
+        Updater.unwatch(onUpdater)
         // Settings changed here may change how the panel looks; the next open builds it afresh.
         Panel.drop()
     }
@@ -966,14 +971,14 @@ class SetupActivity : Activity() {
             refreshers += { install.visibility = if (Prefs.autoUpdate) View.VISIBLE else View.GONE }
         }
         val updateStatus = text("", 13f, secondary = true).apply { visibility = View.GONE }
-        lateinit var check: TextView
-        check = button(getString(R.string.update_check_now), filled = true) {
-            check.isEnabled = false
-            check.alpha = 0.6f
-            Updater.run(this, manual = true, onStatus = {
-                updateStatus.text = it
-                updateStatus.visibility = View.VISIBLE
-            }, done = { check.isEnabled = true; check.alpha = 1f })
+        val check = button(getString(R.string.update_check_now), filled = true) { Updater.run(this, manual = true) }
+        // Also run by [onUpdater] while Settings is in front, so a daily check's progress shows too.
+        refreshers += {
+            val status = Updater.status
+            updateStatus.text = status
+            updateStatus.visibility = if (status == null) View.GONE else View.VISIBLE
+            check.isEnabled = !Updater.busy
+            check.alpha = if (Updater.busy) 0.6f else 1f
         }
         body.addView(check, gap(16).apply { width = -2; marginStart = dp(4) })
         body.addView(updateStatus, gap(8).apply { marginStart = dp(4) })
