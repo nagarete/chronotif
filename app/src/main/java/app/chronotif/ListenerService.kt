@@ -41,6 +41,7 @@ class ListenerService : NotificationListenerService() {
                 Intent.ACTION_SCREEN_OFF -> {
                     LockSession.reset()
                     UsageData.flush()
+                    Prefs.flushNotified()
                 }
                 Intent.ACTION_USER_PRESENT -> LockSession.unlocked()
             }
@@ -79,6 +80,7 @@ class ListenerService : NotificationListenerService() {
             null
         }
         NotifStore.connect(active, currentRanking)
+        Apps.warm(this, NotifStore.visible())
     }
 
     override fun onListenerDisconnected() {
@@ -94,6 +96,7 @@ class ListenerService : NotificationListenerService() {
     }
 
     private fun teardown() {
+        Prefs.flushNotified()
         if (instance === this) instance = null
         if (receiverRegistered) {
             unregisterReceiver(screenReceiver)
@@ -105,7 +108,8 @@ class ListenerService : NotificationListenerService() {
 
     override fun onNotificationPosted(sbn: StatusBarNotification, rankingMap: RankingMap) {
         NotifStore.post(sbn, rankingMap)
-        Apps.warm(this, NotifStore.visible())
+        // Only what arrived: the rest were warmed as they came, or on connecting.
+        NotifStore.get(sbn.key)?.let { Apps.warm(this, listOf(it)) }
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification, rankingMap: RankingMap) {

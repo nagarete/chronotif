@@ -124,6 +124,22 @@ class NotificationBehaviorTest {
     }
 
     @Test
+    fun whenAppsNotifiedIsWrittenOnceABurstSettlesAndKeptAcrossARestart() {
+        val saved = context.getSharedPreferences("chronotif", Context.MODE_PRIVATE)
+        val chat = plain("hi", 1000, 1, "example.chat")
+        val mail = plain("hello", 2000, 2, "example.mail")
+        assertEquals("Search sees each arrival at once", setOf(chat.appId, mail.appId), Prefs.lastNotified.keys)
+        assertNull("but the file isn't rewritten per arrival", saved.getString("last_notified", null))
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(10))
+        assertNotNull("It's written once the burst settles", saved.getString("last_notified", null))
+
+        val shop = plain("parcel", 3000, 3, "example.shop")
+        Prefs.flushNotified()
+        Prefs.init(context)
+        assertEquals("A restart reads back what was flushed", setOf(chat.appId, mail.appId, shop.appId), Prefs.lastNotified.keys)
+    }
+
+    @Test
     fun demoModeShowsOnlyTheMadeUpDemoAppsAndStaysOnAfterARestart() {
         val real = post(notification("real chat"), time = 1000, id = 1, pkg = "example.chat")
         post(notification("demo chat"), time = 2000, id = 2, pkg = DemoMode.PREFIX + "chat")
@@ -208,6 +224,52 @@ class NotificationBehaviorTest {
                 listOf("Lunch?", "Meeting", "Parcel", "Old news"),
                 shown.filter { it in setOf("Lunch?", "Meeting", "Parcel", "Old news") })
             assertFalse(shown.contains("2 more"))
+        }
+    }
+
+    @Test
+    fun aLongListStaysFoldedUnderThePileUntilItUnfoldsAndFoldsAgain() {
+        val older = (1..40).map { "Earlier $it" }
+        older.forEachIndexed { i, title -> plain(title, 500L - i, 100 + i, "example.app$i") }
+        Prefs.markChecked(1000)
+        plain("Lunch?", 4000, 1, "example.chat")
+        withLockView { activity ->
+            var shown = seen(activity.window.decorView)
+            assertTrue(shown.contains("Lunch?"))
+            assertTrue("Nothing in Earlier shows at rest, on screen or off", older.none { it in shown })
+
+            val scroll = activity.scroll()
+            scroll.scrollTo(0, 100_000)
+            shadowOf(Looper.getMainLooper()).idle()
+            shown = seen(activity.window.decorView)
+            assertEquals("Unfolded, every card shows, newest first", listOf("Lunch?") + older, shown.filter { it == "Lunch?" || it in older })
+
+            scroll.scrollTo(0, 0)
+            shadowOf(Looper.getMainLooper()).idle()
+            shown = seen(activity.window.decorView)
+            assertTrue(shown.contains("Lunch?"))
+            assertTrue("Back at rest, it all folds again", older.none { it in shown })
+        }
+    }
+
+    @Test
+    fun aCardShowsWhatItsNotificationSaysNowAfterARepostOrWhenTheLockScreenHidesIt() {
+        Prefs.markChecked(1000)
+        plain("Parcel", 2000, 1, "example.shop")
+        withLockList { list, container ->
+            list.render()
+            shadowOf(Looper.getMainLooper()).idle()
+            assertTrue(shownTexts(container).contains("Parcel"))
+            plain("Parcel delivered", 3000, 1, "example.shop")
+            list.render()
+            shadowOf(Looper.getMainLooper()).idle()
+            var shown = shownTexts(container)
+            assertTrue("A repost shows its new text", shown.contains("Parcel delivered") && !shown.contains("Parcel"))
+            Prefs.lockHideContent = true
+            list.render()
+            shadowOf(Looper.getMainLooper()).idle()
+            shown = shownTexts(container)
+            assertFalse("Hidden on the lock screen, its text goes", shown.contains("Parcel delivered"))
         }
     }
 

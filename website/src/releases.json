@@ -20,7 +20,8 @@
       "On Android 15 and later, the Do Not Disturb shortcut stays lit while a schedule or another app keeps a mode on, and opens Android's Modes settings to turn it off, since only Android can.",
       "Sharing an image from the lock screen opens the share sheet after you unlock, instead of sometimes doing nothing.",
       "On Android 16, Back closes What's new instead of the whole panel.",
-      "Tapping an app in Search that was just uninstalled says so instead of crashing."
+      "Tapping an app in Search that was just uninstalled says so instead of crashing.",
+      "A long list of notifications on the lock screen scrolls more smoothly, and a burst of arriving notifications does less work in the background."
     ]
   },
   "stable": [
