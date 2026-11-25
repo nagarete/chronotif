@@ -1,5 +1,7 @@
+import { readdirSync, statSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { defineConfig } from "vite";
-import { releasesHtml, releaseTeaser } from "./releases.mjs";
+import { esc, releasesHtml, releaseTeaser } from "./releases.mjs";
 
 const REPO = "nagarete/chronotif";
 const RELEASES = `https://github.com/${REPO}/releases`;
@@ -29,18 +31,27 @@ async function github(path) {
   return res.json();
 }
 
+// Release data from the API lands in the page, so only the shapes build.yml publishes are taken:
+// a known tag, its APK by exact name (`chronotif-<tag>.apk`, next to a `.sha256` file) and the URLs
+// GitHub derives from both. Anything else falls back to the release pages.
 function download(rel, nightly) {
   if (rel.draft) return null;
   const match = nightly
     ? rel.tag_name?.match(/^nightly-(\d+)\.(\d+)\.(\d+)-(\d+)$/)
     : !rel.prerelease && rel.tag_name?.match(/^v(\d+)\.(\d+)\.(\d+)$/);
-  const apk = rel.assets?.find((a) => a.name.endsWith(".apk"));
-  if (!match || !apk) return null;
+  if (!match) return null;
+  const tag = match[0];
+  const apkName = `chronotif-${tag}.apk`;
+  const apk = rel.assets?.find((a) => a.name === apkName);
+  if (!apk || !Number.isSafeInteger(apk.size) || apk.size <= 0) return null;
+  const releaseUrl = `${RELEASES}/tag/${tag}`;
+  const apkUrl = `${RELEASES}/download/${tag}/${apkName}`;
+  if (rel.html_url !== releaseUrl || apk.browser_download_url !== apkUrl) return null;
   return {
-    tag: rel.tag_name,
-    releaseUrl: rel.html_url,
-    apkName: apk.name,
-    apkUrl: apk.browser_download_url,
+    tag,
+    releaseUrl,
+    apkName,
+    apkUrl,
     apkSize: `~${Math.round(apk.size / 10_240) * 10} KB`,
     version: match.slice(1, 4).join("."),
     order: match.slice(1).map(Number),
@@ -72,6 +83,45 @@ async function release(nightly) {
   return fallback(nightly);
 }
 
+// Replaces each %CHRONOTIF_KEY% with lookup(KEY), and fails the build on an unknown key.
+function fill(text, lookup) {
+  return text.replace(/%CHRONOTIF_(\w+)%/g, (m, key) => {
+    const value = lookup(key);
+    if (value === undefined) throw new Error(`Unknown placeholder ${m}`);
+    return value;
+  });
+}
+
+// A JSON-LD block is parsed, filled value by value and written back with JSON.stringify, so a
+// value can't break out of its string. "<" is escaped too, so nothing in it can close the script.
+function fillJsonLd(json, vars) {
+  const data = JSON.parse(json, (_, v) => (typeof v === "string" ? fill(v, (k) => vars[k]) : v));
+  return JSON.stringify(data, null, 2).replace(/</g, "\\u003c");
+}
+
+// Every placeholder outside a JSON-LD block sits in HTML text or a quoted attribute, and is
+// escaped for both. `markup` holds HTML that releases.mjs built and escaped already.
+function fillHtml(html, vars, markup) {
+  const lookup = (k) => (k in markup ? markup[k] : k in vars ? esc(vars[k]) : undefined);
+  return html
+    .split(/(<script type="application\/ld\+json">[\s\S]*?<\/script>)/)
+    .map((part, i) => {
+      if (i % 2 === 0) return fill(part, lookup);
+      const json = part.slice(part.indexOf(">") + 1, part.lastIndexOf("</script>"));
+      return `<script type="application/ld+json">\n${fillJsonLd(json, vars)}\n    </script>`;
+    })
+    .join("");
+}
+
+// The Worker answers Range requests for these files and needs their sizes (worker/index.js).
+function writeVideoSizes(outDir) {
+  const dir = join(outDir, "video");
+  const sizes = Object.fromEntries(
+    readdirSync(dir).map((name) => [`/video/${name}`, statSync(join(dir, name)).size]),
+  );
+  writeFileSync(new URL("worker/video-sizes.json", import.meta.url), `${JSON.stringify(sizes, null, 2)}\n`);
+}
+
 export default defineConfig(async () => {
   const [stable, nightly] = await Promise.all([release(false), release(true)]);
   console.log(`[chronotif] Stable download → ${stable.apkUrl}`);
@@ -82,12 +132,15 @@ export default defineConfig(async () => {
     RELEASE_URL: stable.releaseUrl,
     APK_NAME: stable.apkName,
     APK_URL: stable.apkUrl,
-    APK_SIZE: stable.apkSize.replace(" ", "&nbsp;"),
     NIGHTLY_APK_URL: nightly.apkUrl,
     NIGHTLY_RELEASE_URL: nightly.releaseUrl,
+  };
+  const markup = {
+    APK_SIZE: esc(stable.apkSize).replace(" ", "&nbsp;"),
     RELEASES: releasesHtml({ nightlyReleaseUrl: nightly.releaseUrl }),
     RELEASE_TEASER: releaseTeaser(),
   };
+  let outDir;
   return {
     build: {
       rollupOptions: { input: { main: "index.html", releases: "releases.html" } },
@@ -95,11 +148,15 @@ export default defineConfig(async () => {
     plugins: [
       {
         name: "chronotif-release",
-        transformIndexHtml: (html) =>
-          html.replace(/%CHRONOTIF_(\w+)%/g, (m, key) => {
-            if (!(key in vars)) throw new Error(`Unknown placeholder ${m}`);
-            return vars[key];
-          }),
+        transformIndexHtml: (html) => fillHtml(html, vars, markup),
+      },
+      {
+        name: "chronotif-video-sizes",
+        apply: "build",
+        configResolved: (config) => {
+          outDir = join(config.root, config.build.outDir);
+        },
+        closeBundle: () => writeVideoSizes(outDir),
       },
     ],
   };

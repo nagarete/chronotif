@@ -3,6 +3,7 @@
 The landing page for Chronotif. It's a single static page: plain HTML, CSS and a little
 JavaScript, built with [Vite](https://vite.dev). There's no backend, analytics, cookies or
 third-party requests. The only font (Newsreader) is self-hosted from `@fontsource-variable`.
+A small Cloudflare Worker serves it with security headers (see *Security headers*).
 
 Everything for the site, including `node_modules/` and the build output, stays inside
 `website/`. The Android app isn't affected.
@@ -11,6 +12,8 @@ Everything for the site, including `node_modules/` and the build output, stays i
 index.html               the page (all copy lives here)
 src/style.css            styles
 vite.config.js           resolves the newest release for the download links
+releases.mjs             renders src/releases.json into /releases and the homepage teaser
+worker/index.js          the Worker: www redirect, security headers, video Range requests
 src/main.js              masthead + scroll reveal (skipped with reduced motion)
 src/demo.js              the interactive NEW / EARLIER illustration, modelled on core/Attention.kt
 public/                  copied as-is: favicons, og.png, robots.txt, sitemap.xml
@@ -37,7 +40,27 @@ npm run build      # → website/dist/
 npm run preview    # serve dist/ at http://localhost:4173 to check it
 ```
 
-`dist/` is a self-contained static site, so any static host can serve it.
+`dist/` is a self-contained static site, so any static host can serve it. The build also writes
+`worker/video-sizes.json` (git-ignored), which the Worker needs to answer Range requests.
+
+To check the Worker itself, run `npx wrangler dev` after a build. It serves `dist/` through
+`worker/index.js` locally, with no Cloudflare account.
+
+## Security headers
+
+`worker/index.js` adds a Content-Security-Policy, `X-Content-Type-Options`, `Referrer-Policy`,
+`Cross-Origin-Opener-Policy` and `Permissions-Policy` to every response. `run_worker_first` in
+`wrangler.jsonc` sends assets through the Worker too, so a `_headers` file wouldn't apply.
+
+The policy allows only the site's own files. Keep it that way:
+
+- No inline `<script>` or `<style>`, and no `style=""` in markup. Vite emits both as files.
+  Set dynamic styles through `element.style`, as `src/demo.js` does.
+- A new font, image, video or script from another origin needs its own entry in `CSP`.
+- After changing either, load `/` and `/releases` under `npx wrangler dev` and check the browser
+  console for CSP violations.
+
+Another host would need the same headers in its own config.
 
 ## Screenshots and privacy
 
@@ -101,8 +124,10 @@ With Cloudflare credentials available, `npm run deploy` builds and publishes the
 
 - A pull request that touches `website/` gets a build check. The Android build in `build.yml`
   skips pull requests and pushes that only touch `website/`.
-- Merging such a change to `main` runs `npm run deploy`. Changes to `src/releases.json` don't
-  deploy on merge, because the app bundles that file and its `next` notes go live with a release.
+- Merging such a change to `main` builds the site, then runs `wrangler deploy` in a separate
+  step. Only that step gets the Cloudflare token, so `npm ci` and the build never see it.
+  Changes to `src/releases.json` don't deploy on merge, because the app bundles that file and
+  its `next` notes go live with a release.
 - `build.yml` calls it after every published release, so the download buttons follow GitHub.
 - *Actions → website → Run workflow* deploys `main` by hand.
 
