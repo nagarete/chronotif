@@ -7,15 +7,15 @@ import android.content.SharedPreferences
 import app.chronotif.core.Attention
 
 /**
- * The only persisted state: the last-check watermark, when apps last notified, a handful of
- * settings, and Usage data waiting to be sent.
+ * What's kept across restarts: the settings, the last-check watermark, when apps last notified,
+ * snoozes, currency rates, and Usage data waiting to be sent.
  */
 object Prefs {
     const val SHAPE_TAB = 0
     const val SHAPE_HALF_SMALL = 1
     const val SHAPE_HALF_LARGE = 2
     const val SHAPE_CIRCLE = 3
-    /** The original handle: a thin line in a wider, unseen touch area. */
+    /** A thin line in a wider, unseen touch area. */
     const val SHAPE_LINE = 4
     const val COLOUR_GREY = 0
     const val COLOUR_WHITE = 1

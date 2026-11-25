@@ -102,7 +102,8 @@ object LockPolicy {
         }
     }
 
-    // Hidden-but-readable secure settings. If a ROM blocks reading them, fail private.
+    // Hidden-but-readable secure settings. If a ROM blocks reading them, the view still comes up
+    // and private content is hidden.
     private fun systemShowsNotifications(context: Context) =
         secureInt(context, "lock_screen_show_notifications", default = 1, unreadable = 1) != 0
 

@@ -25,7 +25,7 @@ import org.json.JSONObject
 /**
  * What's new: after an update, the first panel open shows the release notes the user hasn't seen,
  * on a sheet over the cards. While it covers them the panel isn't seen, so it's no check (see
- * [PanelView.hold]). It shows once per update, however it's closed.
+ * [PanelView.held]). It shows once per update, however it's closed.
  */
 @SuppressLint("ViewConstructor")
 class WhatsNewSheet private constructor(
@@ -129,7 +129,6 @@ class WhatsNewSheet private constructor(
                 text = first.headline ?: context.getString(R.string.whats_new_title)
             }, Ui.lp().apply { topMargin = dp(6) })
             addView(object : ScrollView(context) {
-                // At most most of the screen; longer notes scroll.
                 override fun onMeasure(w: Int, h: Int) {
                     val cap = (resources.displayMetrics.heightPixels * 0.55f).toInt()
                     super.onMeasure(w, MeasureSpec.makeMeasureSpec(cap, MeasureSpec.AT_MOST))

@@ -2,8 +2,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Only for the opt-in updater (Updater.kt), which reads GitHub Releases. Off by default;
-         no notification data, settings or identifiers are ever sent. -->
+    <!-- Three uses: the updater (Updater.kt) reads GitHub Releases, Search's currency rates
+         (ExchangeRates.kt) read the ECB's daily rates, and Usage data (UsageData.kt) sends what
+         docs/usage-data.md lists. Nothing from a notification is ever sent. -->
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Android 16 requires it for the update job's network constraint. -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />

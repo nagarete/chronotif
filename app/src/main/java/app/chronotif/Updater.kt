@@ -30,8 +30,8 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 
 /**
- * Opt-in self-update from GitHub Releases. The only network code in the app: it finds the newest
- * release tag on github.com and downloads the APK plus its `.sha256`. Nothing is sent.
+ * Opt-in self-update from GitHub Releases: it finds the newest release tag on github.com and
+ * downloads the APK plus its `.sha256`.
  *
  * It reads github.com pages, not api.github.com, whose anonymous quota of 60 requests an hour is
  * shared by everyone behind the same IP address (ADR 0006). CI names the assets after the tag, so
@@ -67,11 +67,11 @@ object Updater {
         val js = context.getSystemService(JobScheduler::class.java)
         if (!Prefs.autoUpdate) return js.cancel(JOB_ID)
         if (js.getPendingJob(JOB_ID) != null) return
-        // Runs from App.onCreate: a scheduling failure must never stop the app from starting.
         val job = JobInfo.Builder(JOB_ID, ComponentName(context, UpdateJob::class.java))
             .setPeriodic(TimeUnit.DAYS.toMillis(1))
             .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
             .build()
+        // Runs from App.onCreate: a scheduling failure must never stop the app from starting.
         runCatching { js.schedule(job) }
     }
 
