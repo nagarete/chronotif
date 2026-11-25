@@ -1,6 +1,10 @@
-// Serves dist/, sends www.chronotif.com to the apex domain, adds security headers, and answers
-// Range requests (Safari won't play a video whose server ignores them; static assets alone return 200).
+// Serves dist/, sends www.chronotif.com to the apex domain, adds security headers, answers
+// Range requests (Safari won't play a video whose server ignores them; static assets alone return 200),
+// and takes Feedback posted to /feedback (feedback.js).
 // run_worker_first in wrangler.jsonc sends every request here, so the headers reach assets too.
+
+import { EmailMessage } from "cloudflare:email";
+import { MAX_BODY, mail, parse } from "./feedback.js";
 
 // Byte sizes of dist/video/*, written by `npm run build` (vite.config.js). The assets binding
 // streams a file without a Content-Length header, and a range needs the size up front.
@@ -22,6 +26,13 @@ const CSP = [
   "form-action 'none'",
   "frame-ancestors 'none'",
 ].join("; ");
+
+// The feedback page also runs Cloudflare Turnstile, the check that keeps bots off the form:
+// its script and the frame it draws in come from challenges.cloudflare.com.
+const TURNSTILE = "https://challenges.cloudflare.com";
+const FEEDBACK_CSP = CSP
+  .replace("script-src 'self'", `script-src 'self' ${TURNSTILE}`)
+  .replace("default-src 'none'", `default-src 'none'; frame-src ${TURNSTILE}`);
 
 const SECURITY_HEADERS = {
   "Content-Security-Policy": CSP,
@@ -45,20 +56,106 @@ export default {
       url.hostname = "chronotif.com";
       return secure(new Response(null, { status: 301, headers: { Location: url.toString() } }));
     }
+    const feedbackPage = url.pathname === "/feedback" || url.pathname === "/feedback.html";
+    if (url.pathname === "/feedback" && request.method === "POST") {
+      return secure(await feedback(request, env));
+    }
     const response = await env.ASSETS.fetch(request);
     const range = request.headers.get("Range");
     if (!range || response.status !== 200 || !url.pathname.startsWith("/video/")) {
-      return secure(response);
+      return secure(response, feedbackPage ? FEEDBACK_CSP : CSP);
     }
     return secure(serveRange(request, response, range, VIDEO_SIZES[url.pathname]));
   },
 };
 
-function secure(response) {
+function secure(response, csp = CSP) {
   // Responses from the assets binding have immutable headers, so copy before setting.
   const out = new Response(response.body, response);
   for (const [name, value] of Object.entries(SECURITY_HEADERS)) out.headers.set(name, value);
+  out.headers.set("Content-Security-Policy", csp);
   return out;
+}
+
+const FEEDBACK_FROM = "feedback@chronotif.com";
+
+function answer(status, error) {
+  return Response.json(error ? { ok: false, error } : { ok: true }, {
+    status,
+    headers: { "Cache-Control": "no-store" },
+  });
+}
+
+/**
+ * Feedback from the app or the site's form, emailed to the maintainer (FEEDBACK_TO, a Worker
+ * secret, so the address isn't in the repository). The sender's IP address is only the key for
+ * FEEDBACK_LIMIT and Turnstile's check; it isn't kept or put in the email.
+ */
+async function feedback(request, env) {
+  if (!env.FEEDBACK_MAIL || !env.FEEDBACK_TO || !env.TURNSTILE_SECRET || !env.FEEDBACK_LIMIT) {
+    console.error("feedback: a binding or secret is missing");
+    return answer(503, "not set up");
+  }
+  const ip = request.headers.get("CF-Connecting-IP") ?? "";
+  // The rate limit is the guard for both forms: the app has no Turnstile, and anyone can post as it.
+  const { success } = await env.FEEDBACK_LIMIT.limit({ key: ip });
+  if (!success) return answer(429, "too many");
+
+  const json = await readCapped(request, MAX_BODY);
+  if (json === null) return answer(413, "too large");
+  const { message, error } = parse(json);
+  if (error) return answer(400, error);
+
+  if (message.source === "web" && !(await turnstile(message.token, ip, env.TURNSTILE_SECRET))) {
+    return answer(403, "check failed");
+  }
+  const raw = mail(message, { from: FEEDBACK_FROM, to: env.FEEDBACK_TO, id: crypto.randomUUID(), date: new Date() });
+  try {
+    await env.FEEDBACK_MAIL.send(new EmailMessage(FEEDBACK_FROM, env.FEEDBACK_TO, raw));
+  } catch (e) {
+    console.error(`feedback: couldn't send (${e.message})`);
+    return answer(502, "not sent");
+  }
+  return answer(200);
+}
+
+// The body read as it arrives, given up as soon as it passes [max] bytes, so a huge post is never held.
+async function readCapped(request, max) {
+  if (Number(request.headers.get("Content-Length") ?? 0) > max) return null;
+  if (!request.body) return "";
+  const reader = request.body.getReader();
+  const chunks = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > max) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(size);
+  let at = 0;
+  for (const c of chunks) {
+    bytes.set(c, at);
+    at += c.byteLength;
+  }
+  return new TextDecoder().decode(bytes);
+}
+
+async function turnstile(token, ip, secret) {
+  const form = new FormData();
+  form.append("secret", secret);
+  form.append("response", token);
+  if (ip) form.append("remoteip", ip);
+  try {
+    const res = await fetch(`${TURNSTILE}/turnstile/v0/siteverify`, { method: "POST", body: form });
+    return (await res.json()).success === true;
+  } catch {
+    return false;
+  }
 }
 
 // One byte range of the asset, read as a stream: the bytes before it are skipped as they pass and

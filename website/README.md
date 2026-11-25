@@ -1,9 +1,10 @@
 # chronotif.com
 
-The landing page for Chronotif. It's a single static page: plain HTML, CSS and a little
-JavaScript, built with [Vite](https://vite.dev). There's no backend, analytics, cookies or
-third-party requests. The only font (Newsreader) is self-hosted from `@fontsource-variable`.
-A small Cloudflare Worker serves it with security headers (see *Security headers*).
+The landing page for Chronotif: plain HTML, CSS and a little JavaScript, built with
+[Vite](https://vite.dev). There are no analytics or cookies, and no third-party requests except
+Cloudflare Turnstile on the feedback page. The only font (Newsreader) is self-hosted from
+`@fontsource-variable`. A small Cloudflare Worker serves it with security headers (see *Security
+headers*) and emails Feedback posted to `/feedback` (see *Feedback*).
 
 Everything for the site, including `node_modules/` and the build output, stays inside
 `website/`. The Android app isn't affected.
@@ -13,7 +14,9 @@ index.html               the page (all copy lives here)
 src/style.css            styles
 vite.config.js           resolves the newest release for the download links
 releases.mjs             renders src/releases.json into /releases and the homepage teaser
-worker/index.js          the Worker: www redirect, security headers, video Range requests
+worker/index.js          the Worker: www redirect, security headers, video Range requests, /feedback
+worker/feedback.js       checks a Feedback post and writes its email (tested by `npm test`)
+feedback.html, src/feedback.js   the site's feedback form
 src/main.js              masthead + scroll reveal (skipped with reduced motion)
 src/demo.js              the interactive NEW / EARLIER illustration, modelled on core/Attention.kt
 public/                  copied as-is: favicons, og.png, robots.txt, sitemap.xml
@@ -57,10 +60,28 @@ The policy allows only the site's own files. Keep it that way:
 - No inline `<script>` or `<style>`, and no `style=""` in markup. Vite emits both as files.
   Set dynamic styles through `element.style`, as `src/demo.js` does.
 - A new font, image, video or script from another origin needs its own entry in `CSP`.
-- After changing either, load `/` and `/releases` under `npx wrangler dev` and check the browser
-  console for CSP violations.
+- After changing either, load `/`, `/releases` and `/feedback` under `npx wrangler dev` and check
+  the browser console for CSP violations.
+- `/feedback` alone also allows `challenges.cloudflare.com` for Turnstile's script and frame.
 
 Another host would need the same headers in its own config.
+
+## Feedback
+
+`POST /feedback` takes Feedback from the app (*Settings → Send feedback*) and from
+`feedback.html`, checks it (`worker/feedback.js`) and emails it with the `FEEDBACK_MAIL` binding.
+Nothing is stored. It needs, on the `chronotif-website` Worker in the Cloudflare dashboard:
+
+- Email Routing on for chronotif.com, with the maintainer's inbox as a verified destination address.
+  `feedback@chronotif.com` forwards there too, so a sender can also just email it.
+- The secrets `FEEDBACK_TO` (that inbox, kept out of the repository) and `TURNSTILE_SECRET` (the
+  secret of the Turnstile widget whose site key is in `vite.config.js`). Set them under *Settings →
+  Variables and secrets* as **Secret**; `wrangler deploy` keeps secrets but drops plain variables.
+
+`FEEDBACK_LIMIT` allows three posts a minute per IP address. Without the secrets, `/feedback` answers
+503. To try it locally, put both in `website/.dev.vars` (git-ignored; Turnstile's test secret
+`1x0000000000000000000000000000000AA` passes any token) and run `npx wrangler dev`: mail is written
+to a `.eml` file under `.wrangler/` instead of being sent.
 
 ## Screenshots and privacy
 

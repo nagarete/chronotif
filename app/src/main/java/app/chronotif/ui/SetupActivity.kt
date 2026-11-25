@@ -72,6 +72,7 @@ class SetupActivity : Activity() {
         SEARCH(R.string.setup_search, R.drawable.ic_search),
         UPDATES(R.string.setup_updates, R.drawable.ic_section_updates),
         ABOUT(R.string.setup_about, R.drawable.ic_section_about),
+        FEEDBACK(R.string.setup_feedback, R.drawable.ic_section_feedback),
     }
 
     /** The open section's page content. */
@@ -103,6 +104,7 @@ class SetupActivity : Activity() {
         const val RESULTS = 30
         /** Every field Usage data sends, for people using the app. */
         const val USAGE_DATA_DOC = "https://github.com/nagarete/chronotif/blob/main/docs/usage-data.md"
+        const val NEW_ISSUE = "https://github.com/nagarete/chronotif/issues/new/choose"
     }
 
     private var settled = false
@@ -186,9 +188,10 @@ class SetupActivity : Activity() {
             val bars = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())
             row.setPadding(bars.left, bars.top, bars.right, bars.bottom)
             if (!wide) drawer.setPadding(bars.left, bars.top, 0, bars.bottom)
-            // Results end above the keyboard.
-            val ime = insets.getInsets(WindowInsets.Type.ime()).bottom
-            searchLayer.setPadding(0, 0, 0, maxOf(0, ime - bars.bottom))
+            // Results, and a page's text fields (Send feedback), end above the keyboard.
+            val ime = maxOf(0, insets.getInsets(WindowInsets.Type.ime()).bottom - bars.bottom)
+            searchLayer.setPadding(0, 0, 0, ime)
+            page.setPadding(page.paddingLeft, page.paddingTop, page.paddingRight, ime)
             insets
         }
         setContentView(root)
@@ -396,7 +399,7 @@ class SetupActivity : Activity() {
         val groups = listOf(
             null to listOf(Section.GENERAL, Section.TUTORIAL, Section.TIPS),
             R.string.settings_group_features to listOf(Section.PANEL, Section.HANDLE, Section.SWIPE, Section.LOCK, Section.SEARCH),
-            R.string.settings_group_app to listOf(Section.UPDATES, Section.ABOUT),
+            R.string.settings_group_app to listOf(Section.UPDATES, Section.ABOUT, Section.FEEDBACK),
         )
         for ((title, sections) in groups) {
             if (title != null) {
@@ -519,6 +522,7 @@ class SetupActivity : Activity() {
             Section.SEARCH -> search()
             Section.UPDATES -> updates()
             Section.ABOUT -> about()
+            Section.FEEDBACK -> FeedbackForm(this, c) { open(Intent(Intent.ACTION_VIEW, Uri.parse(NEW_ISSUE))) }.build(body)
         }
     }
 

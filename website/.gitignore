@@ -5,3 +5,4 @@ dist/
 screenshots-raw/
 worker/video-sizes.json
 .wrangler/
+.dev.vars

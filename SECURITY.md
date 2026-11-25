@@ -1,8 +1,8 @@
 # Security policy
 
 Chronotif reads your notifications locally and never sends them anywhere. The only data it sends
-is anonymous Usage data, listed field by field in [What Chronotif sends](docs/usage-data.md), so
-security reports are taken seriously.
+on its own is anonymous Usage data, listed field by field in [What Chronotif sends](docs/usage-data.md),
+along with Feedback the user writes and sends themselves, so security reports are taken seriously.
 
 **Please report vulnerabilities privately** using GitHub's
 [private vulnerability reporting](../../security/advisories/new) rather than a public issue.

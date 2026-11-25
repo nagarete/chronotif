@@ -125,13 +125,19 @@ If your installed version has no channel setting, install a nightly APK once to 
 
 ## Privacy and battery use
 
-**What leaves your phone.** Only anonymous Usage data, from 0.2.7, on unless you turn it off
+**What leaves your phone.** Anonymous Usage data, from 0.2.7, on unless you turn it off
 under *Settings → Privacy and about*: counts of what you use, Panel speeds, your settings, the
 phone's model, Android version and country, and crash reports, sent to PostHog's servers in the EU
 with a random install ID. Never your notifications or which apps sent them, your contacts,
 calendar or Search, your phone's identifiers or your IP address. Turning it off sends one last
 note that it was turned off, deletes the install ID and sends nothing more. [What Chronotif
-sends](docs/usage-data.md) lists every field, and ADR 0016 explains why.
+sends](docs/usage-data.md) lists every field, and ADR 0016 explains why. Apart from that, only
+Feedback you write and send yourself.
+
+**Feedback without GitHub.** *Settings → Send feedback* in the app, or
+[chronotif.com/feedback](https://chronotif.com/feedback), sends a problem or an idea straight to the
+developer, with your phone's details if you leave them in. It's emailed privately and never posted;
+a way to reach you is optional and only used to reply.
 
 Notifications stay in memory on your device. Chronotif saves your settings, the time
 of your last check, and when each of the last few apps notified (for Search's
@@ -148,10 +154,11 @@ Settings tile. The service subscribes to no accessibility events and can't retri
 other apps' screen content; notification content comes separately through notification access.
 
 The app has no third-party dependencies and responds to system events without polling,
-a foreground service, or wakelocks. It goes online for three things. The GitHub updater, off by
+a foreground service, or wakelocks. It goes online for four things. The GitHub updater, off by
 default, and Search's currency rates from the European Central Bank, on by default and switched off
 under *Settings → Search*, are download-only, and the rates download only when you type a currency.
-The third is Usage data, described above.
+The third is Usage data, described above. The fourth is Feedback, sent only when you write a message
+under *Settings → Send feedback* and tap Send; see below.
 
 ## Build from source
 
