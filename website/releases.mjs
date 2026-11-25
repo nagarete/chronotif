@@ -6,8 +6,36 @@ const RELEASES = "https://github.com/nagarete/chronotif/releases";
 const root = new URL(".", import.meta.url);
 const data = JSON.parse(readFileSync(new URL("src/releases.json", root), "utf8"));
 
-const esc = (s) =>
-  s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+// Escapes text for HTML content and for a double-quoted attribute.
+export const esc = (s) =>
+  String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+// Values that become ids, URLs and attributes must have the shape the page expects, so a typo
+// in releases.json fails the build instead of shipping a broken or unsafe link.
+function check(ok, what, value) {
+  if (!ok) throw new Error(`releases.json: invalid ${what}: ${JSON.stringify(value)}`);
+}
+const isHttps = (u) => {
+  try {
+    return new URL(u).protocol === "https:";
+  } catch {
+    return false;
+  }
+};
+const isVideoPath = (p) => typeof p === "string" && /^\/video\/[\w.-]+$/.test(p) && !p.includes("..");
+
+function validate(r, { next }) {
+  check(/^\d+\.\d+\.\d+$/.test(r.version), "version", r.version);
+  if (!next) {
+    check(/^\d{4}-\d{2}-\d{2}$/.test(r.date) && !Number.isNaN(Date.parse(`${r.date}T00:00:00Z`)), `date of ${r.version}`, r.date);
+  }
+  for (const v of [r.video, ...(r.videos ?? [])].filter(Boolean)) {
+    check(isVideoPath(v.src) && isVideoPath(v.poster), `video of ${r.version}`, v);
+    if (v.music) check(isHttps(v.music.url) && isHttps(v.music.licenseUrl), `music link of ${r.version}`, v.music);
+  }
+}
+if (data.next) validate(data.next, { next: true });
+for (const r of data.stable) validate(r, { next: false });
 
 const date = (iso) =>
   new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-GB", {
@@ -59,14 +87,14 @@ function entry(r, { next, nightlyReleaseUrl }) {
   const meta = next
     ? `<span class="release__tag">Next stable</span> In Nightly now ·
        <a href="${esc(nightlyReleaseUrl)}">Nightly builds</a>`
-    : `<time datetime="${r.date}">${date(r.date)}</time> ·
-       <a href="${RELEASES}/tag/${id}">APK &amp; checksum</a>`;
+    : `<time datetime="${esc(r.date)}">${esc(date(r.date))}</time> ·
+       <a href="${RELEASES}/tag/${esc(id)}">APK &amp; checksum</a>`;
   const media = video(r);
   return `
-      <article class="release${next ? " release--next" : ""}${media ? " release--video" : ""}" id="${id}" aria-labelledby="${id}-title">
+      <article class="release${next ? " release--next" : ""}${media ? " release--video" : ""}" id="${esc(id)}" aria-labelledby="${esc(id)}-title">
         <div class="release__copy">
           <header>
-            <h2 id="${id}-title">${esc(r.version)}</h2>
+            <h2 id="${esc(id)}-title">${esc(r.version)}</h2>
             <p class="release__meta">${meta}</p>
           </header>
           <p class="release__headline">${esc(r.headline)}</p>
@@ -96,5 +124,5 @@ export function releasesHtml({ nightlyReleaseUrl }) {
 export function releaseTeaser() {
   const r = data.next ?? data.stable[0];
   const where = data.next ? `New in ${r.version}, in Nightly now:` : `New in ${r.version}:`;
-  return `${where} ${esc(r.headline)} <a href="/releases#v${r.version}">Release notes</a>`;
+  return `${esc(where)} ${esc(r.headline)} <a href="/releases#v${esc(r.version)}">Release notes</a>`;
 }

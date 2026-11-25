@@ -134,8 +134,8 @@ function card(state, p, extra = "") {
   // A collapsed Conversation stack carries its message count on the icon, as the app does on the Avatar.
   const count = p.msgs?.length > 1 ? `<span class="d-count">${p.msgs.length}</span>` : "";
   return `
-    <div class="d-card ${extra}" style="view-transition-name: card-${p.key}">
-      <span class="d-icon" style="background:${app.color}" aria-hidden="true">${app.glyph}${count}</span>
+    <div class="d-card ${extra}" data-vt="card-${p.key}">
+      <span class="d-icon" data-bg="${app.color}" aria-hidden="true">${app.glyph}${count}</span>
       <div>
         <div class="d-row">
           <span class="d-title">${esc(p.item.title)}</span>
@@ -158,13 +158,13 @@ const svg = (d) => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${d}"/>
 function player(o) {
   const app = APPS[o.app];
   const [e, t] = [o.elapsed, o.total].map((x) => x.split(":").reduce((m, s) => m * 60 + Number(s), 0));
-  return `<div role="listitem" class="d-card d-player" style="view-transition-name: card-${o.id}">
+  return `<div role="listitem" class="d-card d-player" data-vt="card-${o.id}">
     <div class="d-player__top">
-      <span class="d-art" aria-hidden="true"><span class="d-art__badge" style="background:${app.color}">${app.glyph}</span></span>
+      <span class="d-art" aria-hidden="true"><span class="d-art__badge" data-bg="${app.color}">${app.glyph}</span></span>
       <div><div class="d-title">${esc(o.title)}</div><div class="d-body">${esc(o.body)}</div></div>
     </div>
     <div class="d-player__controls" aria-hidden="true">${svg(ICON.prev)}<span class="d-player__play">${svg(ICON.pause)}</span>${svg(ICON.next)}</div>
-    <div class="d-seek" aria-hidden="true"><span>${o.elapsed}</span><div class="d-progress"><i style="width:${((e / t) * 100).toFixed(1)}%"></i></div><span>${o.total}</span></div>
+    <div class="d-seek" aria-hidden="true"><span>${o.elapsed}</span><div class="d-progress"><i data-width="${((e / t) * 100).toFixed(1)}%"></i></div><span>${o.total}</span></div>
   </div>`;
 }
 
@@ -219,6 +219,11 @@ function render(state, list, arrived = new Set()) {
   if (state.running) html += `<p class="d-running"><span class="d-clear">${state.running} running</span></p>`;
 
   list.innerHTML = html;
+  // The site's Content-Security-Policy blocks style="" attributes in markup but not styles set
+  // through the DOM, so per-card styles travel as data attributes and are applied here.
+  for (const el of list.querySelectorAll("[data-vt]")) el.style.viewTransitionName = el.dataset.vt;
+  for (const el of list.querySelectorAll("[data-bg]")) el.style.background = el.dataset.bg;
+  for (const el of list.querySelectorAll("[data-width]")) el.style.width = el.dataset.width;
 }
 
 const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
