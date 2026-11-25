@@ -848,6 +848,15 @@ q {
   letter-spacing: 0;
   text-transform: none;
 }
+button.d-clear {
+  border: 0;
+  font-family: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+button.d-clear:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
 .d-list {
   display: grid;
   gap: 0.45rem;
@@ -862,6 +871,7 @@ q {
   background: var(--card);
 }
 .d-icon {
+  position: relative;
   display: grid;
   place-items: center;
   width: 2rem;
@@ -1019,7 +1029,25 @@ q {
   -webkit-line-clamp: 1;
 }
 
-/* An app stack: the newest card with "slivers" peeking out below, like the app's. */
+/* A Conversation stack's message count, on the icon where the app puts it on the Avatar. */
+.d-count {
+  position: absolute;
+  top: -0.3rem;
+  right: -0.35rem;
+  display: grid;
+  place-items: center;
+  min-width: 1rem;
+  height: 1rem;
+  padding-inline: 0.22rem;
+  border-radius: 999px;
+  background: #fff;
+  color: #111;
+  font-size: 0.6rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* A stack (app or conversation): the newest card with "slivers" peeking out below, like the app's. */
 .d-stack {
   position: relative;
 }
@@ -1055,6 +1083,16 @@ q {
   right: 1.2rem;
   bottom: 0;
   background: #18181a;
+}
+/* In New, the stack keeps New's brighter cards. */
+.d-stack--new .d-card {
+  position: relative;
+}
+.d-stack--new::before {
+  background: #262629;
+}
+.d-stack--new[data-count="3"]::after {
+  background: #1f1f22;
 }
 
 .d-arrive {
