@@ -33,7 +33,11 @@ translations and accessibility improvements are always welcome.
   gestures or log anything about other apps. It must stay opt-in, respect *Chronotif is on*,
   and be tested with TalkBack, the lock screen and fullscreen apps when changed.
 - **Respect lock-screen privacy.** Anything shown on the lock screen must follow the
-  system and per-app visibility rules (`LockPolicy`), and interactions must require unlock.
+  system and per-app visibility rules (`LockPolicy`). The lock-screen view does what the Panel
+  does (ADR 0013): replies and buttons that work in the background run while locked, unless the
+  app asks for an unlock, and anything that opens an app asks to unlock first. When the lock
+  screen hides sensitive content, redacted cards offer no reply or buttons and Search holds
+  contacts and events back.
 
 ## Getting started
 
