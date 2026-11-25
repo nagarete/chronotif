@@ -40,8 +40,11 @@ storage and excluded from backups.
   when Android's *hide sensitive content* setting is on, or when you turn on
   *Hide sensitive content* in Chronotif.
 - If Android's *show notifications on lock screen* is off, the lock-screen view never appears.
-- Opening, actions and replies always go through the system unlock first. Swiping a
-  notification away doesn't.
+- Replies and buttons that work in the background run while locked, unless the app marks them
+  as needing an unlock (ADR 0013). Opening an app, from a card or a button, always goes through
+  the system unlock first; before Android 12, which can't tell which buttons open an app, every
+  button but a reply asks to unlock. Swiping a notification away doesn't. Redacted cards show no
+  reply or buttons.
 - It never covers a ringing call or an alarm/call screen.
 
 ## Install
@@ -214,8 +217,9 @@ To open Chronotif in fullscreen, use the Quick Settings tile, or turn off the ed
   service. Pull down at the top of the panel or the lock-screen view, hold the edge handle, tap the
   *Search* Quick Settings tile or home-screen widget, or long-press Chronotif's icon and pick
   *Search*. Before you type, it suggests the four apps that notified most recently. Tap an answer
-  to copy it. On the lock screen, opening anything asks you to unlock first, and contacts and
-  events stay hidden until you do. *Settings → Search* turns the pull-down off, picks the web
+  to copy it. On the lock screen, opening anything asks you to unlock first. Contacts and events
+  show while locked unless the lock screen hides sensitive content; then they stay hidden until
+  you unlock. *Settings → Search* turns the pull-down off, picks the web
   search engine, turns currency rates off (on for new installs, off for installs from before 0.2.7 until turned on), and turns on contacts, calendar events and calling from Search, each off until you allow it.
   It opens with a checklist of those steps and the Search widget, each with *Not now*, and offers
   the Search tile as an optional extra.
