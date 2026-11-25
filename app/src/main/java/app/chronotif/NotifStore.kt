@@ -77,16 +77,28 @@ object NotifStore {
         }
     }
 
-    /** A conversation whose every message was swiped away isn't New: there's nothing left to show. */
+    /** How many notifications show something in New ([showsNew]): the edge handle's and the tile's count. */
     fun newCount(): Int {
         val lastCheck = Prefs.lastCheck
-        return visible().count { Attention.isNew(it, lastCheck) && !allHidden(it) }
+        return visible().count { showsNew(it, lastCheck) }
     }
 
-    private fun allHidden(e: Entry): Boolean {
-        val h = hidden[e.key] ?: return false
+    /**
+     * Whether [e] shows something in New, as the list draws it ([Attention.showsNew]): a
+     * conversation whose New messages were all swiped away doesn't, even with checked ones left.
+     */
+    fun showsNew(e: Entry, lastCheck: Long): Boolean {
+        if (!Attention.isNew(e, lastCheck)) return false
+        // Nothing swiped away: a New notification always shows its newest message in New.
+        val h = hidden[e.key] ?: return true
+        return Attention.showsNew(e, lastCheck, Content.incoming(e.n), time = { it.time }, hidden = { it.id in h })
+    }
+
+    /** Whether [e] shows anything at all: not a conversation whose every message was swiped away. */
+    fun showsAnything(e: Entry): Boolean {
+        val h = hidden[e.key] ?: return true
         val ids = Content.incomingIds(e.n)
-        return ids.isNotEmpty() && h.containsAll(ids)
+        return ids.isEmpty() || !h.containsAll(ids)
     }
 
     fun connect(active: Array<StatusBarNotification>?, map: RankingMap) {

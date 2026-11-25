@@ -37,6 +37,9 @@
     <string name="save">Save</string>
     <string name="saved">Saved</string>
     <string name="save_failed">Couldn\'t save</string>
+    <string name="settings_page_open_failed">Couldn\'t open that settings page</string>
+    <string name="link_open_failed">No app here can open this link</string>
+    <string name="voice_unavailable">Voice input isn\'t available</string>
     <string name="share">Share</string>
     <string name="open_in_app">Open in app</string>
     <string name="video">Video</string>
@@ -477,12 +480,11 @@
 
     <string name="setup_updates">Updates</string>
     <string name="update_auto">Update automatically</string>
-    <string name="update_auto_desc">Once a day, check GitHub Releases for a new version and install it. Android asks you to confirm unless “Install unknown apps” is allowed for Chronotif.</string>
+    <string name="update_auto_desc">Once a day, when you\'re on Wi-Fi and the battery isn\'t low, check GitHub Releases for a new version and install it. Android asks you to confirm unless “Install unknown apps” is allowed for Chronotif.</string>
     <string name="perm_install">Install unknown apps</string>
     <string name="perm_install_desc">Lets updates install without asking each time (Android 12+).</string>
     <string name="update_check_now">Check for updates</string>
     <string name="update_channel">Updates</string>
-    <string name="update_busy">Already checking…</string>
     <string name="update_checking">Checking for updates…</string>
     <string name="update_none">You\'re up to date (%s).</string>
     <string name="update_skipped">%s failed to install before. Tap “Check for updates” to retry.</string>

@@ -20,7 +20,9 @@ import android.provider.MediaStore
 import android.view.View
 import android.widget.ImageView
 import android.widget.Toast
+import app.chronotif.Background
 import app.chronotif.GoogleLens
+import app.chronotif.Launchable
 import app.chronotif.Launchables
 import app.chronotif.Prefs
 import app.chronotif.QuietMode
@@ -49,10 +51,18 @@ internal class LockShortcuts(
     val right: ImageView = button()
     private var leftKind = LockShortcut.NONE
     private var rightKind = LockShortcut.NONE
-    private val torchId: String? by lazy { Torch.cameraId(activity) }
+    /** The flashlight's camera, once [Background] has looked it up. */
+    @Volatile private var torchId: String? = null
     private var torchOn = false
+    private var dndOn = false
+    /** What [start] listens to, so [stop] undoes only that. */
+    private var torchListening = false
+    private var quietListening = false
+    /** Counts [bind]s, so an app looked up for an earlier one doesn't land on a changed slot. */
+    private var binds = 0
     private var covered = false
     private val main = Handler(Looper.getMainLooper())
+    private val appContext: Context = activity.applicationContext
 
     private val torchCallback = object : CameraManager.TorchCallback() {
         override fun onTorchModeChanged(cameraId: String, enabled: Boolean) {
@@ -63,7 +73,7 @@ internal class LockShortcuts(
     }
 
     private val quietChanged = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) = paint()
+        override fun onReceive(context: Context, intent: Intent) = readQuiet()
     }
 
     @android.annotation.SuppressLint("ClickableViewAccessibility") // Only shows the press; clicks stay with the view.
@@ -125,24 +135,60 @@ internal class LockShortcuts(
     fun bind() {
         leftKind = Prefs.lockShortcutLeft
         rightKind = Prefs.lockShortcutRight
-        icon(left, leftKind, Prefs.lockShortcutLeftApp)
-        icon(right, rightKind, Prefs.lockShortcutRightApp)
+        val bound = ++binds
+        icon(left, leftKind, Prefs.lockShortcutLeftApp, bound)
+        icon(right, rightKind, Prefs.lockShortcutRightApp, bound)
         paint()
     }
 
+    /**
+     * Runs on every wake, so it asks the system for nothing on the main thread. The torch and Do
+     * Not Disturb are only listened to when a slot uses them; finding the flashlight lists the
+     * phone's cameras, and both registrations call into system services, so that happens on
+     * [Background], whose order also keeps [stop]'s unregistering after it.
+     */
     fun start() {
-        if (torchId != null) runCatching {
-            activity.getSystemService(CameraManager::class.java).registerTorchCallback(torchCallback, main)
-        }
-        val filter = IntentFilter(NotificationManager.ACTION_INTERRUPTION_FILTER_CHANGED)
-        if (Build.VERSION.SDK_INT >= 33) activity.registerReceiver(quietChanged, filter, Context.RECEIVER_NOT_EXPORTED)
-        else activity.registerReceiver(quietChanged, filter)
         bind()
+        val kinds = setOf(leftKind, rightKind)
+        if (LockShortcut.FLASHLIGHT in kinds) {
+            torchListening = true
+            Background.run {
+                val id = torchCamera(appContext) ?: return@run
+                torchId = id
+                runCatching { appContext.getSystemService(CameraManager::class.java).registerTorchCallback(torchCallback, main) }
+            }
+        }
+        if (LockShortcut.DO_NOT_DISTURB in kinds) {
+            quietListening = true
+            Background.run {
+                val filter = IntentFilter(NotificationManager.ACTION_INTERRUPTION_FILTER_CHANGED)
+                runCatching {
+                    if (Build.VERSION.SDK_INT >= 33) activity.registerReceiver(quietChanged, filter, Context.RECEIVER_NOT_EXPORTED)
+                    else activity.registerReceiver(quietChanged, filter)
+                }
+            }
+            readQuiet()
+        }
     }
 
     fun stop() {
-        runCatching { activity.getSystemService(CameraManager::class.java).unregisterTorchCallback(torchCallback) }
-        runCatching { activity.unregisterReceiver(quietChanged) }
+        if (torchListening) {
+            torchListening = false
+            Background.run { runCatching { appContext.getSystemService(CameraManager::class.java).unregisterTorchCallback(torchCallback) } }
+        }
+        if (quietListening) {
+            quietListening = false
+            Background.run { runCatching { activity.unregisterReceiver(quietChanged) } }
+        }
+    }
+
+    /** Whether Do Not Disturb is on, asked of the notification service off the main thread. */
+    private fun readQuiet() {
+        Background.run({ runCatching { QuietMode.on(appContext) }.getOrDefault(false) }) { on ->
+            if (dndOn == on) return@run
+            dndOn = on
+            paint()
+        }
     }
 
     /** Hidden while a Preview, the image viewer or Search is over the view. */
@@ -152,7 +198,7 @@ internal class LockShortcuts(
         paint()
     }
 
-    private fun icon(v: ImageView, kind: LockShortcut, appKey: String?) {
+    private fun icon(v: ImageView, kind: LockShortcut, appKey: String?, bound: Int) {
         v.setImageDrawable(null)
         v.imageTintList = null
         val res = when (kind) {
@@ -162,13 +208,33 @@ internal class LockShortcuts(
             LockShortcut.QR_SCANNER -> R.drawable.ic_qr
             LockShortcut.DO_NOT_DISTURB -> R.drawable.ic_dnd
             LockShortcut.APP -> {
-                val app = Launchables.find(activity, appKey)
-                if (app != null) Launchables.icon(activity, app) { v.setImageDrawable(it) }
+                appIcon(v, appKey, bound)
                 null
             }
         }
         if (res != null) v.setImageResource(res)
         v.contentDescription = activity.getString(label(kind))
+    }
+
+    /**
+     * An app slot's icon. Finding the app asks the package manager, so it happens on [Background];
+     * the app found on an earlier wake shows meanwhile, and goes if the app has.
+     */
+    private fun appIcon(v: ImageView, appKey: String?, bound: Int) {
+        val known = appKey?.let(found::get)
+        if (known != null) Launchables.icon(activity, known) { if (bound == binds) v.setImageDrawable(it) }
+        Background.run({ runCatching { Launchables.find(appContext, appKey) }.getOrNull() }) { a ->
+            if (bound != binds || appKey == null) return@run
+            if (a == null) {
+                found.remove(appKey)
+                v.setImageDrawable(null)
+                return@run
+            }
+            found[appKey] = a
+            if (known?.component != a.component || known.user != a.user) {
+                Launchables.icon(activity, a) { if (bound == binds) v.setImageDrawable(it) }
+            }
+        }
     }
 
     private fun paint() {
@@ -180,7 +246,7 @@ internal class LockShortcuts(
         v.visibility = if (kind == LockShortcut.NONE || covered) View.INVISIBLE else View.VISIBLE
         val lit = when (kind) {
             LockShortcut.FLASHLIGHT -> torchOn
-            LockShortcut.DO_NOT_DISTURB -> QuietMode.on(activity)
+            LockShortcut.DO_NOT_DISTURB -> dndOn
             else -> false
         }
         v.background = Ui.rounded(if (lit) 0xFFFFFFFF.toInt() else look.fill, v.dp(SIZE_DP / 2).toFloat()).apply {
@@ -199,17 +265,18 @@ internal class LockShortcuts(
         when (kind) {
             LockShortcut.NONE -> return
             LockShortcut.FLASHLIGHT -> {
-                val id = torchId
+                // Held before the lookup in [start] finished: look it up now.
+                val id = torchId ?: torchCamera(appContext)
                 if (id == null || !Torch.set(activity, id, !torchOn)) say(R.string.lock_shortcut_no_flashlight)
             }
             LockShortcut.CAMERA -> camera()
             LockShortcut.QR_SCANNER ->
                 if (GoogleLens.installed(activity)) unlock { GoogleLens.open(activity) } else showLensMissing(activity, unlock)
             LockShortcut.DO_NOT_DISTURB -> when (QuietMode.toggle(activity)) {
-                QuietMode.Toggle.CHANGED -> paint()
+                QuietMode.Toggle.CHANGED -> readQuiet()
                 QuietMode.Toggle.NO_ACCESS -> say(R.string.lock_shortcut_no_dnd)
                 QuietMode.Toggle.NOT_OURS -> {
-                    paint()
+                    readQuiet()
                     say(R.string.lock_shortcut_dnd_not_ours)
                     unlock { QuietMode.openSettings(activity) }
                 }
@@ -264,6 +331,21 @@ internal class LockShortcuts(
     })
 
     companion object {
+        @Volatile private var torchLooked = false
+        @Volatile private var torchFound: String? = null
+
+        /** The flashlight's camera, looked up once per process: listing cameras asks the camera service. */
+        private fun torchCamera(context: Context): String? {
+            if (!torchLooked) {
+                torchFound = Torch.cameraId(context)
+                torchLooked = true
+            }
+            return torchFound
+        }
+
+        /** Each app slot's app as last found, by its key; read and written on the main thread. */
+        private val found = HashMap<String, Launchable>()
+
         /** The button, and the room around its icon. */
         const val SIZE_DP = 60
         private const val PADDING_DP = 15

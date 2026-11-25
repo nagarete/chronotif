@@ -9,7 +9,6 @@ import android.media.AudioManager
 import android.os.Build
 import android.provider.Settings
 import android.service.notification.NotificationListenerService.Ranking
-import app.chronotif.core.Attention
 import app.chronotif.core.Kind
 
 /** Decides when the lock-screen view appears and what it may reveal. */
@@ -65,10 +64,12 @@ object LockPolicy {
         // Paused players don't: apps leave them around for hours.
         if (NotifStore.visible().any { it.kind == Kind.MEDIA && playing(context, it) && visibility(context, it) != Vis.HIDE }) return true
         // Calls and running work never bring the view up on their own.
-        val shown = NotifStore.visible().filter { it.kind == Kind.NOTIFICATION && visibility(context, it) != Vis.HIDE }
+        val shown = NotifStore.visible().filter {
+            it.kind == Kind.NOTIFICATION && NotifStore.showsAnything(it) && visibility(context, it) != Vis.HIDE
+        }
         return when (mode) {
             Prefs.LOCK_ALWAYS -> shown.isNotEmpty()
-            else -> shown.any { Attention.isNew(it, lastCheck) }
+            else -> shown.any { NotifStore.showsNew(it, lastCheck) }
         }
     }
 

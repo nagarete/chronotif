@@ -24,12 +24,31 @@ class QrTile : TileService() {
         Prefs.qrTileAdded = false
     }
 
+    /**
+     * Runs each time Quick Settings opens, on the main thread. Whether Lens is there takes two
+     * package-manager calls, so the tile shows what was last found and [Background] checks again.
+     */
     override fun onStartListening() {
         Prefs.qrTileAdded = true
         val tile = qsTile ?: return
         tile.state = Tile.STATE_INACTIVE
-        tile.subtitle = if (GoogleLens.installed(this)) null else getString(R.string.qr_tile_needs_lens)
+        show(tile, lens)
+        val app = applicationContext
+        Background.run({ GoogleLens.installed(app) }) { found ->
+            if (found == lens) return@run
+            lens = found
+            qsTile?.let { show(it, found) }
+        }
+    }
+
+    private fun show(tile: Tile, lens: Boolean) {
+        tile.subtitle = if (lens) null else getString(R.string.qr_tile_needs_lens)
         tile.updateTile()
+    }
+
+    private companion object {
+        /** Whether Lens was there when last looked; most phones have the Google app. */
+        @Volatile var lens = true
     }
 
     @SuppressLint("StartActivityAndCollapseDeprecated")

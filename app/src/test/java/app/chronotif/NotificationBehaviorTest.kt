@@ -55,6 +55,8 @@ class NotificationBehaviorTest {
     fun setup() {
         context.getSharedPreferences("chronotif", Context.MODE_PRIVATE).edit().clear().commit()
         Prefs.init(context)
+        // What's new keeps the notes and install time it read for the process; each test installs afresh.
+        app.chronotif.ui.WhatsNewSheet.forget()
         LockSession.reset()
         ranking = ReflectionHelpers.callConstructor(RankingMap::class.java,
             ReflectionHelpers.ClassParameter.from(Array<Ranking>::class.java, emptyArray<Ranking>()))
@@ -1429,6 +1431,146 @@ class NotificationBehaviorTest {
         assertEquals(0, NotifStore.newCount())
     }
 
+    /** A Panel list over the real notifications that records what Clear would cancel in Android. */
+    private fun <T> withClearingPanelList(block: (NotifList, LinearLayout, MutableList<String>) -> T): T =
+        withLockList { _, container ->
+            val dismissed = ArrayList<String>()
+            val source = object : CardSource by CardSource.Real {
+                override fun dismissAll(entries: List<Entry>) {
+                    dismissed += entries.map { it.key }
+                }
+            }
+            val list = NotifList(object : NotifList.Host {
+                override val context: Context = container.context
+                override fun launched() {}
+                override fun guarded(action: () -> Unit) = action()
+            }, container, onLock = false, source = source)
+            block(list, container, dismissed)
+        }
+
+    private fun idOf(e: Entry, text: String) = Content.of(context, e, false).messages.single { it.line.toString() == text }.id
+
+    @Test
+    fun swipingAConversationsOnlyNewMessageLeavesNothingNewThoughCheckedOnesRemain() {
+        post(notification(listOf("seen" to 900L)), 900)
+        Prefs.markChecked(1000)
+        val e = post(notification(listOf("seen" to 900L, "new" to 1200L)), 1200)
+        assertEquals(1, NotifStore.newCount())
+        NotifStore.hideMessage(e.key, idOf(e, "new"))
+        assertEquals("The edge handle and tile go unlit", 0, NotifStore.newCount())
+        assertFalse("Nothing New wakes the lock screen", NotifStore.showsNew(e, Prefs.lastCheck))
+        assertTrue(NotifStore.showsAnything(e))
+        withLockList { list, container ->
+            list.render()
+            val shown = shownTexts(container)
+            assertTrue(shown.contains("seen"))
+            assertFalse(shown.contains("new"))
+            assertEquals("The Pile is empty", 0, list.newPieces)
+            assertEquals(1, list.earlierPieces)
+        }
+    }
+
+    @Test
+    fun clearingEarlierHidesASplitConversationsCheckedMessagesAndKeepsItsNewOnes() {
+        post(notification(listOf("seen" to 900L)), 900)
+        Prefs.markChecked(1000)
+        val chat = post(notification(listOf("seen" to 900L, "new" to 1200L)), 1200)
+        withClearingPanelList { list, container, dismissed ->
+            list.render()
+            fun clearChip() = views(container).filterIsInstance<TextView>().singleOrNull { it.text == "Clear" && it.isShownInTree() }
+            val clear = clearChip()
+            assertNotNull("Earlier offers Clear when it holds only a split conversation's messages", clear)
+            clear!!.performClick()
+            shadowOf(Looper.getMainLooper()).idle()
+            assertEquals(setOf(idOf(chat, "seen")), NotifStore.hiddenMessages(chat.key))
+            assertTrue("The notification isn't cancelled: its New message still shows", dismissed.isEmpty())
+            list.render()
+            val shown = shownTexts(container)
+            assertTrue(shown.contains("new"))
+            assertFalse(shown.contains("seen"))
+            assertNull("Earlier is gone", clearChip())
+        }
+        // With a checked notification beside it, Clear cancels that one and still only hides the chat's checked message.
+        val mail = plain("Checked mail", 800, 2, "example.mail")
+        NotifStore.remove(chat.key, ranking)
+        val again = post(notification(listOf("seen" to 900L, "new" to 1200L)), 1200)
+        withClearingPanelList { list, container, dismissed ->
+            list.render()
+            views(container).filterIsInstance<TextView>().single { it.text == "Clear" && it.isShownInTree() }.performClick()
+            assertEquals(listOf(mail.key), dismissed)
+            assertEquals(setOf(idOf(again, "seen")), NotifStore.hiddenMessages(again.key))
+        }
+    }
+
+    @Test
+    fun clearingAnEarlierStackLeavesTheConversationsNewMessages() {
+        post(notification(listOf("one" to 800L, "two" to 900L)), 900)
+        Prefs.markChecked(1000)
+        val chat = post(notification(listOf("one" to 800L, "two" to 900L, "three" to 1200L)), 1200)
+        withClearingPanelList { list, container, dismissed ->
+            list.render()
+            fun stacks() = views(container).filterIsInstance<app.chronotif.ui.StackView>().filter { it.isShownInTree() }
+            // Earlier holds a collapsed Conversation stack of the two checked messages.
+            val earlierStack = stacks().single()
+            assertTrue(earlierStack.card.swipeAllowed())
+            earlierStack.card.onSwiped()
+            shadowOf(Looper.getMainLooper()).idle()
+            assertEquals(setOf(idOf(chat, "one"), idOf(chat, "two")), NotifStore.hiddenMessages(chat.key))
+            assertTrue(dismissed.isEmpty())
+            list.render()
+            assertTrue(shownTexts(container).contains("three"))
+            assertEquals(1, list.newPieces)
+        }
+        // Once its New message is swiped away too, what Earlier shows is all of it, and clearing cancels it.
+        NotifStore.remove(chat.key, ranking)
+        val next = post(notification(listOf("one" to 800L, "two" to 900L, "three" to 1200L)), 1200)
+        NotifStore.hideMessage(next.key, idOf(next, "three"))
+        withClearingPanelList { list, container, dismissed ->
+            list.render()
+            views(container).filterIsInstance<app.chronotif.ui.StackView>().single { it.isShownInTree() }.card.onSwiped()
+            assertEquals(listOf(next.key), dismissed)
+        }
+    }
+
+    @Test
+    fun clearingAnEarlierAppStackHidesASplitConversationsMessageAndCancelsTheRest() {
+        // One app's single-message chats, checked close together, fold into an App stack (ADR 0004).
+        post(notification(listOf("earlier half" to 900L)), 900, id = 1)
+        val other = post(notification(listOf("other chat" to 950L)), 950, id = 2)
+        Prefs.markChecked(1000)
+        val chat = post(notification(listOf("earlier half" to 900L, "new half" to 1200L)), 1200, id = 1)
+        withClearingPanelList { list, container, dismissed ->
+            list.render()
+            val stack = views(container).filterIsInstance<app.chronotif.ui.StackView>().single { it.isShownInTree() }
+            stack.card.onSwiped()
+            shadowOf(Looper.getMainLooper()).idle()
+            assertEquals(listOf(other.key), dismissed)
+            assertEquals(setOf(idOf(chat, "earlier half")), NotifStore.hiddenMessages(chat.key))
+            list.render()
+            assertTrue("The New half stays", shownTexts(container).contains("new half"))
+        }
+    }
+
+    @Test
+    fun twoPhotosSentTogetherStayTwoMessages() {
+        fun photo(n: Int) = Notification.MessagingStyle.Message("", 100, sender)
+            .setData("image/jpeg", android.net.Uri.parse("content://example.chat/photo/$n"))
+        val style = Notification.MessagingStyle(me).addMessage(photo(1)).addMessage(photo(2))
+        // Apps repeat active messages in the historic list; that overlap still shows once.
+        style.addHistoricMessage(photo(1))
+        val e = post(Notification.Builder(context, "messages").setStyle(style).setOnlyAlertOnce(true).build())
+        val msgs = Content.of(context, e, false).messages
+        assertEquals(2, msgs.size)
+        assertEquals(listOf("content://example.chat/photo/1", "content://example.chat/photo/2"),
+            msgs.map { it.attachment?.uri.toString() })
+        assertEquals("Each has its own id", 2, msgs.map { it.id }.toSet().size)
+        assertEquals(msgs.map { it.id }, Content.incomingIds(e.n))
+        // The same text sent twice at once is two messages too, each with its own id.
+        val twice = Notification.MessagingStyle(me).addMessage("ok", 100, sender).addMessage("ok", 100, sender)
+        val t = post(Notification.Builder(context, "messages").setStyle(twice).build(), id = 2)
+        assertEquals(2, Content.incomingIds(t.n).toSet().size)
+    }
+
     /** Text a user could see: skips views that are gone. */
     private fun shownTexts(view: View): List<String> = when {
         view.visibility != View.VISIBLE -> emptyList()
@@ -1524,6 +1666,7 @@ class NotificationBehaviorTest {
         info.firstInstallTime = 1
         info.lastUpdateTime = 2
         Prefs.whatsNewSeen = emptySet()
+        app.chronotif.ui.WhatsNewSheet.forget()
     }
 
     private fun gotIt(root: View): View? {
@@ -1536,6 +1679,15 @@ class NotificationBehaviorTest {
         return find(root)
     }
 
+    /** Idles the main thread until [done], while work handed to a background thread finishes. */
+    private fun idleUntil(done: () -> Boolean) {
+        repeat(200) {
+            shadowOf(Looper.getMainLooper()).idle()
+            if (done()) return
+            Thread.sleep(10)
+        }
+    }
+
     @Test
     fun whatsNewOverTheCardsIsNoCheck() {
         post(notification("hi"), time = 1000)
@@ -1544,11 +1696,16 @@ class NotificationBehaviorTest {
         withPanelView { panel ->
             panel.shown()
             shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(3))
+            // The notes are read on a background thread.
+            idleUntil { gotIt(panel.rootView) != null }
             assertNotNull("The first open after an update shows What's new", gotIt(panel.rootView))
             panel.dismissed()
         }
         assertEquals("Closed while What's new covered the cards", before, Prefs.lastCheck)
-        assertNull("It shows once", app.chronotif.ui.WhatsNewSheet.pending(context))
+        var again: List<app.chronotif.core.WhatsNew.Release>? = emptyList()
+        app.chronotif.ui.WhatsNewSheet.pending(context) { again = it }
+        idleUntil { again == null }
+        assertNull("It shows once", again)
     }
 
     @Test
@@ -1559,6 +1716,7 @@ class NotificationBehaviorTest {
         withPanelView { panel ->
             panel.shown()
             shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(3))
+            idleUntil { gotIt(panel.rootView) != null }
             gotIt(panel.rootView)!!.performClick()
             shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(500))
             panel.dismissed()

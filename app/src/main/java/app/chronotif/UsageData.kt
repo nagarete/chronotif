@@ -7,8 +7,7 @@ import android.app.ActivityManager
 import android.app.ApplicationExitInfo
 import android.content.Context
 import android.os.Build
-import android.os.Handler
-import android.os.Looper
+import android.os.Process
 import android.provider.Settings
 import android.util.Log
 import app.chronotif.core.Usage
@@ -16,8 +15,10 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.time.LocalDate
 import java.util.UUID
+import java.util.concurrent.Executor
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
-import kotlin.concurrent.thread
 
 /**
  * Usage data (ADR 0016): anonymous counts, Panel speeds, settings and crash reports, sent to
@@ -27,8 +28,9 @@ import kotlin.concurrent.thread
  *
  * On unless turned off. Only Stable and Nightly builds carry the key; the debug build sends
  * nothing. Nothing runs on a timer: the day's counts go out on the first app start or Panel close
- * of a new day, and a crash on the next one. Turning it off sends one last "turned off" event,
- * then forgets the install ID and everything waiting to be sent.
+ * of a new day, and a crash on the next one. A batch is kept until PostHog has it, and a failed
+ * send tries that same batch again. Turning it off sends one last "turned off" event, then
+ * forgets the install ID and everything waiting to be sent.
  */
 // Its one context is the application's, never an activity's.
 @SuppressLint("StaticFieldLeak")
@@ -41,13 +43,37 @@ object UsageData {
     private const val FIELD = '\u001F'
     private const val RECORD = '\u001E'
 
-    private val main = Handler(Looper.getMainLooper())
     private lateinit var app: Context
-    private var sending = false
-    private var failedAt = 0L
+
+    /**
+     * Reading system services, writing counts and sending all happen here, one at a time, so a
+     * send can't overtake the "turned off" event queued after it. The thread ends when idle.
+     */
+    internal var worker: Executor = ThreadPoolExecutor(0, 1, 30, TimeUnit.SECONDS, LinkedBlockingQueue()) { r ->
+        Thread({
+            Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND)
+            r.run()
+        }, "usage-data")
+    }
+
+    /** PostHog's project key; empty in the debug build. Tests set one. */
+    internal var key: String = BuildConfig.USAGE_DATA_KEY
+
+    /** Posts a batch's request body and returns the HTTP status. Tests replace it. */
+    internal var transport: (String) -> Int = ::post
+
+    /** When the last send failed; only the worker reads or writes it. */
+    internal var failedAt = 0L
+
+    // Counts and speeds are kept in memory and written at [flush], [sendIfDue] and a crash, not
+    // on every count. Guarded by [lock], as are the writes that take them into a batch.
+    private val lock = Any()
+    private var counts: HashMap<String, Int>? = null
+    private var speeds: ArrayList<Usage.Speed>? = null
+    private var unsaved = false
 
     /** Whether this build can send at all. */
-    val built: Boolean get() = BuildConfig.USAGE_DATA_KEY.isNotEmpty()
+    val built: Boolean get() = key.isNotEmpty()
 
     private val active: Boolean get() = built && Prefs.usageData && Prefs.usageId != null
 
@@ -55,10 +81,14 @@ object UsageData {
         app = context.applicationContext
         if (!built) return
         catchCrashes()
-        if (!Prefs.usageData) return
-        if (Prefs.usageId == null) start()
-        recordExits()
-        sendIfDue()
+        // Android's exit records and the settings a batch carries are binder calls: off the start path.
+        worker.execute {
+            if (!Prefs.usageData) return@execute
+            if (Prefs.usageId == null) start()
+            recordExits()
+            save()
+            sendDue()
+        }
     }
 
     /** The setting. Off sends one last event, then forgets the install; on starts a new one. */
@@ -67,19 +97,31 @@ object UsageData {
         Prefs.usageData = on
         if (!built) return
         if (on) {
-            start()
-            sendIfDue()
+            worker.execute {
+                if (Prefs.usageId == null) start()
+                sendDue()
+            }
             return
         }
         val install = Prefs.usageId
-        Prefs.clearUsage()
+        // Under the lock, so a batch being built now is either kept and then forgotten here, or not kept.
+        synchronized(lock) {
+            Prefs.clearUsage()
+            forget()
+        }
         if (install == null) return
         val event = Usage.event(install, "usage_data_off", System.currentTimeMillis(), basics())
-        thread(name = "usage-data") { runCatching { post(install, listOf(event)) } }
+        worker.execute {
+            runCatching { transport(Usage.batch(key, install, listOf(event))) }
+                .onFailure { Log.w(TAG, "Couldn't send usage data", it) }
+        }
     }
 
     private fun start() {
-        Prefs.clearUsage()
+        synchronized(lock) {
+            Prefs.clearUsage()
+            forget()
+        }
         Prefs.usageId = UUID.randomUUID().toString()
         Prefs.usageDay = today()
         Prefs.usageOnPending = true
@@ -87,20 +129,52 @@ object UsageData {
         Prefs.usageExitsSeen = System.currentTimeMillis()
     }
 
+    private fun forget() {
+        counts = null
+        speeds = null
+        unsaved = false
+    }
+
     fun count(c: Usage.Count) {
         if (!active) return
-        val all = Usage.decodeCounts(Prefs.usageCounts)
-        Prefs.usageCounts = Usage.encodeCounts(all + (c.key to (all[c.key] ?: 0) + 1))
+        synchronized(lock) {
+            val all = keptCounts()
+            all[c.key] = (all[c.key] ?: 0) + 1
+            unsaved = true
+        }
     }
 
     /** A Panel open took [ms] from the request until its cards were drawn. */
     fun panelSpeed(ms: Long, cards: Int, kept: Boolean, pulled: Boolean) {
         if (!active || ms < 0) return
-        val speeds = Usage.decodeSpeeds(Prefs.usageSpeeds)
-        if (speeds.size >= Usage.MAX_SPEEDS) return
-        val s = Usage.Speed(System.currentTimeMillis(), ms, Usage.cardBucket(cards), kept, pulled)
-        Prefs.usageSpeeds = Usage.encodeSpeeds(speeds + s)
+        synchronized(lock) {
+            val all = keptSpeeds()
+            if (all.size >= Usage.MAX_SPEEDS) return
+            all += Usage.Speed(System.currentTimeMillis(), ms, Usage.cardBucket(cards), kept, pulled)
+            unsaved = true
+        }
     }
+
+    /**
+     * Writes the counts kept in memory. Called when the lock screen closes and the screen turns
+     * off (the Panel's close goes through [sendIfDue]), so a killed process loses only what
+     * happened since.
+     */
+    fun flush() {
+        if (built) worker.execute(::save)
+    }
+
+    private fun save() {
+        synchronized(lock) {
+            if (!unsaved) return
+            Prefs.keepUsage(counts?.let(Usage::encodeCounts), speeds?.let(Usage::encodeSpeeds))
+            unsaved = false
+        }
+    }
+
+    // Read from prefs on first use after a start; callers hold [lock].
+    private fun keptCounts() = counts ?: HashMap(Usage.decodeCounts(Prefs.usageCounts)).also { counts = it }
+    private fun keptSpeeds() = speeds ?: ArrayList(Usage.decodeSpeeds(Prefs.usageSpeeds)).also { speeds = it }
 
     // --- Crashes ---
 
@@ -116,9 +190,15 @@ object UsageData {
         val p = Usage.crashProps(e)
         val record = listOf(System.currentTimeMillis().toString(), p["exception"], p["causes"], p["frames"])
             .joinToString(FIELD.toString())
-        val kept = crashes().takeLast(MAX_CRASHES - 1) + record
-        // Written now: the process is about to end.
-        Prefs.keepUsageCrashes(kept.joinToString(RECORD.toString()))
+        synchronized(lock) {
+            val kept = crashes().takeLast(MAX_CRASHES - 1) + record
+            // Written now, with the counts in memory: the process is about to end.
+            Prefs.keepUsageCrashes(
+                kept.joinToString(RECORD.toString()),
+                counts?.let(Usage::encodeCounts), speeds?.let(Usage::encodeSpeeds),
+            )
+            unsaved = false
+        }
     }
 
     private fun crashes(): List<String> = Prefs.usageCrashes.orEmpty().split(RECORD).filter { it.isNotEmpty() }
@@ -147,67 +227,95 @@ object UsageData {
 
     // --- Sending ---
 
-    /** Sends what's waiting, if a day has ended, a crash is waiting, or the install is new. */
+    /**
+     * Writes the counts kept in memory, then sends what's waiting if a day has ended, a crash is
+     * waiting, the install is new, or a batch is still waiting for PostHog.
+     */
     fun sendIfDue() {
-        if (!active || sending) return
+        if (!built) return
+        worker.execute {
+            save()
+            sendDue()
+        }
+    }
+
+    // On the worker.
+    private fun sendDue() {
+        if (!active) return
         val install = Prefs.usageId ?: return
         val now = System.currentTimeMillis()
         if (now - failedAt < RETRY_MS) return
+        val body = Prefs.usageBatch ?: build(install) ?: return
+        // Turned off while this was being built: nothing more goes out for this install.
+        if (Prefs.usageId != install) return
+        val code = runCatching { transport(body) }.onFailure { Log.w(TAG, "Couldn't send usage data", it) }.getOrDefault(0)
+        when {
+            code in 200..299 -> {
+                failedAt = 0L
+                synchronized(lock) { Prefs.dropUsageBatch(body) }
+            }
+            // PostHog will never take this batch (a bad key or body); keeping it would hold back every later one.
+            code in 400..499 && code != 408 && code != 429 -> {
+                Log.w(TAG, "Usage data: HTTP $code, batch dropped")
+                failedAt = System.currentTimeMillis()
+                synchronized(lock) { Prefs.dropUsageBatch(body) }
+            }
+            else -> {
+                if (code != 0) Log.w(TAG, "Usage data: HTTP $code")
+                failedAt = System.currentTimeMillis()
+            }
+        }
+    }
+
+    /**
+     * Builds what's due into one batch and keeps it, taking its counts, speeds and crashes out of
+     * what's waiting in the same write. A retry then sends exactly this batch, with the same event
+     * IDs, and counts made since wait for the next one. Null when nothing is due.
+     */
+    private fun build(install: String): String? {
+        val now = System.currentTimeMillis()
         val day = today()
         val newDay = Prefs.usageDay != day
-        val crashes = crashes()
         val on = Prefs.usageOnPending
-        if (!newDay && crashes.isEmpty() && !on) return
-        val counts = if (newDay) Usage.decodeCounts(Prefs.usageCounts) else emptyMap()
-        val speeds = if (newDay) Usage.decodeSpeeds(Prefs.usageSpeeds) else emptyList()
+        if (!newDay && !on && crashes().isEmpty()) return null
+        // Binder calls and system properties, read before taking the lock that counting waits on.
+        val device = device()
         val settings = if (newDay || on) settings() else emptyMap()
-        sending = true
-        thread(name = "usage-data") {
-            val ok = runCatching {
-                val device = device()
-                val events = ArrayList<Usage.Event>()
-                if (on) events += Usage.event(install, "usage_data_on", now, device + settings)
-                if (newDay) {
-                    val days = (day - Prefs.usageDay).coerceAtLeast(1)
-                    val n = counts.mapKeys { "n_${it.key}" }
-                    events += Usage.event(install, "daily", now, device + settings + n + ("days" to days))
-                    speeds.forEachIndexed { i, s ->
-                        events += Usage.event(install, "panel_speed", s.at, basics() + mapOf(
-                            "ms" to s.ms, "cards" to s.cards, "kept" to s.kept, "pulled" to s.pulled,
-                            "\$device_model" to Build.MODEL,
-                        ), i)
-                    }
+        synchronized(lock) {
+            if (Prefs.usageId != install) return null
+            val crashes = crashes()
+            val events = ArrayList<Usage.Event>()
+            if (on) events += Usage.event(install, "usage_data_on", now, device + settings)
+            if (newDay) {
+                val days = (day - Prefs.usageDay).coerceAtLeast(1)
+                val n = keptCounts().mapKeys { "n_${it.key}" }
+                events += Usage.event(install, "daily", now, device + settings + n + ("days" to days))
+                keptSpeeds().forEachIndexed { i, s ->
+                    events += Usage.event(install, "panel_speed", s.at, basics() + mapOf(
+                        "ms" to s.ms, "cards" to s.cards, "kept" to s.kept, "pulled" to s.pulled,
+                        "\$device_model" to Build.MODEL,
+                    ), i)
                 }
-                crashes.forEachIndexed { i, r -> crashEvent(install, r, i)?.let { events += it.withProps(device) } }
-                post(install, events)
-            }.onFailure { Log.w(TAG, "Couldn't send usage data", it) }.getOrDefault(false)
-            main.post {
-                sending = false
-                if (!ok) {
-                    failedAt = System.currentTimeMillis()
-                    return@post
-                }
-                failedAt = 0L
-                // The install may have been turned off or restarted while this was on its way.
-                if (Prefs.usageId != install) return@post
-                if (on) Prefs.usageOnPending = false
-                if (newDay) {
-                    Prefs.usageDay = day
-                    Prefs.usageCounts = Usage.encodeCounts(Usage.minus(Usage.decodeCounts(Prefs.usageCounts), counts))
-                    Prefs.usageSpeeds = Usage.encodeSpeeds(Usage.decodeSpeeds(Prefs.usageSpeeds).drop(speeds.size))
-                }
-                if (crashes.isNotEmpty()) {
-                    Prefs.keepUsageCrashes(crashes().drop(crashes.size).joinToString(RECORD.toString()))
-                }
+                counts = HashMap()
+                speeds = ArrayList()
             }
+            crashes.forEachIndexed { i, r -> crashEvent(install, r, i)?.let { events += it.withProps(device) } }
+            // Only unreadable crash records were due: they're dropped, and nothing is sent.
+            val body = if (events.isEmpty()) null else Usage.batch(key, install, events)
+            Prefs.keepUsageBatch(
+                body, day,
+                Usage.encodeCounts(keptCounts()), Usage.encodeSpeeds(keptSpeeds()),
+                crashes().drop(crashes.size).joinToString(RECORD.toString()),
+            )
+            unsaved = false
+            return body
         }
     }
 
     private fun Usage.Event.withProps(more: Map<String, Any?>) = Usage.Event(name, at, more + props, uuid)
 
-    private fun post(install: String, events: List<Usage.Event>): Boolean {
-        if (events.isEmpty()) return true
-        val body = Usage.batch(BuildConfig.USAGE_DATA_KEY, install, events).toByteArray()
+    private fun post(body: String): Int {
+        val bytes = body.toByteArray()
         val c = URL(ENDPOINT).openConnection() as HttpURLConnection
         c.connectTimeout = 10_000
         c.readTimeout = 15_000
@@ -215,12 +323,10 @@ object UsageData {
         c.doOutput = true
         c.setRequestProperty("Content-Type", "application/json")
         c.setRequestProperty("User-Agent", "Chronotif/${BuildConfig.VERSION_NAME}")
-        c.setFixedLengthStreamingMode(body.size)
+        c.setFixedLengthStreamingMode(bytes.size)
         return try {
-            c.outputStream.use { it.write(body) }
-            val code = c.responseCode
-            if (code !in 200..299) Log.w(TAG, "Usage data: HTTP $code")
-            code in 200..299
+            c.outputStream.use { it.write(bytes) }
+            c.responseCode
         } finally {
             c.disconnect()
         }
@@ -252,9 +358,14 @@ object UsageData {
 
     private fun systemProperty(name: String): String? = runCatching {
         val p = ProcessBuilder("getprop", name).redirectErrorStream(true).start()
-        val out = p.inputStream.bufferedReader().use { it.readText() }.trim()
-        if (!p.waitFor(2, TimeUnit.SECONDS)) p.destroy()
-        out.ifEmpty { null }
+        // Waited for before reading: a read would block for as long as getprop hangs. One
+        // property's value fits in the pipe's buffer, so getprop can finish before it's read.
+        if (!p.waitFor(2, TimeUnit.SECONDS)) {
+            p.destroy()
+            Log.w(TAG, "getprop timed out")
+            return@runCatching null
+        }
+        p.inputStream.bufferedReader().use { it.readText() }.trim().ifEmpty { null }
     }.getOrNull()
 
     /** Chronotif's settings and permissions, as they are now. */

@@ -18,10 +18,12 @@ import android.content.pm.PackageInstaller
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.PersistableBundle
 import app.chronotif.core.Version
 import app.chronotif.ui.SetupActivity
 import java.io.File
 import java.io.IOException
+import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
@@ -45,6 +47,9 @@ object Updater {
     private const val REPO = "https://github.com/nagarete/chronotif"
     private const val MAX_APK_BYTES = 50L shl 20
     private const val JOB_ID = 1
+    /** Raised when the job's constraints change, so installs scheduled by an older version are rescheduled. */
+    private const val JOB_VERSION = 2
+    private const val KEY_JOB_VERSION = "version"
     private const val CHANNEL = "updates"
     private const val NOTIF_ID = 1
     const val EXTRA_VERSION = "version"
@@ -54,11 +59,48 @@ object Updater {
     /** GitHub refused the request, most often because this IP address made too many. */
     class RateLimited : IOException("rate limited")
 
+    /** The daily check was stopped, or auto-update was turned off while it ran. */
+    private class Stopped : IOException("stopped")
+
+    /** One check. Android stops the daily job's check through [stopDaily]; a manual check runs on. */
+    private class Check(val manual: Boolean) {
+        @Volatile var stopped = false
+        @Volatile var connection: HttpURLConnection? = null
+
+        /** Throws [Stopped] once the job is stopped, or a daily check finds auto-update off. */
+        fun goOn() {
+            if (stopped || (!manual && !Prefs.autoUpdate)) throw Stopped()
+        }
+    }
+
     /** True while the setup screen is visible, so install prompts open directly instead of notifying. */
     @Volatile var foreground = false
 
     private val running = AtomicBoolean(false)
+    @Volatile private var check: Check? = null
     private val main = Handler(Looper.getMainLooper())
+
+    // --- What Settings shows; main thread only ---
+
+    /** The current or last check's progress, or null before a check in this process. */
+    var status: String? = null
+        private set
+
+    /** A check is running; Settings disables its button. */
+    val busy: Boolean get() = running.get()
+
+    private val watchers = ArrayList<() -> Unit>()
+
+    /** Calls [w] on the main thread whenever [status] or [busy] changes, until [unwatch]. */
+    fun watch(w: () -> Unit) {
+        watchers += w
+    }
+
+    fun unwatch(w: () -> Unit) {
+        watchers -= w
+    }
+
+    private fun changed() = watchers.toList().forEach { it() }
 
     // --- Scheduling ---
 
@@ -66,10 +108,15 @@ object Updater {
     fun sync(context: Context) {
         val js = context.getSystemService(JobScheduler::class.java)
         if (!Prefs.autoUpdate) return js.cancel(JOB_ID)
-        if (js.getPendingJob(JOB_ID) != null) return
+        // A job an older version scheduled keeps its old constraints until it's replaced.
+        if (js.getPendingJob(JOB_ID)?.extras?.getInt(KEY_JOB_VERSION) == JOB_VERSION) return
         val job = JobInfo.Builder(JOB_ID, ComponentName(context, UpdateJob::class.java))
             .setPeriodic(TimeUnit.DAYS.toMillis(1))
-            .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
+            // Many people pay for mobile data, so the daily download waits for Wi-Fi or another
+            // unmetered network. "Check for updates" in Settings runs on any network.
+            .setRequiredNetworkType(JobInfo.NETWORK_TYPE_UNMETERED)
+            .setRequiresBatteryNotLow(true)
+            .setExtras(PersistableBundle().apply { putInt(KEY_JOB_VERSION, JOB_VERSION) })
             .build()
         // Runs from App.onCreate: a scheduling failure must never stop the app from starting.
         runCatching { js.schedule(job) }
@@ -78,66 +125,97 @@ object Updater {
     // --- Check / download / install ---
 
     /**
-     * Checks for a newer release and, if there is one, downloads and installs it.
-     * Runs on a background thread; [onStatus] (main thread) gets human-readable progress.
-     * [manual] checks also retry a version that failed to install before.
+     * Checks for a newer release and, if there is one, downloads and installs it, on a background
+     * thread. Progress goes to [status]. [manual] checks also retry a version that failed to
+     * install before. Returns false, without calling [done], when a check is already running.
+     * [done] runs on the main thread unless the check was stopped.
      */
-    fun run(context: Context, manual: Boolean, onStatus: (String) -> Unit = {}, done: () -> Unit = {}) {
+    fun run(context: Context, manual: Boolean, done: () -> Unit = {}): Boolean {
         val app = context.applicationContext
-        fun status(res: Int, vararg args: Any) = main.post { onStatus(app.getString(res, *args)) }
-        if (!running.compareAndSet(false, true)) {
-            status(R.string.update_busy)
-            return done()
+        if (!running.compareAndSet(false, true)) return false
+        val c = Check(manual)
+        check = c
+        main.post(::changed)
+        fun status(res: Int, vararg args: Any) {
+            val text = app.getString(res, *args)
+            main.post {
+                if (c.stopped) return@post
+                status = text
+                changed()
+            }
         }
         thread(name = "chronotif-update") {
+            var halted = false
             try {
                 status(R.string.update_checking)
-                val r = latest()
+                val r = latest(c)
+                c.goOn()
                 when {
                     r == null || !Version.isNewer(r.version, BuildConfig.VERSION_NAME) ->
                         status(R.string.update_none, BuildConfig.VERSION_NAME)
                     !manual && r.version == Prefs.updateFailedVersion -> status(R.string.update_skipped, r.version)
                     else -> {
                         status(R.string.update_downloading, r.version)
-                        val apk = download(app, r)
+                        val apk = download(app, r, c)
                         status(R.string.update_installing, r.version)
-                        install(app, apk, r.version)
+                        install(app, apk, r.version, c)
                     }
                 }
             } catch (e: RateLimited) {
                 status(R.string.update_rate_limited)
             } catch (e: Exception) {
-                status(R.string.update_error, e.message ?: e.javaClass.simpleName)
+                // A stopped check's connection was cut from another thread, so any error after a stop is the stop.
+                halted = e is Stopped || c.stopped
+                if (!halted) status(R.string.update_error, e.message ?: e.javaClass.simpleName)
             } finally {
+                check = null
                 running.set(false)
-                main.post(done)
+                main.post {
+                    // A halted check's half-done line ("Downloading…") would otherwise stay on screen.
+                    if (halted) status = null
+                    changed()
+                    // After onStopJob, the job mustn't be finished again.
+                    if (!c.stopped) done()
+                }
             }
         }
+        return true
+    }
+
+    /**
+     * Stops the daily job's check: Android stopped the job (its network or battery constraint
+     * no longer holds) or it was cancelled. Cutting the connection ends a blocked read at once.
+     */
+    fun stopDaily() {
+        val c = check?.takeIf { !it.manual } ?: return
+        c.stopped = true
+        c.connection?.disconnect()
     }
 
     /**
      * Stable follows the /releases/latest redirect, which skips prereleases, so frequent nightlies
      * cannot hide it. Nightly reads the releases feed, which lists recent releases without drafts.
      */
-    private fun latest(): Release? {
+    private fun latest(c: Check): Release? {
         val nightly = Prefs.nightlyUpdates
         val tags = if (nightly) {
-            feedTags(get("$REPO/releases.atom").use { it.readBytes().decodeToString() })
+            feedTags(get("$REPO/releases.atom", c) { it.readBytes().decodeToString() })
         } else {
-            listOfNotNull(latestTag())
+            listOfNotNull(latestTag(c))
         }
         return selectRelease(tags, nightly)
     }
 
     /** The tag that /releases/latest redirects to, or null when there's no stable release yet. */
-    private fun latestTag(): String? {
-        val c = open("$REPO/releases/latest")
+    private fun latestTag(check: Check): String? {
+        val c = open("$REPO/releases/latest", check)
         c.instanceFollowRedirects = false
         try {
             val code = c.responseCode
             if (code !in 300..399) throw failure(code)
             return c.getHeaderField("Location")?.substringAfter("/releases/tag/", "")?.ifBlank { null }
         } finally {
+            check.connection = null
             c.disconnect()
         }
     }
@@ -158,17 +236,18 @@ object Updater {
         return best
     }
 
-    private fun download(context: Context, r: Release): File {
-        val expected = get(r.sumUrl).use { it.readBytes().decodeToString() }
+    private fun download(context: Context, r: Release, c: Check): File {
+        val expected = get(r.sumUrl, c) { it.readBytes().decodeToString() }
             .let(Version::sha256Of) ?: throw IOException("bad checksum file")
         val dir = File(context.cacheDir, "updates").apply { deleteRecursively(); mkdirs() }
         val file = File(dir, "update.apk")
         val digest = MessageDigest.getInstance("SHA-256")
-        get(r.apkUrl).use { input ->
+        get(r.apkUrl, c) { input ->
             file.outputStream().use { out ->
                 val buf = ByteArray(64 * 1024)
                 var total = 0L
                 while (true) {
+                    c.goOn()
                     val n = input.read(buf)
                     if (n < 0) break
                     total += n
@@ -186,7 +265,7 @@ object Updater {
         return file
     }
 
-    private fun install(context: Context, apk: File, version: String) {
+    private fun install(context: Context, apk: File, version: String, c: Check) {
         val installer = context.packageManager.packageInstaller
         // Drop sessions left over from an update the user never confirmed.
         installer.mySessions.forEach { runCatching { installer.abandonSession(it.sessionId) } }
@@ -198,11 +277,14 @@ object Updater {
             }
         }
         val id = installer.createSession(params)
-        installer.openSession(id).use { session ->
-            session.openWrite("base.apk", 0, apk.length()).use { out ->
-                apk.inputStream().use { it.copyTo(out) }
-                session.fsync(out)
-            }
+        try {
+            installer.openSession(id).use { session ->
+                session.openWrite("base.apk", 0, apk.length()).use { out ->
+                    apk.inputStream().use { it.copyTo(out) }
+                    session.fsync(out)
+                }
+                // Auto-update may have been turned off during the download.
+                c.goOn()
             val result = Intent(context, UpdateReceiver::class.java)
                 .setAction(UpdateReceiver.ACTION_STATUS)
                 .putExtra(EXTRA_VERSION, version)
@@ -211,27 +293,44 @@ object Updater {
                 context, id, result,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE,
             )
-            session.commit(pi.intentSender)
+                session.commit(pi.intentSender)
+            }
+        } catch (e: Exception) {
+            runCatching { installer.abandonSession(id) }
+            throw e
+        } finally {
+            apk.delete()
         }
-        apk.delete()
     }
 
-    private fun open(url: String): HttpURLConnection {
+    /** A connection [check] can cut; the caller disconnects it and clears [Check.connection]. */
+    private fun open(url: String, check: Check): HttpURLConnection {
         val c = URL(url).openConnection() as HttpURLConnection
         c.connectTimeout = 15_000
         c.readTimeout = 30_000
         c.setRequestProperty("User-Agent", "Chronotif/${BuildConfig.VERSION_NAME}")
+        check.connection = c
+        // Stopped before the connection was there to cut.
+        try {
+            check.goOn()
+        } catch (e: Stopped) {
+            check.connection = null
+            throw e
+        }
         return c
     }
 
-    private fun get(url: String): java.io.InputStream {
-        val c = open(url)
-        if (c.responseCode != HttpURLConnection.HTTP_OK) {
+    /** Reads [url]'s body with [read], then closes the stream and the connection. */
+    private fun <T> get(url: String, check: Check, read: (InputStream) -> T): T {
+        val c = open(url, check)
+        try {
             val code = c.responseCode
+            if (code != HttpURLConnection.HTTP_OK) throw failure(code)
+            return c.inputStream.use(read)
+        } finally {
+            check.connection = null
             c.disconnect()
-            throw failure(code)
         }
-        return c.inputStream
     }
 
     private fun failure(code: Int) = if (code == 403 || code == 429) RateLimited() else IOException("HTTP $code")
@@ -263,14 +362,20 @@ object Updater {
         context.getSystemService(NotificationManager::class.java).cancel(NOTIF_ID)
 }
 
-/** The daily background check. Only scheduled while auto-update is on. */
+/**
+ * The daily background check. Only scheduled while auto-update is on, and only runs on an
+ * unmetered network with the battery not low.
+ */
 class UpdateJob : JobService() {
-    override fun onStartJob(params: JobParameters): Boolean {
+    // False when a check from Settings is already running: it does this job's work.
+    override fun onStartJob(params: JobParameters): Boolean =
         Updater.run(this, manual = false, done = { jobFinished(params, false) })
+
+    // True: a download cut short by leaving Wi-Fi tries again when the constraints hold, not a day later.
+    override fun onStopJob(params: JobParameters): Boolean {
+        Updater.stopDaily()
         return true
     }
-
-    override fun onStopJob(params: JobParameters) = false
 }
 
 /** Install results from PackageInstaller, and the "we were just updated" broadcast. */

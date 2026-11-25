@@ -297,6 +297,7 @@ class LockActivity : Activity(), NotifList.Host {
         super.onStop()
         if (practice) Tutorial.shown(Tutorial.Surface.LOCK, false)
         shortcuts.stop()
+        app.chronotif.UsageData.flush()
         if (!isFinishing && !unlocking) finish()
     }
 

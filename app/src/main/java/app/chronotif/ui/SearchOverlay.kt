@@ -58,6 +58,13 @@ class SearchOverlay private constructor(
 ) : FrameLayout(context), Overlay {
 
     companion object {
+        /**
+         * Where typed queries are matched: off the main thread, so a phone with thousands of
+         * contacts or hundreds of apps still types smoothly. Its own lane, so a slow system call
+         * on [app.chronotif.Background] never holds up results.
+         */
+        private val lane = app.chronotif.Lane("chronotif-search")
+
         /** Lays Search over [anchor]'s window. Nothing happens if something already covers it. */
         fun show(anchor: View, host: NotifList.Host, query: String = "", onClosed: () -> Unit = {}): SearchOverlay? {
             val root = anchor.rootView as? ViewGroup ?: return null
@@ -80,14 +87,36 @@ class SearchOverlay private constructor(
     private val field = EditText(context)
     private val fieldBox = LinearLayout(context)
     private var apps: List<Launchable> = emptyList()
-    private var contacts: List<Contact> = emptyList()
-    private var events: List<CalendarEvent> = emptyList()
+    /** Search's lists with their names folded once. Only read and written on [lane]. */
+    private var appKeys: List<AppKey> = emptyList()
+    private var contactKeys: List<ContactKey> = emptyList()
+    private var eventKeys: List<EventKey> = emptyList()
+    /** The latest query handed to [lane]; a match for an older one is dropped. */
+    @Volatile private var asked = 0
+    /** What's on screen now, for "Show more" and Go. */
+    private var shown: Found? = null
     /** "Show more" was tapped for this query's contacts. */
     private var allContacts = false
+    /** Apps showing for this query; "Show more" adds [AppMatch.MORE]. */
+    private var appsShown = AppMatch.SHOWN
     private var shownQuery = ""
     private var closing = false
     /** Data arrived while off screen; shown once back on it. */
     private var stale = false
+
+    private class AppKey(val app: Launchable, val key: AppMatch.Key)
+    private class ContactKey(val contact: Contact, val key: AppMatch.Key, val digits: List<String>)
+    private class EventKey(val event: CalendarEvent, val key: AppMatch.Key)
+
+    /** What matched one query, found on [lane]. */
+    private class Found(
+        val query: String,
+        val apps: List<Launchable>,
+        val people: List<Contact>,
+        val pages: List<SettingsPages.Page>,
+        val events: List<CalendarEvent>,
+        val hidePersonal: Boolean,
+    )
 
     private val back = if (Build.VERSION.SDK_INT >= 33) OnBackInvokedCallback { close() } else null
 
@@ -168,7 +197,9 @@ class SearchOverlay private constructor(
                 if (id != EditorInfo.IME_ACTION_GO) return@setOnEditorActionListener false
                 val q = text.toString()
                 if (AppMatch.fold(q).isNotEmpty()) {
-                    AppMatch.search(apps, q) { it.label }.firstOrNull()?.let(::open) ?: openWeb(q)
+                    val top = shown?.takeIf { it.query == q }?.apps?.firstOrNull()
+                        ?: AppMatch.search(apps, q) { it.label }.firstOrNull()
+                    top?.let(::open) ?: openWeb(q)
                 }
                 true
             }
@@ -187,20 +218,29 @@ class SearchOverlay private constructor(
             field.setText(initialQuery)
             field.setSelection(initialQuery.length)
         }
+        val app = context.applicationContext
+        // Settings pages are looked up before the first letter, not on it.
+        lane.run { runCatching { SettingsPages.prepare(app) } }
         loadApps()
         PersonalData.contacts(context) { list ->
-            contacts = list
-            if (list.isNotEmpty()) refreshWhenShown()
+            if (list.isEmpty()) return@contacts
+            lane.run({
+                contactKeys = list.map { c -> ContactKey(c, AppMatch.Key(c.name), c.numbers.map { n -> n.filter(Char::isDigit) }) }
+            }) { refreshWhenShown() }
         }
         PersonalData.events(context) { list ->
-            events = list
-            if (list.isNotEmpty()) refreshWhenShown()
+            if (list.isEmpty()) return@events
+            lane.run({ eventKeys = list.map { EventKey(it, AppMatch.Key(it.title)) } }) { refreshWhenShown() }
         }
     }
 
+    private fun locked(c: Context) = c.getSystemService(android.app.KeyguardManager::class.java).isKeyguardLocked
+
+    private fun locked() = locked(context)
+
     private fun loadApps() = Launchables.load(context) { list ->
         apps = list
-        refreshWhenShown()
+        lane.run({ appKeys = list.map { AppKey(it, AppMatch.Key(it.label)) } }) { refreshWhenShown() }
     }
 
     /**
@@ -211,12 +251,12 @@ class SearchOverlay private constructor(
         if (isAttachedToWindow) refresh() else stale = true
     }
 
-    private fun locked() = context.getSystemService(android.app.KeyguardManager::class.java).isKeyguardLocked
-
     private fun refresh() {
         if (closing) return
         val query = field.text.toString()
+        val ask = ++asked
         if (AppMatch.fold(query).isEmpty()) {
+            shown = null
             resultsScroll.visibility = GONE
             spacer.visibility = VISIBLE
             val picks = Launchables.suggestions(apps)
@@ -229,10 +269,41 @@ class SearchOverlay private constructor(
             }
             return
         }
+        val app = context.applicationContext
+        // Typing faster than matching: only the latest query is matched, and only its result shows.
+        lane.run({ if (ask == asked) find(app, query, ask) else null }) { found ->
+            if (found != null && ask == asked && !closing) show(found)
+        }
+    }
+
+    /** Matches [query] on [lane]; null once a newer query has been typed. */
+    private fun find(c: Context, query: String, ask: Int): Found? {
+        val folded = AppMatch.fold(query)
+        val matched = AppMatch.rank(appKeys, folded) { it.key }.map { it.app }
+        if (ask != asked) return null
+        // While locked, contacts and events show unless the lock screen hides content.
+        val hidePersonal = locked(c) && app.chronotif.LockPolicy.hidesContent(c) && (PersonalData.contactsOn(c) || PersonalData.calendarOn(c))
+        val people = if (hidePersonal) emptyList()
+        else PersonalMatch.rankContacts(contactKeys, query, { it.key }, { it.digits }).map { it.contact }
+        if (ask != asked) return null
+        val pages = runCatching { SettingsPages.search(c, query) }.getOrDefault(emptyList())
+        val upcoming = if (hidePersonal) emptyList()
+        else PersonalMatch.rankEvents(eventKeys, query, System.currentTimeMillis(), { it.event.id }, { it.key },
+            { it.event.begin }, { it.event.end }).map { it.event }
+        return Found(query, matched, people, pages, upcoming, hidePersonal)
+    }
+
+    /** Lays out what [find] matched, under the answer and over the web row. */
+    private fun show(found: Found) {
+        val query = found.query
+        shown = found
         suggestionsBlock.visibility = GONE
         resultsScroll.visibility = VISIBLE
         spacer.visibility = GONE
-        if (query != shownQuery) allContacts = false
+        if (query != shownQuery) {
+            allContacts = false
+            appsShown = AppMatch.SHOWN
+        }
         shownQuery = query
         results.removeAllViews()
         Answer.of(query, numbers)?.let { a ->
@@ -242,23 +313,23 @@ class SearchOverlay private constructor(
                 app.chronotif.Tutorial.notice(app.chronotif.TutorialSource.Event.ANSWER_SHOWN)
             }
         }
-        val found = AppMatch.search(apps, query) { it.label }
-        if (found.isNotEmpty()) results.addView(card(R.string.search_apps, found.map(::row)), cardLp())
-        // While locked, contacts and events show unless the lock screen hides content.
-        val hidePersonal = locked() && app.chronotif.LockPolicy.hidesContent(context) && (PersonalData.contactsOn(context) || PersonalData.calendarOn(context))
-        val people = if (hidePersonal) emptyList() else PersonalMatch.contacts(contacts, query, { it.name }, { it.numbers })
+        // A short query can match hundreds of apps: a few show, and "Show more" adds the next ones.
+        val apps = found.apps
+        if (apps.isNotEmpty()) {
+            val rows = apps.take(appsShown).map(::row) +
+                listOfNotNull(if (apps.size > appsShown) showMoreRow(apps.size - appsShown) { appsShown += AppMatch.MORE } else null)
+            results.addView(card(R.string.search_apps, rows), cardLp())
+        }
+        val people = found.people
         if (people.isNotEmpty()) {
-            val shown = if (allContacts) people.take(PersonalMatch.CONTACTS_MAX) else people.take(PersonalMatch.CONTACTS_SHOWN)
-            val rows = shown.map(::contactRow) +
-                listOfNotNull(if (shown.size < people.size && !allContacts) showMoreRow(people.size - shown.size) else null)
+            val visible = if (allContacts) people.take(PersonalMatch.CONTACTS_MAX) else people.take(PersonalMatch.CONTACTS_SHOWN)
+            val rows = visible.map(::contactRow) +
+                listOfNotNull(if (visible.size < people.size && !allContacts) showMoreRow(people.size - visible.size) { allContacts = true } else null)
             results.addView(card(R.string.search_contacts, rows), cardLp())
         }
-        val pages = SettingsPages.search(context, query)
-        if (pages.isNotEmpty()) results.addView(card(R.string.search_settings, pages.map(::settingsRow)), cardLp())
-        val upcoming = if (hidePersonal) emptyList()
-        else PersonalMatch.events(events, query, System.currentTimeMillis(), { it.id }, { it.title }, { it.begin }, { it.end })
-        if (upcoming.isNotEmpty()) results.addView(card(R.string.search_calendar, upcoming.map(::eventRow)), cardLp())
-        if (hidePersonal) results.addView(card(null, listOf(unlockRow())), cardLp())
+        if (found.pages.isNotEmpty()) results.addView(card(R.string.search_settings, found.pages.map(::settingsRow)), cardLp())
+        if (found.events.isNotEmpty()) results.addView(card(R.string.search_calendar, found.events.map(::eventRow)), cardLp())
+        if (found.hidePersonal) results.addView(card(null, listOf(unlockRow())), cardLp())
         results.addView(card(null, listOf(webRow(query))), cardLp())
         resultsScroll.scrollTo(0, 0)
     }
@@ -469,13 +540,16 @@ class SearchOverlay private constructor(
         setOnClickListener { launch(Usage.Count.SEARCH_CONTACT, contactApp, action) }
     }
 
-    private fun showMoreRow(more: Int): View = Ui.text(context, 15f, pal.accent, lines = 1).apply {
+    /** "Show more" under a card: [more] is how many aren't showing; [expand] lets more show. */
+    private fun showMoreRow(more: Int, expand: () -> Unit): View = Ui.text(context, 15f, pal.accent, lines = 1).apply {
         text = context.getString(R.string.search_show_more, more)
         background = Ui.pressable(0, 0f, pal.ripple)
         setPadding(dp(68), dp(12), dp(14), dp(14))
         setOnClickListener {
-            allContacts = true
-            refresh()
+            expand()
+            val y = resultsScroll.scrollY
+            shown?.let(::show)
+            resultsScroll.post { resultsScroll.scrollTo(0, y) }
         }
     }
 

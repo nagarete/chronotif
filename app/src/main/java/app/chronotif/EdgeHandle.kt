@@ -13,6 +13,7 @@ import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.PixelFormat
 import android.hardware.display.DisplayManager
+import android.util.Log
 import android.view.Display
 import android.view.Gravity
 import android.view.HapticFeedbackConstants
@@ -131,7 +132,8 @@ class EdgeHandle(service: Context) {
             layout()
             try {
                 wm.addView(v, params)
-            } catch (_: RuntimeException) {
+            } catch (e: RuntimeException) {
+                Log.w("EdgeHandle", "Couldn't add the edge handle", e)
                 view = null
                 return
             }
