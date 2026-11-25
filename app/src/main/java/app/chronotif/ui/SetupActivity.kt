@@ -206,7 +206,6 @@ class SetupActivity : Activity() {
     override fun onResume() {
         super.onResume()
         // Back from Android's settings, a permission may have changed.
-        index = null
         refreshAll()
         // Back from granting a permission (e.g. display over other apps): let the strip re-check.
         StatusBarSwipe.instance?.refresh()
@@ -464,6 +463,34 @@ class SetupActivity : Activity() {
     private val engines = listOf(R.string.search_engine_google, R.string.search_engine_duckduckgo,
         R.string.search_engine_bing, R.string.search_engine_brave)
 
+    // Each pick's options, as its page offers them and as Search reads its value back.
+    private val themes = listOf(
+        Prefs.THEME_SYSTEM to R.string.theme_system,
+        Prefs.THEME_LIGHT to R.string.theme_light,
+        Prefs.THEME_DARK to R.string.theme_dark,
+    )
+    private val looks = listOf(
+        Prefs.LOOK_FROSTED to R.string.fill_frosted,
+        Prefs.LOOK_SOLID to R.string.fill_solid,
+        Prefs.LOOK_COUNT to R.string.style_count_short,
+    )
+    private val usualColours = listOf(
+        Prefs.COLOUR_GREY to R.string.colour_grey,
+        Prefs.COLOUR_WHITE to R.string.colour_white,
+        Prefs.COLOUR_BLACK to R.string.colour_black,
+    )
+    private val newColours = listOf(
+        Prefs.NEW_ACCENT to R.string.colour_accent,
+        Prefs.NEW_BLUE to R.string.colour_blue,
+        Prefs.NEW_GREEN to R.string.colour_green,
+        Prefs.NEW_ORANGE to R.string.colour_orange,
+        Prefs.NEW_RED to R.string.colour_red,
+        Prefs.NEW_PURPLE to R.string.colour_purple,
+        Prefs.NEW_UNCHANGED to R.string.colour_unchanged,
+    )
+    private val lockModes = listOf(R.string.lock_off, R.string.lock_new, R.string.lock_any)
+    private val dateAligns = listOf(R.string.header_align_top, R.string.header_align_center, R.string.header_align_bottom)
+
     // --- Pages ---
 
     private fun show(s: Section) {
@@ -549,11 +576,9 @@ class SetupActivity : Activity() {
             }
         }
         group {
-            val themes = listOf(Prefs.THEME_SYSTEM, Prefs.THEME_LIGHT, Prefs.THEME_DARK)
-            segmented(R.string.settings_theme, listOf(getString(R.string.theme_system), getString(R.string.theme_light),
-                getString(R.string.theme_dark)), themes.indexOf(Prefs.settingsTheme).coerceAtLeast(0)) {
-                if (Prefs.settingsTheme == themes[it]) return@segmented
-                Prefs.settingsTheme = themes[it]
+            segmented(R.string.settings_theme, themes.map { getString(it.second) }, themeIndex()) {
+                if (Prefs.settingsTheme == themes[it].first) return@segmented
+                Prefs.settingsTheme = themes[it].first
                 // Let the pick show before the screen redraws in the new colours.
                 body.postDelayed({ recreate() }, 150)
             }
@@ -657,7 +682,6 @@ class SetupActivity : Activity() {
             }, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(14) })
         }
         target.addView(row, Ui.lp())
-        indexed(part.title, getString(part.desc), row)
         refreshers += {
             val place = Tutorial.placeOf(part)
             val done = Tutorial.finished(part)
@@ -737,30 +761,23 @@ class SetupActivity : Activity() {
                 Prefs.handleShape = shapes[it].second
                 applyHandle()
             }
-            val looks = listOf(Prefs.LOOK_FROSTED, Prefs.LOOK_SOLID, Prefs.LOOK_COUNT)
-            segmented(R.string.handle_fill, listOf(getString(R.string.fill_frosted), getString(R.string.fill_solid),
-                getString(R.string.style_count_short)), looks.indexOf(Prefs.handleLook),
+            segmented(R.string.handle_fill, looks.map { getString(it.second) }, looks.indexOfFirst { it.first == Prefs.handleLook },
                 note = getString(R.string.fill_count_desc)) {
-                Prefs.handleLook = looks[it]
+                Prefs.handleLook = looks[it].first
                 applyHandle()
                 reshow()
             }
         }
         group(R.string.handle_colours) {
-            val usual = listOf(Prefs.COLOUR_GREY, Prefs.COLOUR_WHITE, Prefs.COLOUR_BLACK)
-            swatches(R.string.handle_colour, usual.map { EdgeHandle.idleColour(it) },
-                listOf(R.string.colour_grey, R.string.colour_white, R.string.colour_black), usual.indexOf(Prefs.handleColour)) {
-                Prefs.handleColour = usual[it]
+            swatches(R.string.handle_colour, usualColours.map { EdgeHandle.idleColour(it.first) },
+                usualColours.map { it.second }, usualColours.indexOfFirst { it.first == Prefs.handleColour }) {
+                Prefs.handleColour = usualColours[it].first
                 applyHandle()
                 reshow()
             }
-            val fresh = listOf(Prefs.NEW_ACCENT, Prefs.NEW_BLUE, Prefs.NEW_GREEN, Prefs.NEW_ORANGE, Prefs.NEW_RED,
-                Prefs.NEW_PURPLE, Prefs.NEW_UNCHANGED)
-            swatches(R.string.handle_new_colour, fresh.map { EdgeHandle.newColour(this, it) },
-                listOf(R.string.colour_accent, R.string.colour_blue, R.string.colour_green, R.string.colour_orange,
-                    R.string.colour_red, R.string.colour_purple, R.string.colour_unchanged),
-                fresh.indexOf(Prefs.handleNewColour)) {
-                Prefs.handleNewColour = fresh[it]
+            swatches(R.string.handle_new_colour, newColours.map { EdgeHandle.newColour(this, it.first) },
+                newColours.map { it.second }, newColours.indexOfFirst { it.first == Prefs.handleNewColour }) {
+                Prefs.handleNewColour = newColours[it].first
                 applyHandle()
             }
         }
@@ -800,7 +817,7 @@ class SetupActivity : Activity() {
 
     private fun lock() {
         group {
-            tiles(R.string.lock_mode, listOf(R.string.lock_off, R.string.lock_new, R.string.lock_any).map { getString(it) to null },
+            tiles(R.string.lock_mode, lockModes.map { getString(it) to null },
                 columns = 3, selected = Prefs.lockMode) { Prefs.lockMode = it }
             toggle(R.string.lock_privacy, R.string.lock_privacy_desc, { Prefs.lockHideContent }) {
                 Prefs.lockHideContent = it
@@ -813,17 +830,23 @@ class SetupActivity : Activity() {
             val fit = button(getString(if (fitted) R.string.fingerprint_fit_again else R.string.fingerprint_fit_button), filled = false) {
                 open(Intent(this, FingerprintFitActivity::class.java))
             }
-            val desc = when {
-                fitted -> R.string.fingerprint_fit_desc_fitted
-                FingerprintSensor.present(this) -> R.string.fingerprint_fit_desc
-                else -> R.string.fingerprint_fit_desc_unknown
-            }
-            item(R.string.fingerprint_fit, getString(desc), trailing = fit)
+            item(R.string.fingerprint_fit, fingerprintDesc(), trailing = fit)
             // Back from fitting or removing the fit: show which it is now.
             refreshers += { if (current == Section.LOCK && fitted != Prefs.fingerprintTop > 0f) body.post { reshow() } }
         }
         lockShortcuts()
     }
+
+    /** What Fit to your fingerprint sensor says: whether it's fitted, or whether the phone says it has one. */
+    private fun fingerprintDesc() = getString(when {
+        Prefs.fingerprintTop > 0f -> R.string.fingerprint_fit_desc_fitted
+        FingerprintSensor.present(this) -> R.string.fingerprint_fit_desc
+        else -> R.string.fingerprint_fit_desc_unknown
+    })
+
+    private fun clockSizeLabel(size: Int) = getString(R.string.header_clock_size, size)
+
+    private fun themeIndex() = themes.indexOfFirst { it.first == Prefs.settingsTheme }.coerceAtLeast(0)
 
     /** The two Lock-screen shortcuts, the QR scanner's need for Google Lens (ADR 0017), and its tile. */
     private fun lockShortcuts() {
@@ -1014,7 +1037,7 @@ class SetupActivity : Activity() {
                 refresh()
             }
             clockOptions += slider(R.string.header_clock_size, Prefs.CLOCK_SIZE_MAX - Prefs.CLOCK_SIZE_MIN,
-                Prefs.headerClockSize - Prefs.CLOCK_SIZE_MIN, label = { getString(R.string.header_clock_size, Prefs.CLOCK_SIZE_MIN + it) }) {
+                Prefs.headerClockSize - Prefs.CLOCK_SIZE_MIN, label = { clockSizeLabel(Prefs.CLOCK_SIZE_MIN + it) }) {
                 Prefs.headerClockSize = Prefs.CLOCK_SIZE_MIN + it
             }
             clockOptions += segmented(R.string.header_date_position,
@@ -1023,8 +1046,7 @@ class SetupActivity : Activity() {
                 Prefs.headerDateBeside = it == 1
                 refresh()
             }
-            besideOptions += segmented(R.string.header_date_align,
-                listOf(getString(R.string.header_align_top), getString(R.string.header_align_center), getString(R.string.header_align_bottom)),
+            besideOptions += segmented(R.string.header_date_align, dateAligns.map { getString(it) },
                 Prefs.headerDateAlign) { Prefs.headerDateAlign = it }
             toggle(R.string.header_weekday, null, { Prefs.headerWeekday }) { Prefs.headerWeekday = it }
             toggle(R.string.header_year, null, { Prefs.headerYear }) { Prefs.headerYear = it }
@@ -1041,8 +1063,6 @@ class SetupActivity : Activity() {
      */
     private fun changed() {
         Panel.drop()
-        // Search shows values; it reads them afresh next time.
-        index = null
     }
 
     private fun applyHandle() {
@@ -1088,19 +1108,11 @@ class SetupActivity : Activity() {
         val title: Int?,
         val label: String,
         val path: String,
-        val row: View?,
         val doc: SettingMatch.Doc,
-    ) {
-        /** What it's set to, read from its row once the page is built. */
-        var value: String? = null
-    }
+    )
 
-    /** Every setting, built from the pages themselves when search opens, so it can't drift from them. */
+    /** Every setting, read from res/xml/settings_search.xml when search opens; see [buildIndex]. */
     private var index: List<Entry>? = null
-    /** While [buildIndex] runs: where [indexed] collects rows, and the section being built. */
-    private var indexing: MutableList<Entry>? = null
-    private var indexSection = Section.GENERAL
-    private var groupHeading: Int? = null
 
     private var searching = false
     private lateinit var searchLayer: LinearLayout
@@ -1108,30 +1120,6 @@ class SetupActivity : Activity() {
     private lateinit var results: LinearLayout
     private lateinit var resultsScroll: ScrollView
     private lateinit var clearQuery: View
-
-    /** Words people type for a setting that its name and description don't contain. */
-    private val keywords = mapOf(
-        R.string.enabled to "on off disable pause",
-        R.string.perm_listener to "permission notification listener",
-        R.string.perm_overlay to "permission overlay draw",
-        R.string.handle_enabled to "handle tab button",
-        R.string.handle_colour to "color",
-        R.string.handle_new_colour to "color light glow",
-        R.string.handle_fill to "count number frosted solid",
-        R.string.handle_position to "height move",
-        R.string.header_clock_size to "font text big small",
-        R.string.swipe_to_clear to "dismiss delete remove",
-        R.string.lock_mode to "lockscreen keyguard",
-        R.string.lock_privacy to "private hide privacy",
-        R.string.lock_double_tap to "screen off turn off gesture wake",
-        R.string.fingerprint_fit to "fingerprint sensor fod overlap covered bottom unlock",
-        R.string.search_setup_widget to "home screen bar launcher",
-        R.string.search_setup_tile to "quick settings",
-        R.string.setup_tutorial to "learn guide how practice try",
-        R.string.search_engine to "google duckduckgo bing brave web browser",
-        R.string.update_auto to "upgrade install",
-        R.string.update_channel_label to "beta nightly stable",
-    )
 
     private val speech by lazy {
         Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
@@ -1275,7 +1263,7 @@ class SetupActivity : Activity() {
         searchLayer.postOnAnimation {
             searchLayer.post {
                 if (!searching) return@post
-                if (index == null) index = buildIndex()
+                index = buildIndex()
                 for (i in resultRows.size until RESULTS) resultRow(i).view.visibility = View.GONE
             }
         }
@@ -1302,56 +1290,119 @@ class SetupActivity : Activity() {
             .hideSoftInputFromWindow(query.windowToken, 0)
     }
 
-    /** Records a row while [buildIndex] builds the pages; does nothing otherwise. */
-    private fun indexed(title: Int, desc: CharSequence?, row: View) {
-        val into = indexing ?: return
-        val label = getString(title)
-        val heading = groupHeading?.let { getString(it) }
-        val section = getString(indexSection.title)
-        val path = if (heading != null) "$section › $heading" else section
-        val other = listOfNotNull(section, heading, desc, keywords[title]).joinToString(" ")
-        into += Entry(indexSection, title, label, path, row, SettingMatch.Doc(label, other))
-    }
-
     /**
-     * Builds every page off screen and keeps its rows, each page also findable by its name. Rows
-     * are found by the same words they show, and their values are read from the rows themselves.
+     * Reads the settings from res/xml/settings_search.xml, each page also findable by its name,
+     * without building any page: a row's words are its section, group, description and keywords.
+     * Rows a page shows only sometimes ("when") are left out while it doesn't.
      */
     private fun buildIndex(): List<Entry> {
-        val savedBody = body
-        val savedRefreshers = ArrayList(refreshers)
-        val savedPending = HashMap(pendingPermission)
         val out = ArrayList<Entry>()
-        indexing = out
+        val p = resources.getXml(R.xml.settings_search)
+        fun res(name: String) = p.getAttributeResourceValue(null, name, 0).takeIf { it != 0 }
+        fun shown() = when (p.getAttributeValue(null, "when")) {
+            null -> true
+            "xiaomi" -> isXiaomi
+            "usage_notice" -> !Prefs.usageNoticed
+            "haptics_off" -> !app.chronotif.Haptics.on(this)
+            "lens_missing" -> !app.chronotif.GoogleLens.installed(this)
+            else -> error("Unknown when in settings_search.xml")
+        }
         try {
-            for (s in Section.entries) {
-                val start = out.size
-                body = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-                target = body
-                indexSection = s
-                build(s)
-                refreshers.forEach { it() }
-                refreshers.clear()
-                for (i in start until out.size) out[i].value = out[i].row?.let(::valueOf)
-                // The page itself, unless a row already has its name (Edge handle's switch).
-                val name = getString(s.title)
-                if (out.subList(start, out.size).none { it.label == name }) {
-                    out.add(start, Entry(s, null, name, getString(R.string.settings_search_page), null,
-                        SettingMatch.Doc(name, keywords[s.title] ?: "")))
+            var section = Section.GENERAL
+            var sectionStart = 0
+            var sectionKeywords: String? = null
+            var heading: Int? = null
+            var groupShown = true
+            while (p.next() != org.xmlpull.v1.XmlPullParser.END_DOCUMENT) {
+                when (p.eventType) {
+                    org.xmlpull.v1.XmlPullParser.START_TAG -> when (p.name) {
+                        "section" -> {
+                            section = Section.valueOf(p.getAttributeValue(null, "name"))
+                            sectionStart = out.size
+                            sectionKeywords = res("keywords")?.let(::getString)
+                        }
+                        "group" -> {
+                            heading = res("heading")
+                            groupShown = shown()
+                        }
+                        "setting" -> if (groupShown && shown()) {
+                            val title = res("title") ?: error("A setting without a title in settings_search.xml")
+                            val label = if (title == R.string.header_clock_size) clockSizeLabel(Prefs.headerClockSize) else getString(title)
+                            val desc = if (title == R.string.fingerprint_fit) fingerprintDesc() else res("summary")?.let(::getString)
+                            val sectionName = getString(section.title)
+                            val headingName = heading?.let(::getString)
+                            val path = if (headingName != null) "$sectionName › $headingName" else sectionName
+                            val other = listOfNotNull(sectionName, headingName, desc, res("keywords")?.let(::getString)).joinToString(" ")
+                            out += Entry(section, title, label, path, SettingMatch.Doc(label, other))
+                        }
+                    }
+                    org.xmlpull.v1.XmlPullParser.END_TAG -> when (p.name) {
+                        "group" -> {
+                            heading = null
+                            groupShown = true
+                        }
+                        // The page itself, unless a row already has its name (Edge handle's switch).
+                        "section" -> {
+                            val name = getString(section.title)
+                            if (out.subList(sectionStart, out.size).none { it.label == name }) {
+                                out.add(sectionStart, Entry(section, null, name, getString(R.string.settings_search_page),
+                                    SettingMatch.Doc(name, sectionKeywords ?: "")))
+                            }
+                        }
+                    }
                 }
             }
         } finally {
-            indexing = null
-            body = savedBody
-            target = body
-            groupHeading = null
-            refreshers.clear()
-            refreshers += savedRefreshers
-            pendingPermission.clear()
-            pendingPermission.putAll(savedPending)
+            p.close()
         }
         return out
     }
+
+    /**
+     * What a setting is set to, for a shown result: a switch's On or Off, or the picked option's
+     * name, read from the setting itself. Null for a row that shows no value.
+     */
+    private fun valueOf(e: Entry): String? {
+        fun onOff(on: Boolean) = getString(if (on) R.string.value_on else R.string.value_off)
+        fun <T> picked(options: List<Pair<T, Int>>, value: T) = options.firstOrNull { it.first == value }?.let { getString(it.second) }
+        return when (e.title) {
+            R.string.enabled -> onOff(Prefs.enabled)
+            R.string.settings_theme -> getString(themes[themeIndex()].second)
+            R.string.header_clock -> onOff(Prefs.headerClock)
+            R.string.header_date_position -> getString(if (Prefs.headerDateBeside) R.string.header_date_beside else R.string.header_date_under)
+            R.string.header_date_align -> dateAligns.getOrNull(Prefs.headerDateAlign)?.let(::getString)
+            R.string.header_weekday -> onOff(Prefs.headerWeekday)
+            R.string.header_year -> onOff(Prefs.headerYear)
+            R.string.header_short_names -> onOff(Prefs.headerShortNames)
+            R.string.header_settings -> onOff(Prefs.headerSettings)
+            R.string.swipe_to_clear -> onOff(Prefs.swipeToClear)
+            R.string.handle_enabled -> onOff(Prefs.handleEnabled)
+            R.string.handle_side -> getString(if (Prefs.handleRight) R.string.side_right else R.string.side_left)
+            R.string.handle_shape -> shapes.firstOrNull { it.second == Prefs.handleShape }?.let { getString(it.first) }
+            R.string.handle_fill -> picked(looks, Prefs.handleLook)
+            R.string.handle_colour -> picked(usualColours, Prefs.handleColour)
+            R.string.handle_new_colour -> picked(newColours, Prefs.handleNewColour)
+            R.string.handle_landscape -> onOff(Prefs.handleHideLandscape)
+            R.string.status_swipe_enabled -> onOff(Prefs.statusSwipeEnabled)
+            R.string.lock_mode -> lockModes.getOrNull(Prefs.lockMode)?.let(::getString)
+            R.string.lock_privacy -> onOff(Prefs.lockHideContent)
+            R.string.lock_double_tap -> onOff(Prefs.lockDoubleTapSleep)
+            R.string.search_pull_down -> onOff(Prefs.pullDownSearch)
+            R.string.search_engine -> engines.getOrNull(Prefs.searchEngine)?.let(::getString)
+            R.string.search_find_contacts -> onOff(Prefs.searchContacts && granted(android.Manifest.permission.READ_CONTACTS))
+            R.string.search_calls -> onOff(Prefs.searchCalls && granted(android.Manifest.permission.CALL_PHONE))
+            R.string.search_currency_rates -> onOff(Prefs.currencyRates)
+            R.string.search_find_calendar -> onOff(Prefs.searchCalendar && granted(android.Manifest.permission.READ_CALENDAR))
+            R.string.update_channel_label -> getString(if (Prefs.nightlyUpdates) R.string.update_nightly else R.string.update_stable)
+            R.string.update_auto -> onOff(Prefs.autoUpdate)
+            R.string.usage_data -> onOff(Prefs.usageData)
+            else -> null
+        }
+    }
+
+    /** Every search result's section, title and value, for a test to hold the index to the pages. */
+    internal fun searchIndex(): List<Triple<String, Int?, String?>> =
+        buildIndex().map { Triple(it.section.name, it.title, valueOf(it)) }
 
     /** Result rows, made once and reused, so typing only rebinds them. */
     private class ResultRow(val view: LinearLayout, val icon: ImageView, val label: TextView, val path: TextView, val value: TextView)
@@ -1413,7 +1464,7 @@ class SetupActivity : Activity() {
         } else {
             val all = index ?: buildIndex().also { index = it }
             for (e in SettingMatch.search(all, typed, RESULTS) { it.doc }) {
-                bind(shown++, e.section, e.label, e.path, e.value, typed, e) { pick(e) }
+                bind(shown++, e.section, e.label, e.path, valueOf(e), typed, e) { pick(e) }
             }
         }
         for (i in shown until resultRows.size) resultRows[i].view.visibility = View.GONE
@@ -1434,22 +1485,6 @@ class SetupActivity : Activity() {
         return android.text.SpannableString(label).apply {
             setSpan(android.text.style.StyleSpan(Typeface.BOLD), at, at + q.length, 0)
             setSpan(android.text.style.ForegroundColorSpan(c.primary), at, at + q.length, 0)
-        }
-    }
-
-    /** What a row is set to: a switch's On or Off, or the picked option's name. */
-    private fun valueOf(row: View): String? {
-        fun find(v: View, test: (View) -> Boolean): View? {
-            if (test(v)) return v
-            if (v is android.view.ViewGroup) for (i in 0 until v.childCount) find(v.getChildAt(i), test)?.let { return it }
-            return null
-        }
-        (find(row) { it is M3Switch } as? M3Switch)?.let { return getString(if (it.isChecked) R.string.value_on else R.string.value_off) }
-        val picked = find(row) { it !== row && it.isSelected } ?: return null
-        return when (picked) {
-            is TextView -> picked.text.toString()
-            is LinearLayout -> (picked.getChildAt(picked.childCount - 1) as? TextView)?.text?.toString()
-            else -> picked.contentDescription?.toString()
         }
     }
 
@@ -1521,7 +1556,6 @@ class SetupActivity : Activity() {
      * add their rows to it.
      */
     private fun group(heading: Int? = null, block: () -> Unit): SettingGroup {
-        groupHeading = heading
         if (heading != null) body.addView(text(getString(heading), 14f, weight = 600).apply {
             setTextColor(c.primary)
             setPadding(dp(16), 0, dp(16), 0)
@@ -1531,7 +1565,6 @@ class SetupActivity : Activity() {
         target = g
         block()
         target = body
-        groupHeading = null
         return g
     }
 
@@ -1540,7 +1573,11 @@ class SetupActivity : Activity() {
         body.addView(text(s, 13f, secondary = true).apply { setPadding(dp(4), 0, dp(4), 0) }, gap(top))
     }
 
-    /** A row: optional [title], optional [desc], then [content] below or [trailing] beside them. */
+    /**
+     * A row: optional [title], optional [desc], then [content] below or [trailing] beside them.
+     * Settings' search finds a titled row once it's listed in res/xml/settings_search.xml, where
+     * SettingsSearchTest expects every one.
+     */
     private fun item(
         title: Int?,
         desc: CharSequence? = null,
@@ -1568,7 +1605,6 @@ class SetupActivity : Activity() {
             if (onClick != null) setOnClickListener { onClick() }
         }
         target.addView(row, Ui.lp())
-        if (title != null) indexed(title, desc, row)
         return row
     }
 
@@ -1662,8 +1698,6 @@ class SetupActivity : Activity() {
             }, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(14) })
         }
         target.addView(row, Ui.lp())
-        // The widget and the tile have no switch below, so search finds them here.
-        if (step == SearchSetup.Step.WIDGET || step == SearchSetup.Step.TILE) indexed(title, getString(desc), row)
         refreshers += {
             val done = SearchSetup.done(this, step)
             val skipped = !done && SearchSetup.skipped(step)
@@ -1824,7 +1858,6 @@ class SetupActivity : Activity() {
             setOnClickListener { onClick() }
         }
         target.addView(row, Ui.lp())
-        indexed(title, getString(desc), row)
         refreshers += {
             val ok = done() && !broken()
             mark.background = GradientDrawable().apply {
