@@ -3,6 +3,7 @@
 package app.chronotif
 
 import android.media.session.PlaybackState
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -26,14 +27,14 @@ class MediaSwipePolicyTest {
         for (state in listOf(null, PlaybackState.STATE_NONE)) {
             assertFalse(MediaSwipePolicy.canAttempt(state, clearable = false, hasDeleteIntent = true))
             assertTrue(MediaSwipePolicy.canAttempt(state, clearable = false,
-                hasDeleteIntent = true, hasPlayAction = true))
+                hasDeleteIntent = true, hasPlayAction = { true }))
             assertTrue(MediaSwipePolicy.canAttempt(state, clearable = true,
-                hasDeleteIntent = false, hasPlayAction = true))
+                hasDeleteIntent = false, hasPlayAction = { true }))
             // Existing behaviour: don't require a Play action on clearable media.
             assertTrue(MediaSwipePolicy.canAttempt(state, clearable = true,
-                hasDeleteIntent = false, hasPlayAction = false))
+                hasDeleteIntent = false, hasPlayAction = { false }))
             assertFalse(MediaSwipePolicy.canAttempt(state, clearable = false,
-                hasDeleteIntent = false, hasPlayAction = true))
+                hasDeleteIntent = false, hasPlayAction = { true }))
         }
     }
 
@@ -46,9 +47,9 @@ class MediaSwipePolicyTest {
             PlaybackState.STATE_SKIPPING_TO_NEXT,
         )) {
             assertTrue(MediaSwipePolicy.canAttempt(state, clearable = true,
-                hasDeleteIntent = false, hasPlayAction = false))
+                hasDeleteIntent = false, hasPlayAction = { false }))
             assertFalse(MediaSwipePolicy.canAttempt(state, clearable = false,
-                hasDeleteIntent = true, hasPlayAction = true))
+                hasDeleteIntent = true, hasPlayAction = { true }))
         }
     }
 
@@ -67,10 +68,24 @@ class MediaSwipePolicyTest {
             if (state in listOf(PlaybackState.STATE_PLAYING,
                     PlaybackState.STATE_BUFFERING, PlaybackState.STATE_CONNECTING)) {
                 assertFalse(MediaSwipePolicy.canAttempt(state, clearable = true,
-                    hasDeleteIntent = true, hasPlayAction = true))
+                    hasDeleteIntent = true, hasPlayAction = { true }))
             }
             assertFalse(MediaSwipePolicy.canAttempt(state, clearable = false,
-                hasDeleteIntent = true, hasPlayAction = true))
+                hasDeleteIntent = true, hasPlayAction = { true }))
         }
+    }
+
+    @Test
+    fun theActionFallbackIsOnlyReadWhenTheStateLeavesItOpen() {
+        // canSwipe runs on every touch move; the fallback reads another app's resources.
+        var asked = 0
+        val fallback = { asked++; true }
+        MediaSwipePolicy.canAttempt(PlaybackState.STATE_PAUSED, clearable = false, hasDeleteIntent = true, hasPlayAction = fallback)
+        MediaSwipePolicy.canAttempt(PlaybackState.STATE_PLAYING, clearable = false, hasDeleteIntent = true, hasPlayAction = fallback)
+        MediaSwipePolicy.canAttempt(null, clearable = true, hasDeleteIntent = false, hasPlayAction = fallback)
+        MediaSwipePolicy.canAttempt(null, clearable = false, hasDeleteIntent = false, hasPlayAction = fallback)
+        assertEquals(0, asked)
+        assertTrue(MediaSwipePolicy.canAttempt(null, clearable = false, hasDeleteIntent = true, hasPlayAction = fallback))
+        assertEquals(1, asked)
     }
 }

@@ -39,7 +39,7 @@ Sent once a day, the first time Chronotif starts or the Panel closes on a new da
 | `system` | `HyperOS 3.0`, `One UI 6.1`, `MIUI 14` or `Android` |
 | `country`, `$geoip_country_code` | `DE`, from the mobile network, else the SIM, else the language's region |
 
-**Settings and permissions**, as they are when the event is sent: `set_enabled`, `set_swipe_to_clear`, `set_status_swipe`, `set_handle`, `set_handle_right`, `set_handle_shape`, `set_handle_colour`, `set_handle_new_colour`, `set_handle_look`, `set_handle_hide_landscape`, `set_lock_mode`, `set_lock_hide_content`, `set_lock_double_tap`, `set_lock_shortcut_left`, `set_lock_shortcut_right` (`none`, `flashlight`, `camera`, `qr`, `dnd` or `app`, never which app), `set_qr_tile`, `has_google_lens`, `set_header_clock`, `set_header_clock_size`, `set_header_date_beside`, `set_header_date_align`, `set_header_weekday`, `set_header_year`, `set_header_short_names`, `set_header_settings`, `set_pull_down_search`, `set_search_engine`, `set_search_contacts`, `set_search_calls`, `set_search_calendar`, `set_currency_rates`, `set_search_tile`, `set_auto_update`, `set_nightly_updates`, `set_settings_theme`, `tutorial_parts_done` (how many parts), `perm_listener`, `perm_overlay`, `perm_status_swipe`.
+**Settings and permissions**, as they are when the day's batch is made: `set_enabled`, `set_swipe_to_clear`, `set_status_swipe`, `set_handle`, `set_handle_right`, `set_handle_shape`, `set_handle_colour`, `set_handle_new_colour`, `set_handle_look`, `set_handle_hide_landscape`, `set_lock_mode`, `set_lock_hide_content`, `set_lock_double_tap`, `set_lock_shortcut_left`, `set_lock_shortcut_right` (`none`, `flashlight`, `camera`, `qr`, `dnd` or `app`, never which app), `set_qr_tile`, `has_google_lens`, `set_header_clock`, `set_header_clock_size`, `set_header_date_beside`, `set_header_date_align`, `set_header_weekday`, `set_header_year`, `set_header_short_names`, `set_header_settings`, `set_pull_down_search`, `set_search_engine`, `set_search_contacts`, `set_search_calls`, `set_search_calendar`, `set_currency_rates`, `set_search_tile`, `set_auto_update`, `set_nightly_updates`, `set_settings_theme`, `tutorial_parts_done` (how many parts), `perm_listener`, `perm_overlay`, `perm_status_swipe`.
 
 **Counts** since the last `daily`. Each is how often something happened, never what it was about. A count that stayed at 0 is left out.
 
@@ -93,6 +93,10 @@ The exception's **message is never sent**. A message can quote whatever value th
 ### `usage_data_off`
 
 Sent once when Usage data is turned off, with `$app_version` and `channel` only. Then the install ID and everything waiting to be sent are deleted, and nothing more is sent.
+
+## When sending fails
+
+Chronotif keeps a batch on the phone until PostHog has it. If a send fails, it tries again at the next app start or Panel close at least an hour later, with that same batch, so nothing is counted twice. Counts made in the meantime go in the next day's batch.
 
 ## Builds that send nothing
 

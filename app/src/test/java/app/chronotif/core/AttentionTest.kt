@@ -3,6 +3,7 @@
 package app.chronotif.core
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -70,6 +71,42 @@ class AttentionTest {
         // Message times come from the sender's clock; a New conversation still shows its latest.
         assertEquals(1, Attention.newMessages(listOf(5, 10), lastCheck = 15))
         assertEquals(0, Attention.newMessages(emptyList(), lastCheck = 15))
+    }
+
+    @Test
+    fun aConversationsMessagesSplitAtTheCheckWithHiddenOnesLeftOut() {
+        // Messages are (id, time); the chat arrived at 30, after the check at 15.
+        val msgs = listOf("a" to 5L, "b" to 10L, "c" to 20L, "d" to 30L)
+        val chat = N("chat", "chat", 30)
+        fun split(item: N, hidden: Set<String>) =
+            Attention.split(item, 15, msgs, time = { it.second }, hidden = { it.first in hidden })
+        split(chat, emptySet()).let {
+            assertEquals(listOf("c", "d"), it.new.map { m -> m.first })
+            assertEquals(listOf("a", "b"), it.earlier.map { m -> m.first })
+        }
+        split(chat, setOf("c", "a")).let {
+            assertEquals(listOf("d"), it.new.map { m -> m.first })
+            assertEquals(listOf("b"), it.earlier.map { m -> m.first })
+        }
+        // A checked conversation has nothing New, whatever its message times.
+        assertEquals(emptyList<Pair<String, Long>>(), split(N("chat", "chat", 10), emptySet()).new)
+        assertEquals(4, split(N("chat", "chat", 10), emptySet()).earlier.size)
+    }
+
+    @Test
+    fun swipingAwayTheOnlyNewMessageLeavesNothingNewThoughCheckedOnesRemain() {
+        val msgs = listOf("seen" to 5L, "new" to 30L)
+        val chat = N("chat", "chat", 30)
+        fun showsNew(hidden: Set<String>) =
+            Attention.showsNew(chat, 15, msgs, time = { it.second }, hidden = { it.first in hidden })
+        assertTrue(showsNew(emptySet()))
+        val split = Attention.split(chat, 15, msgs, time = { it.second }, hidden = { it.first == "new" })
+        assertTrue("The checked message isn't moved up into New", split.new.isEmpty())
+        assertEquals(listOf("seen"), split.earlier.map { it.first })
+        assertFalse(showsNew(setOf("new")))
+        // A New notification without messages shows in New; a checked one doesn't.
+        assertTrue(Attention.showsNew(chat, 15, emptyList<Pair<String, Long>>(), { it.second }, { false }))
+        assertFalse(Attention.showsNew(N("x", "mail", 10), 15, emptyList<Pair<String, Long>>(), { it.second }, { false }))
     }
 
     @Test

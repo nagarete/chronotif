@@ -16,7 +16,7 @@ Setup help, notification behaviour, privacy rules, and development details.
 | Lock-screen view | Shown over the locked keyguard when the screen turns on | Started only on screen-on |
 
 No foreground service, wakelocks or alarms. The only scheduled work is the once-a-day update
-check, and only if you turn it on.
+check, only if you turn it on, and only on Wi-Fi with the battery not low.
 
 ### What counts as a "meaningful check"
 
@@ -89,14 +89,16 @@ v0.2.2 and older have no channel setting. Install a nightly APK once to opt into
 Older updaters ignore nightly tags and continue to receive stable versions.
 
 Turn on *Settings → Updates → Update automatically* and Chronotif checks GitHub Releases once
-a day. When there's a newer version it downloads the APK, checks it against the release's
+a day, when the phone is on Wi-Fi (or another network that isn't metered) and the battery isn't
+low, so it never spends paid mobile data. A download cut short by leaving Wi-Fi stops and tries
+again later. When there's a newer version it downloads the APK, checks it against the release's
 `.sha256` file and installs it:
 
 - If **Install unknown apps** is allowed for Chronotif (Android 12+), the update installs
   silently and you get an "updated" notification.
 - Otherwise you get an "update available" notification. Tap it to confirm the install.
 
-*Check for updates* does the same thing on demand. The check reads the public release pages
+*Check for updates* does the same thing on demand, on any network. The check reads the public release pages
 on github.com and sends nothing about you or your notifications. If GitHub is limiting
 requests from your network, the check says so; try again later or on another network. Android only accepts an update signed with
 the same key as the installed app, so a tampered APK can't install.

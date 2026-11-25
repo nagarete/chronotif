@@ -66,7 +66,7 @@ class SearchActivityTest {
             level.flatMap { v -> if (v is ViewGroup) (0 until v.childCount).map(v::getChildAt) else emptyList() }.ifEmpty { null }
         }.flatten().filterIsInstance<android.widget.EditText>().single()
         field.setText("12*7.5+3")
-        shadowOf(Looper.getMainLooper()).idle()
+        idleUntil { texts(search).any { it.startsWith("Search the web for") } }
         val shown = texts(search).filter { it.isNotBlank() }
         val answer = shown.indexOf("= 93")
         val web = shown.indexOfFirst { it.startsWith("Search the web for") }
@@ -75,11 +75,20 @@ class SearchActivityTest {
         controller.destroy()
     }
 
+    /** Types [text], then waits for its results: they're matched on a background thread, ending with the web row. */
     private fun typeInto(search: SearchOverlay, text: String) {
         generateSequence(listOf<android.view.View>(search)) { level ->
             level.flatMap { v -> if (v is ViewGroup) (0 until v.childCount).map(v::getChildAt) else emptyList() }.ifEmpty { null }
         }.flatten().filterIsInstance<android.widget.EditText>().single().setText(text)
-        shadowOf(Looper.getMainLooper()).idle()
+        idleUntil { texts(search).any { text.trim() in it } }
+    }
+
+    private fun idleUntil(done: () -> Boolean) {
+        repeat(200) {
+            shadowOf(Looper.getMainLooper()).idle()
+            if (done()) return
+            Thread.sleep(10)
+        }
     }
 
     private fun shownWith(locked: Boolean, hideContent: Boolean = false): List<String> {
@@ -115,7 +124,9 @@ class SearchActivityTest {
     @Test fun startsWithTheQueryCarriedOverFromTheLockScreen() {
         val controller = Robolectric.buildActivity(SearchActivity::class.java, SearchActivity.intent(context, "12*2")).setup()
         shadowOf(Looper.getMainLooper()).idle()
-        val shown = texts(overlays(controller.get().window.decorView as ViewGroup).single())
+        val search = overlays(controller.get().window.decorView as ViewGroup).single()
+        idleUntil { "= 24" in texts(search) }
+        val shown = texts(search)
         assertTrue("$shown", "= 24" in shown)
         controller.destroy()
     }
@@ -191,6 +202,56 @@ class SearchActivityTest {
         Robolectric.setupContentProvider(OneEvent::class.java, android.provider.CalendarContract.AUTHORITY)
         assertEquals("In the tutorial nothing opens. Otherwise your calendar would.",
             tapInTutorialSearch("dentist", "Dentist"))
+    }
+
+    /** An app in the launcher, as LauncherApps lists it. */
+    private fun launcherApp(label: String) {
+        val user = android.os.Process.myUserHandle()
+        val info = android.content.pm.ActivityInfo().apply {
+            packageName = "test.${label.lowercase().replace(' ', '.')}"
+            name = "$packageName.Main"
+            nonLocalizedLabel = label
+            applicationInfo = android.content.pm.ApplicationInfo()
+            applicationInfo.packageName = packageName
+        }
+        val internal = org.robolectric.util.ReflectionHelpers.callConstructor(
+            Class.forName("android.content.pm.LauncherActivityInfoInternal"),
+            org.robolectric.util.ReflectionHelpers.ClassParameter.from(android.content.pm.ActivityInfo::class.java, info),
+            org.robolectric.util.ReflectionHelpers.ClassParameter.from(Class.forName("android.content.pm.IncrementalStatesInfo"), null),
+            org.robolectric.util.ReflectionHelpers.ClassParameter.from(android.os.UserHandle::class.java, user),
+        )
+        val launcherInfo = org.robolectric.util.ReflectionHelpers.callConstructor(
+            android.content.pm.LauncherActivityInfo::class.java,
+            org.robolectric.util.ReflectionHelpers.ClassParameter.from(Context::class.java, context),
+            org.robolectric.util.ReflectionHelpers.ClassParameter.from(Class.forName("android.content.pm.LauncherActivityInfoInternal"), internal),
+        )
+        shadowOf(context.getSystemService(android.content.pm.LauncherApps::class.java)).addActivity(user, launcherInfo)
+    }
+
+    // Robolectric names an app by its package.
+    @Test fun manyMatchingAppsShowAFewThenMoreOnRequest() {
+        repeat(10) { launcherApp("Alpha $it") }
+        val controller = Robolectric.buildActivity(SearchActivity::class.java, SearchActivity.intent(context)).setup()
+        try {
+            shadowOf(Looper.getMainLooper()).idle()
+            val search = overlays(controller.get().window.decorView as ViewGroup).single()
+            typeInto(search, "alpha")
+            // The apps load on a background thread too; Search matches again once they're in.
+            idleUntil { texts(search).any { it.startsWith("test.alpha") } }
+            val shown = texts(search)
+            assertEquals("A few apps show: $shown", app.chronotif.core.AppMatch.SHOWN, shown.count { it.startsWith("test.alpha") })
+            val more = context.getString(app.chronotif.R.string.search_show_more, 10 - app.chronotif.core.AppMatch.SHOWN)
+            assertTrue("The rest are a tap away: $shown", more in shown)
+            fun views(v: android.view.View): List<android.view.View> =
+                listOf(v) + if (v is ViewGroup) (0 until v.childCount).flatMap { views(v.getChildAt(it)) } else emptyList()
+            views(search).filterIsInstance<android.widget.TextView>().first { it.text.toString() == more }.performClick()
+            shadowOf(Looper.getMainLooper()).idle()
+            val all = texts(search)
+            assertEquals("All of them after Show more: $all", 10, all.count { it.startsWith("test.alpha") })
+            assertTrue(all.none { it.startsWith("Show more") })
+        } finally {
+            controller.destroy()
+        }
     }
 
     @Test fun currencyOffersToTurnOnRatesFirst() {

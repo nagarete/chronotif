@@ -93,6 +93,12 @@ class LockPile(
         stage.addView(big, 1, FrameLayout.LayoutParams(0, 0))
         stage.addView(deco, FrameLayout.LayoutParams(-1, -1))
         scroll.setOnScrollChangeListener { _, _, _, _, _ -> apply() }
+        // Rows can move or change size only in a layout pass; until the next one, what was
+        // worked out for the last frame still holds.
+        stage.viewTreeObserver.addOnGlobalLayoutListener {
+            fitStale = true
+            applyStale = true
+        }
         // Size the clock's room and the gap before each frame that follows a change in the list.
         stage.viewTreeObserver.addOnPreDrawListener(object : ViewTreeObserver.OnPreDrawListener {
             var tries = 0
@@ -105,6 +111,17 @@ class LockPile(
             }
         })
     }
+
+    /** Set by a layout pass: [fit] and [apply] work everything out again. */
+    private var fitStale = true
+    private var applyStale = true
+    /** What [fit] last saw besides layout: the rows, and the artwork it sized the room for. */
+    private var fitPlaced = -1
+    private var fitArtwork: Drawable? = null
+    /** What [apply] last drew for besides layout: scroll position, resting place and rows. */
+    private var appliedScroll = -1
+    private var appliedRest = -1
+    private var appliedPlaced = -1
 
     /**
      * The scroll position the Pile rests at: 0, or how far an opened Pile card overflows the room
@@ -130,19 +147,38 @@ class LockPile(
     /** Whether [ev] lands on the count under the Pile while it isn't open. */
     fun hitsCount(ev: MotionEvent): Boolean = progress < 1f && count.visibility == View.VISIBLE && on(count, ev)
 
-    private fun on(v: View, ev: MotionEvent): Boolean {
-        val r = Rect()
-        return v.getGlobalVisibleRect(r) && r.contains(ev.rawX.toInt(), ev.rawY.toInt())
-    }
+    private fun on(v: View, ev: MotionEvent): Boolean =
+        v.getGlobalVisibleRect(hit) && hit.contains(ev.rawX.toInt(), ev.rawY.toInt())
+
+    private val hit = Rect()
 
     /**
      * The Pile's card, whose last row the rest fold under, and the rows after the clock's room. With
-     * nothing New the card is empty, and everything folds where Earlier's first row is.
+     * nothing New the card is empty, and everything folds where Earlier's first row is. Worked out
+     * by [rows] when the list places rows, and kept between frames.
      */
-    private fun folded(): Pair<List<View>, List<View>> {
-        val sp = list.spacer ?: return emptyList<View>() to emptyList()
-        val after = (listBox.indexOfChild(sp) + 1 until listBox.childCount).map { listBox.getChildAt(it) }
-        return list.pile to after
+    private val card = ArrayList<View>()
+    private val inCard = HashSet<View>()
+    private val after = ArrayList<View>()
+    /** Where the card's last row is in [after], or -1: the rows past it are clipped under it. */
+    private var below = -1
+    /** The [NotifList.placed] that [card] and [after] were worked out for. */
+    private var rowsPlaced = -1
+
+    private fun rows() {
+        if (rowsPlaced == list.placed) return
+        rowsPlaced = list.placed
+        card.clear()
+        inCard.clear()
+        after.clear()
+        val sp = list.spacer
+        if (sp != null) {
+            card.addAll(list.pile)
+            inCard.addAll(card)
+            for (i in listBox.indexOfChild(sp) + 1 until listBox.childCount) after += listBox.getChildAt(i)
+        }
+        below = card.lastOrNull()?.let(after::indexOf) ?: -1
+        moved.retainAll { it.parent === listBox }
     }
 
     /**
@@ -152,19 +188,24 @@ class LockPile(
      */
     private fun fit(): Boolean {
         if (stage.height == 0) return false
+        rows()
+        val featured = list.featured?.takeIf { it.height > 0 }
+        val artwork = featured?.artwork
+        // Nothing it reads has changed since it last found everything in place.
+        if (!fitStale && !settling && fitPlaced == rowsPlaced && fitArtwork === artwork) return false
+        fitStale = false
+        fitPlaced = rowsPlaced
+        fitArtwork = artwork
         var changed = false
         val room = clockBox.height
         if (clockRoom.layoutParams.height != room) {
             clockRoom.layoutParams = clockRoom.layoutParams.apply { height = room }
             changed = true
         }
-        val (card, after) = folded()
         val top = card.lastOrNull()
         val first = top ?: after.firstOrNull()
         var gap = list.gap
         var art = 0
-        val featured = list.featured?.takeIf { it.height > 0 }
-        val artwork = featured?.artwork
         val sp = list.spacer
         if (featured != null && artwork != null && sp != null) {
             // The room left between the clock and what rests at the bottom: the Pile, or the
@@ -239,11 +280,25 @@ class LockPile(
         return h
     }
 
-    private fun countLabel(): String? = when {
-        list.newPieces > 1 -> ctx.getString(R.string.more_in_stack, list.newPieces - 1)
-        list.newPieces == 0 && list.earlierPieces > 0 -> ctx.getString(R.string.earlier_count, list.earlierPieces)
-        else -> null
+    private fun countLabel(): String? {
+        val n = list.newPieces
+        val e = list.earlierPieces
+        if (n != labelNew || e != labelEarlier) {
+            labelNew = n
+            labelEarlier = e
+            label = when {
+                n > 1 -> ctx.getString(R.string.more_in_stack, n - 1)
+                n == 0 && e > 0 -> ctx.getString(R.string.earlier_count, e)
+                else -> null
+            }
+        }
+        return label
     }
+
+    /** [countLabel] for the counts it was last made for. */
+    private var label: String? = null
+    private var labelNew = -1
+    private var labelEarlier = -1
 
     /** Rows moved or faded by the fold, to put back once the Pile is open. */
     private val moved = HashSet<View>()
@@ -255,41 +310,64 @@ class LockPile(
         v.visibility = View.VISIBLE
     }
 
+    /** Whether every row to fold is in [moved], since [rows] last changed. */
+    private var allMoved = false
+
+    /** The part of a folded row that shows past the Pile's card; reused, as the row copies it. */
+    private val cut = Rect()
+
     /**
      * Folds and unfolds the list for the current scroll, and moves the clock and the slivers with
      * it. Run before every frame: rows can arrive over several frames, and each must start folded.
+     * With nothing scrolled, laid out or placed since the last frame, only the artwork is drawn again.
      *
      * Folded rows sit [unfold] higher than their place, so while the list scrolls through the
      * unfold they hold still on screen and the Pile's card slides up off them, uncovering them.
-     * Whatever is still under the card is clipped, since the cards are translucent.
+     * Whatever is still under the card is clipped, since the cards are translucent. A folded row
+     * off screen is only hidden; it's moved and faded when it comes on screen.
      */
     fun apply() {
-        val p = progress
-        val (card, after) = folded()
-        val top = card.lastOrNull()
+        rows()
         val sy = scroll.scrollY
-        val first = top ?: after.firstOrNull()
-        moved.retainAll { it.parent === listBox }
-        for (v in card) if (v in moved) {
-            unfoldRow(v)
-            moved -= v
+        if (!applyStale && sy == appliedScroll && restAt == appliedRest && rowsPlaced == appliedPlaced) {
+            artwork(sy)
+            return
         }
+        if (rowsPlaced != appliedPlaced) allMoved = false
+        applyStale = false
+        appliedScroll = sy
+        appliedRest = restAt
+        appliedPlaced = rowsPlaced
+        val p = progress
+        val top = card.lastOrNull()
+        val first = top ?: after.firstOrNull()
+        for (v in card) if (moved.remove(v)) unfoldRow(v)
         if (p >= 1f) {
             moved.forEach(::unfoldRow)
             moved.clear()
+            allMoved = false
         } else {
             val lift = -unfold * (1f - p)
-            val below = top?.let { after.indexOf(it) } ?: -1
             val edge = top?.bottom ?: Int.MIN_VALUE
-            for ((i, v) in after.withIndex()) {
-                if (v in card) continue
-                moved += v
+            // What's on screen, in the list's coordinates.
+            val shownTop = sy - listBox.top
+            val shownBottom = shownTop + scroll.height
+            for (i in after.indices) {
+                val v = after[i]
+                if (v in inCard) continue
+                if (!allMoved) moved += v
+                val y = v.top + lift.toInt()
+                if (y > shownBottom || y + v.height < shownTop) {
+                    if (v.visibility != View.INVISIBLE) v.visibility = View.INVISIBLE
+                    continue
+                }
                 v.translationY = lift
                 v.alpha = p
                 v.visibility = if (p == 0f) View.INVISIBLE else View.VISIBLE
-                val hidden = edge - (v.top + lift.toInt())
-                v.clipBounds = if (i > below && hidden > 0) Rect(0, minOf(hidden, v.height), v.width, v.height) else null
+                val hidden = edge - y
+                v.clipBounds = if (i > below && hidden > 0) cut.apply { set(0, minOf(hidden, v.height), v.width, v.height) } else null
             }
+            allMoved = true
         }
 
         // Slivers and the count, under the Pile's card (or where Earlier folds), fading as it unfolds.
@@ -300,21 +378,9 @@ class LockPile(
             deco.visibility = View.VISIBLE
             deco.alpha = 1f - p
             val base = listBox.top + (if (top != null) first.bottom else first.top) - sy
-            val left = listBox.left + listBox.paddingLeft
-            val width = listBox.width - listBox.paddingLeft - listBox.paddingRight
-            fun place(v: View, inset: Int, y: Int, show: Boolean) {
-                v.visibility = if (show) View.VISIBLE else View.GONE
-                val lp = v.layoutParams as FrameLayout.LayoutParams
-                if (lp.leftMargin != left + inset || lp.width != width - 2 * inset) {
-                    lp.leftMargin = left + inset
-                    lp.width = width - 2 * inset
-                    v.layoutParams = lp
-                }
-                v.translationY = y.toFloat()
-            }
             val n = if (top != null) list.newPieces else 0
-            place(sliver1, ctx.dp(14), base, n > 1)
-            place(sliver2, ctx.dp(30), base + ctx.dp(7), n > 2)
+            placeDeco(sliver1, ctx.dp(14), base, n > 1)
+            placeDeco(sliver2, ctx.dp(30), base + ctx.dp(7), n > 2)
             val slivers = if (n > 2) ctx.dp(14) else if (n > 1) ctx.dp(7) else 0
             count.visibility = if (label != null) View.VISIBLE else View.GONE
             if (label != null && count.text != label) count.text = label
@@ -322,15 +388,37 @@ class LockPile(
         }
 
         // The clock stays until the list's top edge reaches it, then is pushed up and fades.
-        // Rows still folded don't count: they only fade in where they'll be.
-        val edge = listBox.top - sy + (0 until listBox.childCount).map { listBox.getChildAt(it) }
-            .filter { it !== list.spacer && it !== list.artRow && it !in moved && it.visibility == View.VISIBLE && it.height > 0 }
-            .minOfOrNull { it.top + it.translationY.toInt() }.let { it ?: listBox.height }
+        // Rows still folded don't count: they only fade in where they'll be. Rows that aren't
+        // folded aren't moved, so the first one down the list is the top edge.
+        val sp = list.spacer
+        val artRow = list.artRow
+        var listTop = Int.MAX_VALUE
+        for (i in 0 until listBox.childCount) {
+            val v = listBox.getChildAt(i)
+            if (v.top >= listTop) break
+            if (v === sp || v === artRow || v in moved || v.visibility != View.VISIBLE || v.height <= 0) continue
+            listTop = minOf(listTop, v.top + v.translationY.toInt())
+        }
+        val edge = listBox.top - sy + if (listTop == Int.MAX_VALUE) listBox.height else listTop
         val push = minOf(0, edge - clockBox.bottom).toFloat()
         clockBox.translationY = push
         clockBox.alpha = (1f + push / maxOf(1, clockBox.height)).coerceIn(0f, 1f)
 
         artwork(sy)
+    }
+
+    /** Puts a sliver or the count [inset] in from the list's sides, at [y] on screen. */
+    private fun placeDeco(v: View, inset: Int, y: Int, show: Boolean) {
+        v.visibility = if (show) View.VISIBLE else View.GONE
+        val left = listBox.left + listBox.paddingLeft + inset
+        val width = listBox.width - listBox.paddingLeft - listBox.paddingRight - 2 * inset
+        val lp = v.layoutParams as FrameLayout.LayoutParams
+        if (lp.leftMargin != left || lp.width != width) {
+            lp.leftMargin = left
+            lp.width = width
+            v.layoutParams = lp
+        }
+        v.translationY = y.toFloat()
     }
 
     /**
@@ -368,8 +456,10 @@ class LockPile(
         val e = a * a * (3f - 2f * a)
         val x0 = (stage.width - artW) / 2f
         val y0 = (listBox.top + row.top + ctx.dp(ART_ABOVE_DP) - sy).toFloat()
-        val here = IntArray(2).also(stage::getLocationInWindow)
-        val at = IntArray(2).also(featured.thumb::getLocationInWindow)
+        val here = stageAt
+        val at = thumbAt
+        stage.getLocationInWindow(here)
+        featured.thumb.getLocationInWindow(at)
         val x1 = (at[0] - here[0]).toFloat()
         val y1 = (at[1] - here[1]).toFloat()
         val tw = featured.thumb.width.toFloat().takeIf { it > 0 } ?: ctx.dp(64).toFloat()
@@ -400,6 +490,10 @@ class LockPile(
         big.translationX = x - cx * scale
         big.translationY = y - cy * scale
     }
+
+    /** Where the stage and the player's thumbnail are, reused each frame. */
+    private val stageAt = IntArray(2)
+    private val thumbAt = IntArray(2)
 
     /**
      * A blurred copy of the artwork behind everything, in place of the wallpaper. It's drawn

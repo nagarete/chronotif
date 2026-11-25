@@ -29,6 +29,14 @@ class AppMatchTest {
         )
     }
 
+    @Test fun namesFoldedAheadRankTheSameAsNamesFoldedPerQuery() {
+        val names = listOf("Gmail", "Google Maps", "Messages", "Maps", "Café Reader", "TikTok", "YouTube Music")
+        val keys = names.map { it to AppMatch.Key(it) }
+        for (q in listOf("m", "MA", "cafe", "tok", "music", "", "zz")) {
+            assertEquals(q, AppMatch.search(names, q) { it }, AppMatch.rank(keys, AppMatch.fold(q)) { it.second }.map { it.first })
+        }
+    }
+
     @Test fun suggestionsAreTheNewestNotifyingAppsOnceEachSkippingUnlaunchable() {
         val last = mapOf("chat" to 500L, "mail" to 900L, "gone" to 1000L, "bank" to 100L, "news" to 700L, "shop" to 300L)
         assertEquals(

@@ -23,12 +23,20 @@ import java.util.Locale
  * listener hasn't reported removal after the dismissal animation.
  */
 object MediaDismiss {
-    fun canSwipe(entry: Entry, playback: PlaybackState?, context: Context? = null): Boolean =
+    /**
+     * Whether a swipe may start. The player calls this on every touch move, so [hasPlayAction]
+     * runs only when the decision needs it (a protected player with no playback state) and the
+     * player passes one it worked out once per bind: the fallback reads another app's resources.
+     */
+    fun canSwipe(
+        entry: Entry, playback: PlaybackState?, context: Context? = null,
+        hasPlayAction: () -> Boolean = { MediaActionSignal.hasPlayWithoutPause(entry.n, context) },
+    ): Boolean =
         entry.kind == Kind.MEDIA && MediaSwipePolicy.canAttempt(
             playback?.state,
             entry.clearable,
             entry.n.deleteIntent != null,
-            MediaActionSignal.hasPlayWithoutPause(entry.n, context),
+            hasPlayAction,
         )
 
     /** A small boundary for testing the *real* dismissal decision without a bound system service. */
@@ -64,8 +72,7 @@ object MediaDismiss {
         val state = token?.let { gateway.playbackState(context, it) }
         if (!MediaSwipePolicy.canAttempt(
                 state, live.clearable, live.n.deleteIntent != null,
-                MediaActionSignal.hasPlayWithoutPause(live.n, context),
-            )
+            ) { MediaActionSignal.hasPlayWithoutPause(live.n, context) }
         ) return false
         if (!gateway.listenerConnected()) return false
 
@@ -89,19 +96,21 @@ object MediaDismiss {
         if (Build.VERSION.SDK_INT >= 33) {
             notification.extras.getParcelable(Notification.EXTRA_MEDIA_SESSION, MediaSession.Token::class.java)
         } else {
+            // The untyped read takes whatever the app put there; a token of another type would
+            // fail a cast to MediaSession.Token, so it's checked, as the typed read does from Android 13.
             @Suppress("DEPRECATION")
-            notification.extras.getParcelable(Notification.EXTRA_MEDIA_SESSION)
+            runCatching { notification.extras.getParcelable<android.os.Parcelable>(Notification.EXTRA_MEDIA_SESSION) }.getOrNull() as? MediaSession.Token
         }
 }
 
 /**
  * A clearable player swipes away unless it's PLAYING, BUFFERING or CONNECTING. A protected
- * player needs a real inactive state or a positive action hint.
+ * player needs a real inactive state or a positive action hint, which is asked for only then.
  */
 internal object MediaSwipePolicy {
     fun canAttempt(
         state: Int?, clearable: Boolean, hasDeleteIntent: Boolean,
-        hasPlayAction: Boolean = false,
+        hasPlayAction: () -> Boolean = { false },
     ): Boolean {
         if (clearable) return state !in setOf(
             PlaybackState.STATE_PLAYING,
@@ -113,7 +122,7 @@ internal object MediaSwipePolicy {
             PlaybackState.STATE_PAUSED,
             PlaybackState.STATE_STOPPED,
             PlaybackState.STATE_ERROR -> true
-            null, PlaybackState.STATE_NONE -> hasPlayAction
+            null, PlaybackState.STATE_NONE -> hasPlayAction()
             else -> false
         }
     }

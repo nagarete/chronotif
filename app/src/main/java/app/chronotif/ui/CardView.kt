@@ -199,7 +199,7 @@ class CardView(context: Context, private val cb: CardCallbacks) : LinearLayout(c
      * card passes its own [id] and the message's send time as [at].
      */
     fun bind(
-        e: Entry, c: Content, style: Style, expanded: Boolean, replyIndex: Int, now: Long,
+        e: Entry, c: Content, style: Style, expanded: Boolean, replyIndex: Int, today: Ui.Today,
         newSince: Long = Long.MAX_VALUE, id: String = e.key, at: Long = e.alertTime,
     ) {
         val keyChanged = this.id != id
@@ -229,7 +229,7 @@ class CardView(context: Context, private val cb: CardCallbacks) : LinearLayout(c
         if (showApp) app.text = listOfNotNull(c.appName, c.subText).joinToString(" · ")
 
         title.text = c.title
-        time.text = if (e.kind != Kind.NOTIFICATION) "" else Ui.relTime(context, at, now)
+        time.text = if (e.kind != Kind.NOTIFICATION) "" else Ui.relTime(context, at, today)
 
         val acts = if (c.redacted) emptyList() else e.n.actions.orEmpty().take(3)
         val canExpand = c.expandable || acts.isNotEmpty()
@@ -289,7 +289,7 @@ class CardView(context: Context, private val cb: CardCallbacks) : LinearLayout(c
         }
         lines.visibility = if (lines.childCount > 0) VISIBLE else GONE
 
-        val pic = if (expanded && !c.redacted) Content.picture(context, e) else null
+        val pic = if (expanded && !c.redacted) Apps.picture(context, e) else null
         bindImage(picture, pic)
         picture.setOnClickListener(if (pic == null) null else OnClickListener {
             cb.onViewImages(this, e, listOf(Viewable(null, pic)), 0)

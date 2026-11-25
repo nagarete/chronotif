@@ -43,10 +43,20 @@ object Act {
         service.snoozeNotification(e.key, (until - System.currentTimeMillis()).coerceAtLeast(60_000L))
     }
 
-    /** Returns true if the action is expected to bring up an activity (the panel should close). */
-    fun action(context: Context, a: Notification.Action): Boolean {
-        val pi = a.actionIntent ?: return false
-        return send(context, pi) && launchesActivity(pi)
+    /** What running a button did. */
+    enum class Sent {
+        /** Nothing: no intent, or the app had cancelled it. */
+        FAILED,
+        /** Delivered to the app, which does its work in the background. */
+        SENT,
+        /** Delivered, and expected to bring up an activity (the panel should close). */
+        OPENS,
+    }
+
+    fun action(context: Context, a: Notification.Action): Sent {
+        val pi = a.actionIntent ?: return Sent.FAILED
+        if (!send(context, pi)) return Sent.FAILED
+        return if (launchesActivity(pi)) Sent.OPENS else Sent.SENT
     }
 
     fun reply(context: Context, a: Notification.Action, text: CharSequence): Boolean {

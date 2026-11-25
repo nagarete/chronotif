@@ -9,7 +9,6 @@ import android.media.AudioManager
 import android.os.Build
 import android.provider.Settings
 import android.service.notification.NotificationListenerService.Ranking
-import app.chronotif.core.Attention
 import app.chronotif.core.Kind
 
 /** Decides when the lock-screen view appears and what it may reveal. */
@@ -21,11 +20,13 @@ object LockPolicy {
      * restrictive of the app's notification visibility and the channel override wins; the
      * system "hide sensitive content" setting (or ours) redacts everything not marked public.
      */
-    fun visibility(context: Context, e: Entry): Vis {
+    fun visibility(context: Context, e: Entry): Vis = visibility(e, Snapshot(context))
+
+    /** [visibility] for one of many notifications, with what it reads from the system read once in [lock]. */
+    fun visibility(e: Entry, lock: Snapshot): Vis {
         // The Tutorial's samples are made up: nothing in them is private.
         if (e.isSample) return Vis.SHOW
-        val secure = context.getSystemService(KeyguardManager::class.java).isDeviceSecure
-        if (!secure) return if (Prefs.lockHideContent) Vis.REDACT else Vis.SHOW
+        if (!lock.secure) return if (lock.hideContent) Vis.REDACT else Vis.SHOW
 
         var v = e.n.visibility
         val overrides = listOf(
@@ -35,7 +36,18 @@ object LockPolicy {
         for (o in overrides) if (o != null && o != Ranking.VISIBILITY_NO_OVERRIDE) v = minOf(v, o)
         if (v == Notification.VISIBILITY_SECRET) return Vis.HIDE
         if (v == Notification.VISIBILITY_PUBLIC) return Vis.SHOW
-        return if (Prefs.lockHideContent || !systemAllowsPrivate(context)) Vis.REDACT else Vis.SHOW
+        return if (lock.hideContent || !lock.allowsPrivate) Vis.REDACT else Vis.SHOW
+    }
+
+    /**
+     * What [visibility] reads from the system and settings, read once for a whole list rather than
+     * per card: whether the device is secure is a call into another process.
+     */
+    class Snapshot(context: Context) {
+        val secure = context.getSystemService(KeyguardManager::class.java).isDeviceSecure
+        val hideContent = Prefs.lockHideContent
+        /** Read only if a card needs it. */
+        val allowsPrivate by lazy(LazyThreadSafetyMode.NONE) { systemAllowsPrivate(context) }
     }
 
     /**
@@ -65,10 +77,12 @@ object LockPolicy {
         // Paused players don't: apps leave them around for hours.
         if (NotifStore.visible().any { it.kind == Kind.MEDIA && playing(context, it) && visibility(context, it) != Vis.HIDE }) return true
         // Calls and running work never bring the view up on their own.
-        val shown = NotifStore.visible().filter { it.kind == Kind.NOTIFICATION && visibility(context, it) != Vis.HIDE }
+        val shown = NotifStore.visible().filter {
+            it.kind == Kind.NOTIFICATION && NotifStore.showsAnything(it) && visibility(context, it) != Vis.HIDE
+        }
         return when (mode) {
             Prefs.LOCK_ALWAYS -> shown.isNotEmpty()
-            else -> shown.any { Attention.isNew(it, lastCheck) }
+            else -> shown.any { NotifStore.showsNew(it, lastCheck) }
         }
     }
 

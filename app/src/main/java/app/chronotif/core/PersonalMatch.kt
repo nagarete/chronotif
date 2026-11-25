@@ -18,7 +18,7 @@ object PersonalMatch {
     /** Typed digits at least this long also match phone numbers. */
     private const val MIN_NUMBER_DIGITS = 3
 
-    private fun wordStart(name: String, query: String): Int? = AppMatch.tier(name, query)?.takeIf { it < 2 }
+    private fun wordStart(key: AppMatch.Key, foldedQuery: String): Int? = AppMatch.tier(key, foldedQuery)?.takeIf { it < 2 }
 
     class Number(val number: String, val isDefault: Boolean, val isMobile: Boolean)
 
@@ -30,16 +30,21 @@ object PersonalMatch {
      * Contacts whose name matches, best tier first and alphabetical within it. A query of digits
      * also finds contacts whose number contains them, after the name matches.
      */
-    fun <T> contacts(all: List<T>, query: String, name: (T) -> String, numbers: (T) -> List<String>): List<T> {
-        val byName = all.mapNotNull { c -> wordStart(name(c), query)?.let { Triple(it, AppMatch.fold(name(c)), c) } }
+    fun <T> contacts(all: List<T>, query: String, name: (T) -> String, numbers: (T) -> List<String>): List<T> =
+        rankContacts(all, query, { AppMatch.Key(name(it)) }, { c -> numbers(c).map { n -> n.filter(Char::isDigit) } })
+
+    /** [contacts] for names folded ahead with [AppMatch.Key] and numbers kept as their digits only. */
+    fun <T> rankContacts(all: List<T>, query: String, key: (T) -> AppMatch.Key, digits: (T) -> List<String>): List<T> {
+        val q = AppMatch.fold(query)
+        val byName = all.mapNotNull { c -> val k = key(c); wordStart(k, q)?.let { Triple(it, k.folded, c) } }
             .sortedWith(compareBy({ it.first }, { it.second }))
             .map { it.third }
-        val digits = query.filter(Char::isDigit)
+        val typed = query.filter(Char::isDigit)
         val numberOnly = query.all { it.isDigit() || it in "+ -()" }
-        if (!numberOnly || digits.length < MIN_NUMBER_DIGITS) return byName
+        if (!numberOnly || typed.length < MIN_NUMBER_DIGITS) return byName
         val named = byName.toHashSet()
-        val byNumber = all.filter { c -> c !in named && numbers(c).any { it.filter(Char::isDigit).contains(digits) } }
-            .sortedBy { AppMatch.fold(name(it)) }
+        val byNumber = all.filter { c -> c !in named && digits(c).any { it.contains(typed) } }
+            .sortedBy { key(it).folded }
         return byName + byNumber
     }
 
@@ -49,12 +54,19 @@ object PersonalMatch {
      * same event in two calendars (a holiday in two holiday calendars) shows once.
      */
     fun <T> events(all: List<T>, query: String, now: Long, id: (T) -> Long, title: (T) -> String, begin: (T) -> Long, end: (T) -> Long): List<T> {
-        val matching = all.filter { wordStart(title(it), query) != null }
+        val keys = all.associateWith { AppMatch.Key(title(it)) }
+        return rankEvents(all, query, now, id, { keys.getValue(it) }, begin, end)
+    }
+
+    /** [events] for titles folded ahead with [AppMatch.Key]. */
+    fun <T> rankEvents(all: List<T>, query: String, now: Long, id: (T) -> Long, key: (T) -> AppMatch.Key, begin: (T) -> Long, end: (T) -> Long): List<T> {
+        val q = AppMatch.fold(query)
+        val matching = all.filter { wordStart(key(it), q) != null }
         val (upcoming, past) = matching.partition { end(it) > now }
         val chosen = LinkedHashMap<Long, T>()
         val seen = HashSet<Pair<String, Long>>()
         for (e in upcoming.sortedBy(begin) + past.sortedByDescending(begin)) {
-            if (id(e) in chosen || !seen.add(AppMatch.fold(title(e)) to begin(e))) continue
+            if (id(e) in chosen || !seen.add(key(e).folded to begin(e))) continue
             chosen[id(e)] = e
         }
         return chosen.values.take(EVENTS_SHOWN)

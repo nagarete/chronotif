@@ -55,6 +55,8 @@ class NotificationBehaviorTest {
     fun setup() {
         context.getSharedPreferences("chronotif", Context.MODE_PRIVATE).edit().clear().commit()
         Prefs.init(context)
+        // What's new keeps the notes and install time it read for the process; each test installs afresh.
+        app.chronotif.ui.WhatsNewSheet.forget()
         LockSession.reset()
         ranking = ReflectionHelpers.callConstructor(RankingMap::class.java,
             ReflectionHelpers.ClassParameter.from(Array<Ranking>::class.java, emptyArray<Ranking>()))
@@ -119,6 +121,22 @@ class NotificationBehaviorTest {
         val last = Prefs.lastNotified
         assertEquals(setOf(chat.appId, mail.appId), last.keys)
         assertTrue("The app that notified later is newer", last.getValue(mail.appId) > last.getValue(chat.appId))
+    }
+
+    @Test
+    fun whenAppsNotifiedIsWrittenOnceABurstSettlesAndKeptAcrossARestart() {
+        val saved = context.getSharedPreferences("chronotif", Context.MODE_PRIVATE)
+        val chat = plain("hi", 1000, 1, "example.chat")
+        val mail = plain("hello", 2000, 2, "example.mail")
+        assertEquals("Search sees each arrival at once", setOf(chat.appId, mail.appId), Prefs.lastNotified.keys)
+        assertNull("but the file isn't rewritten per arrival", saved.getString("last_notified", null))
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(10))
+        assertNotNull("It's written once the burst settles", saved.getString("last_notified", null))
+
+        val shop = plain("parcel", 3000, 3, "example.shop")
+        Prefs.flushNotified()
+        Prefs.init(context)
+        assertEquals("A restart reads back what was flushed", setOf(chat.appId, mail.appId, shop.appId), Prefs.lastNotified.keys)
     }
 
     @Test
@@ -206,6 +224,52 @@ class NotificationBehaviorTest {
                 listOf("Lunch?", "Meeting", "Parcel", "Old news"),
                 shown.filter { it in setOf("Lunch?", "Meeting", "Parcel", "Old news") })
             assertFalse(shown.contains("2 more"))
+        }
+    }
+
+    @Test
+    fun aLongListStaysFoldedUnderThePileUntilItUnfoldsAndFoldsAgain() {
+        val older = (1..40).map { "Earlier $it" }
+        older.forEachIndexed { i, title -> plain(title, 500L - i, 100 + i, "example.app$i") }
+        Prefs.markChecked(1000)
+        plain("Lunch?", 4000, 1, "example.chat")
+        withLockView { activity ->
+            var shown = seen(activity.window.decorView)
+            assertTrue(shown.contains("Lunch?"))
+            assertTrue("Nothing in Earlier shows at rest, on screen or off", older.none { it in shown })
+
+            val scroll = activity.scroll()
+            scroll.scrollTo(0, 100_000)
+            shadowOf(Looper.getMainLooper()).idle()
+            shown = seen(activity.window.decorView)
+            assertEquals("Unfolded, every card shows, newest first", listOf("Lunch?") + older, shown.filter { it == "Lunch?" || it in older })
+
+            scroll.scrollTo(0, 0)
+            shadowOf(Looper.getMainLooper()).idle()
+            shown = seen(activity.window.decorView)
+            assertTrue(shown.contains("Lunch?"))
+            assertTrue("Back at rest, it all folds again", older.none { it in shown })
+        }
+    }
+
+    @Test
+    fun aCardShowsWhatItsNotificationSaysNowAfterARepostOrWhenTheLockScreenHidesIt() {
+        Prefs.markChecked(1000)
+        plain("Parcel", 2000, 1, "example.shop")
+        withLockList { list, container ->
+            list.render()
+            shadowOf(Looper.getMainLooper()).idle()
+            assertTrue(shownTexts(container).contains("Parcel"))
+            plain("Parcel delivered", 3000, 1, "example.shop")
+            list.render()
+            shadowOf(Looper.getMainLooper()).idle()
+            var shown = shownTexts(container)
+            assertTrue("A repost shows its new text", shown.contains("Parcel delivered") && !shown.contains("Parcel"))
+            Prefs.lockHideContent = true
+            list.render()
+            shadowOf(Looper.getMainLooper()).idle()
+            shown = shownTexts(container)
+            assertFalse("Hidden on the lock screen, its text goes", shown.contains("Parcel delivered"))
         }
     }
 
@@ -1429,6 +1493,146 @@ class NotificationBehaviorTest {
         assertEquals(0, NotifStore.newCount())
     }
 
+    /** A Panel list over the real notifications that records what Clear would cancel in Android. */
+    private fun <T> withClearingPanelList(block: (NotifList, LinearLayout, MutableList<String>) -> T): T =
+        withLockList { _, container ->
+            val dismissed = ArrayList<String>()
+            val source = object : CardSource by CardSource.Real {
+                override fun dismissAll(entries: List<Entry>) {
+                    dismissed += entries.map { it.key }
+                }
+            }
+            val list = NotifList(object : NotifList.Host {
+                override val context: Context = container.context
+                override fun launched() {}
+                override fun guarded(action: () -> Unit) = action()
+            }, container, onLock = false, source = source)
+            block(list, container, dismissed)
+        }
+
+    private fun idOf(e: Entry, text: String) = Content.of(context, e, false).messages.single { it.line.toString() == text }.id
+
+    @Test
+    fun swipingAConversationsOnlyNewMessageLeavesNothingNewThoughCheckedOnesRemain() {
+        post(notification(listOf("seen" to 900L)), 900)
+        Prefs.markChecked(1000)
+        val e = post(notification(listOf("seen" to 900L, "new" to 1200L)), 1200)
+        assertEquals(1, NotifStore.newCount())
+        NotifStore.hideMessage(e.key, idOf(e, "new"))
+        assertEquals("The edge handle and tile go unlit", 0, NotifStore.newCount())
+        assertFalse("Nothing New wakes the lock screen", NotifStore.showsNew(e, Prefs.lastCheck))
+        assertTrue(NotifStore.showsAnything(e))
+        withLockList { list, container ->
+            list.render()
+            val shown = shownTexts(container)
+            assertTrue(shown.contains("seen"))
+            assertFalse(shown.contains("new"))
+            assertEquals("The Pile is empty", 0, list.newPieces)
+            assertEquals(1, list.earlierPieces)
+        }
+    }
+
+    @Test
+    fun clearingEarlierHidesASplitConversationsCheckedMessagesAndKeepsItsNewOnes() {
+        post(notification(listOf("seen" to 900L)), 900)
+        Prefs.markChecked(1000)
+        val chat = post(notification(listOf("seen" to 900L, "new" to 1200L)), 1200)
+        withClearingPanelList { list, container, dismissed ->
+            list.render()
+            fun clearChip() = views(container).filterIsInstance<TextView>().singleOrNull { it.text == "Clear" && it.isShownInTree() }
+            val clear = clearChip()
+            assertNotNull("Earlier offers Clear when it holds only a split conversation's messages", clear)
+            clear!!.performClick()
+            shadowOf(Looper.getMainLooper()).idle()
+            assertEquals(setOf(idOf(chat, "seen")), NotifStore.hiddenMessages(chat.key))
+            assertTrue("The notification isn't cancelled: its New message still shows", dismissed.isEmpty())
+            list.render()
+            val shown = shownTexts(container)
+            assertTrue(shown.contains("new"))
+            assertFalse(shown.contains("seen"))
+            assertNull("Earlier is gone", clearChip())
+        }
+        // With a checked notification beside it, Clear cancels that one and still only hides the chat's checked message.
+        val mail = plain("Checked mail", 800, 2, "example.mail")
+        NotifStore.remove(chat.key, ranking)
+        val again = post(notification(listOf("seen" to 900L, "new" to 1200L)), 1200)
+        withClearingPanelList { list, container, dismissed ->
+            list.render()
+            views(container).filterIsInstance<TextView>().single { it.text == "Clear" && it.isShownInTree() }.performClick()
+            assertEquals(listOf(mail.key), dismissed)
+            assertEquals(setOf(idOf(again, "seen")), NotifStore.hiddenMessages(again.key))
+        }
+    }
+
+    @Test
+    fun clearingAnEarlierStackLeavesTheConversationsNewMessages() {
+        post(notification(listOf("one" to 800L, "two" to 900L)), 900)
+        Prefs.markChecked(1000)
+        val chat = post(notification(listOf("one" to 800L, "two" to 900L, "three" to 1200L)), 1200)
+        withClearingPanelList { list, container, dismissed ->
+            list.render()
+            fun stacks() = views(container).filterIsInstance<app.chronotif.ui.StackView>().filter { it.isShownInTree() }
+            // Earlier holds a collapsed Conversation stack of the two checked messages.
+            val earlierStack = stacks().single()
+            assertTrue(earlierStack.card.swipeAllowed())
+            earlierStack.card.onSwiped()
+            shadowOf(Looper.getMainLooper()).idle()
+            assertEquals(setOf(idOf(chat, "one"), idOf(chat, "two")), NotifStore.hiddenMessages(chat.key))
+            assertTrue(dismissed.isEmpty())
+            list.render()
+            assertTrue(shownTexts(container).contains("three"))
+            assertEquals(1, list.newPieces)
+        }
+        // Once its New message is swiped away too, what Earlier shows is all of it, and clearing cancels it.
+        NotifStore.remove(chat.key, ranking)
+        val next = post(notification(listOf("one" to 800L, "two" to 900L, "three" to 1200L)), 1200)
+        NotifStore.hideMessage(next.key, idOf(next, "three"))
+        withClearingPanelList { list, container, dismissed ->
+            list.render()
+            views(container).filterIsInstance<app.chronotif.ui.StackView>().single { it.isShownInTree() }.card.onSwiped()
+            assertEquals(listOf(next.key), dismissed)
+        }
+    }
+
+    @Test
+    fun clearingAnEarlierAppStackHidesASplitConversationsMessageAndCancelsTheRest() {
+        // One app's single-message chats, checked close together, fold into an App stack (ADR 0004).
+        post(notification(listOf("earlier half" to 900L)), 900, id = 1)
+        val other = post(notification(listOf("other chat" to 950L)), 950, id = 2)
+        Prefs.markChecked(1000)
+        val chat = post(notification(listOf("earlier half" to 900L, "new half" to 1200L)), 1200, id = 1)
+        withClearingPanelList { list, container, dismissed ->
+            list.render()
+            val stack = views(container).filterIsInstance<app.chronotif.ui.StackView>().single { it.isShownInTree() }
+            stack.card.onSwiped()
+            shadowOf(Looper.getMainLooper()).idle()
+            assertEquals(listOf(other.key), dismissed)
+            assertEquals(setOf(idOf(chat, "earlier half")), NotifStore.hiddenMessages(chat.key))
+            list.render()
+            assertTrue("The New half stays", shownTexts(container).contains("new half"))
+        }
+    }
+
+    @Test
+    fun twoPhotosSentTogetherStayTwoMessages() {
+        fun photo(n: Int) = Notification.MessagingStyle.Message("", 100, sender)
+            .setData("image/jpeg", android.net.Uri.parse("content://example.chat/photo/$n"))
+        val style = Notification.MessagingStyle(me).addMessage(photo(1)).addMessage(photo(2))
+        // Apps repeat active messages in the historic list; that overlap still shows once.
+        style.addHistoricMessage(photo(1))
+        val e = post(Notification.Builder(context, "messages").setStyle(style).setOnlyAlertOnce(true).build())
+        val msgs = Content.of(context, e, false).messages
+        assertEquals(2, msgs.size)
+        assertEquals(listOf("content://example.chat/photo/1", "content://example.chat/photo/2"),
+            msgs.map { it.attachment?.uri.toString() })
+        assertEquals("Each has its own id", 2, msgs.map { it.id }.toSet().size)
+        assertEquals(msgs.map { it.id }, Content.incomingIds(e.n))
+        // The same text sent twice at once is two messages too, each with its own id.
+        val twice = Notification.MessagingStyle(me).addMessage("ok", 100, sender).addMessage("ok", 100, sender)
+        val t = post(Notification.Builder(context, "messages").setStyle(twice).build(), id = 2)
+        assertEquals(2, Content.incomingIds(t.n).toSet().size)
+    }
+
     /** Text a user could see: skips views that are gone. */
     private fun shownTexts(view: View): List<String> = when {
         view.visibility != View.VISIBLE -> emptyList()
@@ -1524,6 +1728,7 @@ class NotificationBehaviorTest {
         info.firstInstallTime = 1
         info.lastUpdateTime = 2
         Prefs.whatsNewSeen = emptySet()
+        app.chronotif.ui.WhatsNewSheet.forget()
     }
 
     private fun gotIt(root: View): View? {
@@ -1536,6 +1741,15 @@ class NotificationBehaviorTest {
         return find(root)
     }
 
+    /** Idles the main thread until [done], while work handed to a background thread finishes. */
+    private fun idleUntil(done: () -> Boolean) {
+        repeat(200) {
+            shadowOf(Looper.getMainLooper()).idle()
+            if (done()) return
+            Thread.sleep(10)
+        }
+    }
+
     @Test
     fun whatsNewOverTheCardsIsNoCheck() {
         post(notification("hi"), time = 1000)
@@ -1544,11 +1758,16 @@ class NotificationBehaviorTest {
         withPanelView { panel ->
             panel.shown()
             shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(3))
+            // The notes are read on a background thread.
+            idleUntil { gotIt(panel.rootView) != null }
             assertNotNull("The first open after an update shows What's new", gotIt(panel.rootView))
             panel.dismissed()
         }
         assertEquals("Closed while What's new covered the cards", before, Prefs.lastCheck)
-        assertNull("It shows once", app.chronotif.ui.WhatsNewSheet.pending(context))
+        var again: List<app.chronotif.core.WhatsNew.Release>? = emptyList()
+        app.chronotif.ui.WhatsNewSheet.pending(context) { again = it }
+        idleUntil { again == null }
+        assertNull("It shows once", again)
     }
 
     @Test
@@ -1559,6 +1778,7 @@ class NotificationBehaviorTest {
         withPanelView { panel ->
             panel.shown()
             shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(3))
+            idleUntil { gotIt(panel.rootView) != null }
             gotIt(panel.rootView)!!.performClick()
             shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(500))
             panel.dismissed()
@@ -1806,6 +2026,210 @@ class NotificationBehaviorTest {
             val dialog = org.robolectric.shadows.ShadowAlertDialog.getLatestAlertDialog()
             assertEquals(context.getString(R.string.qr_needs_lens), shadowOf(dialog).message.toString())
             assertNull("Nothing opens", shadowOf(activity).nextStartedActivity)
+        }
+    }
+
+    @Test
+    @Config(sdk = [35], application = Application::class, shadows = [QuietModeTest.ScheduleKeepsItOn::class])
+    fun holdingDoNotDisturbWhileAnotherOwnersModeIsOnSendsTheUserToSettings() {
+        Prefs.lockShortcutRight = app.chronotif.core.LockShortcut.DO_NOT_DISTURB
+        val nm = context.getSystemService(android.app.NotificationManager::class.java)
+        shadowOf(nm).setNotificationPolicyAccessGranted(true)
+        nm.setInterruptionFilter(android.app.NotificationManager.INTERRUPTION_FILTER_ALL)
+        try {
+            withLockView { activity ->
+                val button = activity.shortcut(R.string.lock_shortcut_dnd)!!
+                button.performLongClick()
+                assertTrue("Chronotif's own turns on and lights the button", button.isActivated)
+                button.performLongClick()
+                assertFalse(button.isActivated)
+
+                QuietModeTest.ScheduleKeepsItOn.on = true
+                button.performLongClick()
+                assertTrue("A schedule's mode still lights it", button.isActivated)
+                assertEquals(context.getString(R.string.lock_shortcut_dnd_not_ours),
+                    org.robolectric.shadows.ShadowToast.getTextOfLatestToast())
+                assertNull("Settings wait for the unlock", shadowOf(activity).nextStartedActivity)
+                shadowOf(context.getSystemService(KeyguardManager::class.java)).setKeyguardLocked(false)
+                shadowOf(Looper.getMainLooper()).idle()
+                assertEquals(android.provider.Settings.ACTION_ZEN_MODE_PRIORITY_SETTINGS,
+                    shadowOf(activity).nextStartedActivity?.action)
+            }
+        } finally {
+            QuietModeTest.ScheduleKeepsItOn.on = false
+        }
+    }
+
+    // --- Seen on the lock screen ---
+
+    @Test
+    fun aCardThatArrivesWhileTheLockScreenViewIsUpIsCheckedByAnyUnlock() {
+        // An update another test left queued on its own looper would hold back every later one.
+        ReflectionHelpers.setStaticField(NotifStore::class.java, "pending", false)
+        plain("Parcel", 2000, 1, "example.shop")
+        val km = shadowOf(context.getSystemService(KeyguardManager::class.java))
+        km.setKeyguardLocked(true)
+        val controller = Robolectric.buildActivity(LockActivity::class.java).setup()
+        try {
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(2))
+            plain("Lunch?", 5000, 2, "example.chat")
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(2))
+            plain("Just now", 7000, 3, "example.mail")
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(300))
+            // A fingerprint on the stock lock screen: Chronotif only sees itself paused, unlocked.
+            km.setKeyguardLocked(false)
+            controller.pause()
+            assertEquals("On screen for a moment before the unlock", 5000, Prefs.lastCheck)
+        } finally {
+            controller.stop().destroy()
+        }
+    }
+
+    // --- Image viewer ---
+
+    private fun picture() = Viewable(null, android.graphics.drawable.BitmapDrawable(context.resources,
+        android.graphics.Bitmap.createBitmap(4, 4, android.graphics.Bitmap.Config.ARGB_8888)))
+
+    /** Runs the main looper until [done], while the export's own thread works. */
+    private fun waitFor(done: () -> Boolean) {
+        val until = System.currentTimeMillis() + 5000
+        while (!done() && System.currentTimeMillis() < until) {
+            Thread.sleep(10)
+            shadowOf(Looper.getMainLooper()).idle()
+        }
+    }
+
+    private fun withViewer(share: (start: (finished: (Boolean) -> Unit) -> Unit) -> Unit, block: (Activity, app.chronotif.ui.ImageViewer) -> Unit) {
+        val controller = Robolectric.buildActivity(Activity::class.java).setup()
+        try {
+            val activity = controller.get()
+            val viewer = app.chronotif.ui.ImageViewer.show(activity.window.decorView, listOf(picture()), 0,
+                object : app.chronotif.ui.ImageViewer.Actions {
+                    override fun share(start: (finished: (launched: Boolean) -> Unit) -> Unit) = share(start)
+                    override fun openInApp() {}
+                })!!
+            shadowOf(Looper.getMainLooper()).idle()
+            block(activity, viewer)
+        } finally {
+            controller.pause().stop().destroy()
+        }
+    }
+
+    private fun button(root: View, label: Int) =
+        views(root).filterIsInstance<TextView>().first { it.text.toString() == context.getString(label) }
+
+    @Test
+    fun shareFromTheImageViewerOpensTheShareSheetOnceTheCopyIsReady() {
+        val results = mutableListOf<Boolean>()
+        withViewer({ start -> start { results += it } }) { activity, viewer ->
+            button(viewer, R.string.share).performClick()
+            waitFor { results.isNotEmpty() }
+            assertEquals(listOf(true), results)
+            assertEquals(Intent.ACTION_CHOOSER, shadowOf(activity).nextStartedActivity?.action)
+        }
+    }
+
+    @Test
+    fun closingTheImageViewerCancelsAShareStillCopying() {
+        val results = mutableListOf<Boolean>()
+        withViewer({ start -> start { results += it } }) { activity, viewer ->
+            button(viewer, R.string.share).performClick()
+            viewer.close()
+            assertEquals("Told at once that no share sheet comes", listOf(false), results)
+            Thread.sleep(300)
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(1))
+            assertEquals(listOf(false), results)
+            assertNull("Nothing pops up over what came next", shadowOf(activity).nextStartedActivity)
+        }
+    }
+
+    @Test
+    fun hiddenImageViewerButtonsTakeNoTaps() {
+        withViewer({}) { _, viewer ->
+            val save = button(viewer, R.string.save)
+            ReflectionHelpers.callInstanceMethod<Unit>(viewer, "toggleChrome")
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(300))
+            assertFalse("Hidden, not just transparent", save.isShown)
+            ReflectionHelpers.callInstanceMethod<Unit>(viewer, "toggleChrome")
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(300))
+            assertTrue(save.isShown)
+        }
+    }
+
+    @Test
+    fun unlockingToShareKeepsTheLockScreenViewUpUntilTheShareSheet() {
+        withLockView { activity ->
+            var finished: ((Boolean) -> Unit)? = null
+            activity.guardedUntil { finished = it }
+            assertNull("Waits for the unlock", finished)
+            shadowOf(context.getSystemService(KeyguardManager::class.java)).setKeyguardLocked(false)
+            shadowOf(Looper.getMainLooper()).idle()
+            assertNotNull(finished)
+            assertFalse("Still up for the share sheet to start from", activity.isFinishing)
+            finished!!(true)
+            assertTrue(activity.isFinishing)
+        }
+    }
+
+    // --- Search over the lock screen ---
+
+    @Test
+    fun currencyRatesWaitForAnUnlockOnTheLockScreen() {
+        Prefs.currencyRates = false
+        withLockView { activity ->
+            val search = app.chronotif.ui.SearchOverlay.show(activity.window.decorView, activity, "100 usd to eur")!!
+            shadowOf(Looper.getMainLooper()).idle()
+            val offer = views(search).filterIsInstance<TextView>()
+                .first { it.text.toString() == context.getString(R.string.search_currency_off_title) }
+            (offer.parent as View).performClick()
+            assertFalse("Not turned on while locked", Prefs.currencyRates)
+            shadowOf(context.getSystemService(KeyguardManager::class.java)).setKeyguardLocked(false)
+            shadowOf(Looper.getMainLooper()).idle()
+            assertTrue(Prefs.currencyRates)
+            assertEquals("Search reopens unlocked with the same question",
+                "app.chronotif.ui.SearchActivity", shadowOf(activity).nextStartedActivity?.component?.className)
+        }
+    }
+
+    // --- What's new ---
+
+    /** Back as Android 16 sends it to an app targeting it: to callbacks, not as a key. */
+    private fun <T> withPredictiveBack(block: () -> T): T {
+        val shadow = org.robolectric.shadows.ShadowWindowOnBackInvokedDispatcher::class.java
+        ReflectionHelpers.callStaticMethod<Unit>(shadow, "setEnablePredictiveBack",
+            ReflectionHelpers.ClassParameter.from(Boolean::class.javaPrimitiveType, true))
+        ReflectionHelpers.callInstanceMethod<Unit>(context.applicationInfo, "setEnableOnBackInvokedCallback",
+            ReflectionHelpers.ClassParameter.from(Boolean::class.javaPrimitiveType, true))
+        try {
+            return block()
+        } finally {
+            ReflectionHelpers.callInstanceMethod<Unit>(context.applicationInfo, "setEnableOnBackInvokedCallback",
+                ReflectionHelpers.ClassParameter.from(Boolean::class.javaPrimitiveType, false))
+            org.robolectric.shadows.ShadowWindowOnBackInvokedDispatcher.reset()
+        }
+    }
+
+    @Test
+    fun backClosesWhatsNewBeforeThePanel() = withPredictiveBack {
+        post(notification("hi"), time = 1000)
+        pretendUpdated()
+        var panelClosed = false
+        withPanelView { panel ->
+            val activity = panel.context as Activity
+            activity.onBackInvokedDispatcher.registerOnBackInvokedCallback(
+                android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT) { panelClosed = true }
+            panel.shown()
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(3))
+            assertNotNull(gotIt(panel.rootView))
+            val dispatcher = ReflectionHelpers.callInstanceMethod<Any>(
+                ReflectionHelpers.callInstanceMethod<Any>(activity.window.decorView, "getViewRootImpl"),
+                "getOnBackInvokedDispatcher")
+            val top = ReflectionHelpers.callInstanceMethod<android.window.OnBackInvokedCallback>(dispatcher, "getTopCallback")
+            top.onBackInvoked()
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(500))
+            assertNull("The sheet closed", gotIt(panel.rootView))
+            assertFalse("The Panel stayed", panelClosed)
+            panel.dismissed()
         }
     }
 }

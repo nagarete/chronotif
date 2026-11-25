@@ -12,6 +12,7 @@ import android.os.Build
 import android.provider.Settings
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
+import android.util.Log
 import app.chronotif.ui.LockActivity
 
 /**
@@ -37,7 +38,11 @@ class ListenerService : NotificationListenerService() {
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
                 Intent.ACTION_SCREEN_ON -> if (LockPolicy.shouldShow(context)) showLockView()
-                Intent.ACTION_SCREEN_OFF -> LockSession.reset()
+                Intent.ACTION_SCREEN_OFF -> {
+                    LockSession.reset()
+                    UsageData.flush()
+                    Prefs.flushNotified()
+                }
                 Intent.ACTION_USER_PRESENT -> LockSession.unlocked()
             }
         }
@@ -75,6 +80,7 @@ class ListenerService : NotificationListenerService() {
             null
         }
         NotifStore.connect(active, currentRanking)
+        Apps.warm(this, NotifStore.visible())
     }
 
     override fun onListenerDisconnected() {
@@ -90,6 +96,7 @@ class ListenerService : NotificationListenerService() {
     }
 
     private fun teardown() {
+        Prefs.flushNotified()
         if (instance === this) instance = null
         if (receiverRegistered) {
             unregisterReceiver(screenReceiver)
@@ -101,7 +108,8 @@ class ListenerService : NotificationListenerService() {
 
     override fun onNotificationPosted(sbn: StatusBarNotification, rankingMap: RankingMap) {
         NotifStore.post(sbn, rankingMap)
-        Apps.warm(this, NotifStore.visible())
+        // Only what arrived: the rest were warmed as they came, or on connecting.
+        NotifStore.get(sbn.key)?.let { Apps.warm(this, listOf(it)) }
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification, rankingMap: RankingMap) {
@@ -135,7 +143,8 @@ class ListenerService : NotificationListenerService() {
                 Intent(this, LockActivity::class.java)
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION),
             )
-        } catch (_: RuntimeException) {
+        } catch (e: RuntimeException) {
+            Log.w("ListenerService", "Couldn't show the lock-screen view", e)
         }
     }
 }

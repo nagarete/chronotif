@@ -39,6 +39,9 @@ object Prefs {
 
     fun init(context: Context) {
         sp = context.applicationContext.getSharedPreferences("chronotif", Context.MODE_PRIVATE)
+        notifiedMemo = null
+        if (notifiedDirty) main.removeCallbacks(notifiedWrite)
+        notifiedDirty = false
         keepOldDefaults(context)
     }
 
@@ -339,18 +342,47 @@ object Prefs {
      * When each app last notified, for Search's suggestion row: app id (package|user) to
      * arrival time. Times only, never content, and only the most recent few apps are kept.
      */
-    val lastNotified: Map<String, Long>
-        get() = sp.getString("last_notified", null).orEmpty().split(';').mapNotNull { pair ->
+    val lastNotified: Map<String, Long> get() = HashMap(notifiedNow())
+
+    /**
+     * [lastNotified] as it stands. Every arrival updates it here, and [flushNotified] writes it out
+     * later, so a burst of notifications doesn't parse and rewrite the preferences file each time.
+     * A process killed before the write loses only those last few seconds of recency.
+     */
+    private var notifiedMemo: MutableMap<String, Long>? = null
+    private var notifiedDirty = false
+    private val main by lazy { android.os.Handler(android.os.Looper.getMainLooper()) }
+    private val notifiedWrite = Runnable { flushNotified() }
+
+    private fun notifiedNow(): MutableMap<String, Long> = notifiedMemo
+        ?: sp.getString("last_notified", null).orEmpty().split(';').mapNotNull { pair ->
             val i = pair.lastIndexOf('=')
             if (i <= 0) null else pair.substring(i + 1).toLongOrNull()?.let { pair.substring(0, i) to it }
-        }.toMap()
+        }.toMap(HashMap()).also { notifiedMemo = it }
 
+    /** Called on the main thread, as each notification arrives. */
     fun notified(appId: String, at: Long) {
-        val all = lastNotified
+        val all = notifiedNow()
         if ((all[appId] ?: 0L) >= at) return
-        val kept = (all + (appId to at)).entries.sortedByDescending { it.value }.take(LAST_NOTIFIED_KEPT)
+        all[appId] = at
+        if (all.size > LAST_NOTIFIED_KEPT) all.remove(all.minBy { it.value }.key)
+        if (!notifiedDirty) {
+            notifiedDirty = true
+            main.postDelayed(notifiedWrite, NOTIFIED_WRITE_DELAY_MS)
+        }
+    }
+
+    /** Writes [lastNotified] out now, if it changed: a while after an arrival, when the screen goes off, and when the listener stops. */
+    fun flushNotified() {
+        if (!notifiedDirty) return
+        notifiedDirty = false
+        main.removeCallbacks(notifiedWrite)
+        val kept = notifiedNow().entries.sortedByDescending { it.value }
         sp.edit().putString("last_notified", kept.joinToString(";") { "${it.key}=${it.value}" }).apply()
     }
+
+    /** How long arrivals gather before [lastNotified] is written. */
+    private const val NOTIFIED_WRITE_DELAY_MS = 10_000L
 
     /** Enough to fill the row when some of them can't be launched (uninstalled, no launcher entry). */
     private const val LAST_NOTIFIED_KEPT = 16
@@ -388,22 +420,50 @@ object Prefs {
         set(v) = sp.edit().putLong("usage_day", v).apply()
 
     /** The day's counts, in [app.chronotif.core.Usage.encodeCounts]'s form. */
-    var usageCounts: String?
-        get() = sp.getString("usage_counts", null)
-        set(v) = sp.edit().putString("usage_counts", v).apply()
+    val usageCounts: String? get() = sp.getString("usage_counts", null)
 
     /** The day's timed Panel opens, in [app.chronotif.core.Usage.encodeSpeeds]'s form. */
-    var usageSpeeds: String?
-        get() = sp.getString("usage_speeds", null)
-        set(v) = sp.edit().putString("usage_speeds", v).apply()
+    val usageSpeeds: String? get() = sp.getString("usage_speeds", null)
 
     /** Crashes waiting to be sent. */
     val usageCrashes: String? get() = sp.getString("usage_crashes", null)
 
-    /** Written at once: it's called as the process ends. */
+    /** The counts and speeds kept in memory; null leaves that one as it is. */
+    fun keepUsage(counts: String?, speeds: String?) {
+        sp.edit().apply {
+            if (counts != null) putString("usage_counts", counts)
+            if (speeds != null) putString("usage_speeds", speeds)
+        }.apply()
+    }
+
+    /** Written at once with the counts and speeds kept in memory: it's called as the process ends. */
     @android.annotation.SuppressLint("ApplySharedPref")
-    fun keepUsageCrashes(v: String) {
-        sp.edit().putString("usage_crashes", v).commit()
+    fun keepUsageCrashes(v: String, counts: String?, speeds: String?) {
+        sp.edit().apply {
+            putString("usage_crashes", v)
+            if (counts != null) putString("usage_counts", counts)
+            if (speeds != null) putString("usage_speeds", speeds)
+        }.commit()
+    }
+
+    /** A batch built and not yet taken by PostHog: its exact request body, sent again unchanged. */
+    val usageBatch: String? get() = sp.getString("usage_batch", null)
+
+    /**
+     * Keeps [batch] and takes what went into it out of what's waiting, in one write that's on disk
+     * before the batch is sent: a lost answer then resends this batch, never a second one.
+     */
+    @android.annotation.SuppressLint("ApplySharedPref")
+    fun keepUsageBatch(batch: String?, day: Long, counts: String, speeds: String, crashes: String) {
+        sp.edit().putString("usage_batch", batch).putLong("usage_day", day).putString("usage_counts", counts)
+            .putString("usage_speeds", speeds).putString("usage_crashes", crashes).putBoolean("usage_on_pending", false)
+            .commit()
+    }
+
+    /** PostHog has [batch], or never will; a different batch kept since stays. */
+    @android.annotation.SuppressLint("ApplySharedPref")
+    fun dropUsageBatch(batch: String) {
+        if (usageBatch == batch) sp.edit().remove("usage_batch").commit()
     }
 
     /** The newest app exit already looked at, so each ANR is counted once. */
@@ -419,7 +479,7 @@ object Prefs {
     /** Forgets the install ID and everything waiting to be sent. */
     fun clearUsage() {
         sp.edit().remove("usage_id").remove("usage_day").remove("usage_counts").remove("usage_speeds")
-            .remove("usage_crashes").remove("usage_exits_seen").remove("usage_on_pending").apply()
+            .remove("usage_crashes").remove("usage_exits_seen").remove("usage_on_pending").remove("usage_batch").apply()
     }
 
     /** A version that failed to install; automatic checks skip it until a manual retry. */
