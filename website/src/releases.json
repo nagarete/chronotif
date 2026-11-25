@@ -7,7 +7,9 @@
       "Scan QR codes with Google Lens from a lock-screen shortcut or the new Chronotif QR scanner tile in Quick Settings.",
       "On the lock screen, tapping the top notification opens just that one in place, with a conversation’s messages and its Reply button, instead of unfolding everything. Tap the count under it to see the rest.",
       "Fit to your fingerprint sensor is now under Settings → Lock screen on every phone, for in-screen sensors your phone doesn't tell Chronotif about.",
-      "Leaving Settings takes a second Back, so one stray edge swipe doesn't drop you out of it."
+      "Leaving Settings takes a second Back, so one stray edge swipe doesn't drop you out of it.",
+      "Search keeps up with your typing on phones with many apps and contacts. When a short search matches lots of apps, the best six show, with Show more for the rest.",
+      "The lock screen and the first panel after an update open faster."
     ]
   },
   "stable": [
