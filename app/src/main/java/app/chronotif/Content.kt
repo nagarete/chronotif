@@ -104,9 +104,7 @@ class Content(
             var attachments = emptyList<Attachment?>()
             var msgs = emptyList<Msg>()
 
-            val messages = (messages(x, Notification.EXTRA_HISTORIC_MESSAGES) + messages(x))
-                .distinctBy { Triple(it.time, it.senderKey ?: it.sender?.toString(), it.body.toString()) }
-                .sortedBy { it.time }
+            val messages = conversation(x)
             if (messages.isNotEmpty()) {
                 val conversation = x.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE)
                 val group = isGroup(x)
@@ -122,9 +120,10 @@ class Content(
                 lineTimes = messages.map { it.time }
                 attachments = messages.map { it.attachment }
                 val user = user(x)
+                val ids = ids(messages)
                 msgs = messages.mapIndexed { i, m ->
                     Msg(
-                        id = idOf(m),
+                        id = ids[i],
                         line = uncolored(lines[i]), time = m.time, attachment = m.attachment,
                         incoming = !isOwn(m, user),
                     )
@@ -245,15 +244,67 @@ class Content(
             if (x.containsKey(Notification.EXTRA_IS_GROUP_CONVERSATION)) x.getBoolean(Notification.EXTRA_IS_GROUP_CONVERSATION)
             else x.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE) != null
 
-        /** The ids of a conversation's incoming messages, as [Msg.id], without building its [Content]. */
-        fun incomingIds(n: Notification): List<String> {
+        /** One incoming message's [Msg.id] and send time. */
+        class Incoming(val id: String, val time: Long)
+
+        /**
+         * A conversation's incoming messages, oldest first, as [of] gives them in [messages], without
+         * building its [Content]: what is New is decided per message, on every change, so this
+         * skips the text and attachments a card needs.
+         */
+        fun incoming(n: Notification): List<Incoming> {
             val x = n.extras
+            val all = conversation(x)
+            if (all.isEmpty()) return emptyList()
             val user = user(x)
-            return (messages(x, Notification.EXTRA_HISTORIC_MESSAGES) + messages(x))
-                .filter { !isOwn(it, user) }.map(::idOf).distinct()
+            val ids = ids(all)
+            return all.indices.filter { !isOwn(all[it], user) }.map { Incoming(ids[it], all[it].time) }
         }
 
-        private fun idOf(m: Message) = "${m.time}|${m.senderKey ?: m.sender}|${m.body.toString().hashCode()}"
+        /** The ids of a conversation's incoming messages, as [Msg.id], without building its [Content]. */
+        fun incomingIds(n: Notification): List<String> = incoming(n).map { it.id }
+
+        /**
+         * The historic messages Android keeps for context, then the active ones, oldest first. Apps
+         * repeat some active messages in the historic list, so a historic one that is also active
+         * is dropped. Repeats within one list stay: two photos sent together can share a time,
+         * a sender and the same placeholder text.
+         */
+        private fun conversation(x: Bundle): List<Message> {
+            val active = messages(x)
+            val historic = messages(x, Notification.EXTRA_HISTORIC_MESSAGES)
+            if (historic.isEmpty()) return active.sortedBy { it.time }
+            val activeKeys = active.mapTo(HashSet(), ::keyOf)
+            return (historic.filter { keyOf(it) !in activeKeys } + active).sortedBy { it.time }
+        }
+
+        /**
+         * Ids that stay the same when the app reposts the conversation, so a hidden message stays
+         * hidden. A message is known by its time, sender, attachment and text. The text is hashed to
+         * 64 bits to keep ids short; a repeat of the same message gets its place among the repeats,
+         * so every id in a conversation is distinct.
+         */
+        private fun ids(messages: List<Message>): List<String> {
+            val seen = HashMap<String, Int>()
+            return messages.map { m ->
+                val base = "${m.time}|${m.senderKey ?: m.sender}|${m.attachment?.uri ?: ""}|${hash64(m.body)}"
+                val n = seen.merge(base, 1, Int::plus)!!
+                if (n == 1) base else "$base|$n"
+            }
+        }
+
+        private fun keyOf(m: Message) =
+            listOf(m.time, m.senderKey ?: m.sender?.toString(), m.attachment?.uri, m.body.toString())
+
+        /** FNV-1a over the text's UTF-16 units: 64 bits, so two texts sharing an id is out of reach in practice. */
+        private fun hash64(cs: CharSequence): String {
+            var h = -0x340d631b7bdddcdbL
+            for (i in cs.indices) {
+                h = h xor cs[i].code.toLong()
+                h *= 0x100000001b3L
+            }
+            return java.lang.Long.toHexString(h)
+        }
 
         private fun latestIncoming(x: Bundle): Message? {
             val user = user(x)
