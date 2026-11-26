@@ -43,6 +43,8 @@ object Prefs {
         if (notifiedDirty) main.removeCallbacks(notifiedWrite)
         notifiedDirty = false
         keepOldDefaults(context)
+        // Starts the Support sheet's quiet first week from the first run of a version that has it.
+        if (!sp.contains(SUPPORT_SINCE)) sp.edit().putLong(SUPPORT_SINCE, System.currentTimeMillis()).apply()
     }
 
     /**
@@ -146,6 +148,21 @@ object Prefs {
     var whatsNewCode: Long
         get() = sp.getLong("whats_new_code", 0L)
         set(v) = sp.edit().putLong("whats_new_code", v).apply()
+
+    private const val SUPPORT_SINCE = "support_since"
+
+    /** When this install first ran a version with the Support sheet; [app.chronotif.core.SupportAsk] counts from it. */
+    val supportSince: Long get() = sp.getLong(SUPPORT_SINCE, 0L)
+
+    /** When the Support sheet last showed; 0 before it ever has. */
+    var supportShown: Long
+        get() = sp.getLong("support_shown", 0L)
+        set(v) = sp.edit().putLong("support_shown", v).apply()
+
+    /** Support was tapped once, on the sheet or the Ko-fi button. Whether anyone paid, nothing here knows. */
+    var supportTapped: Boolean
+        get() = sp.getBoolean("support_tapped", false)
+        set(v) = sp.edit().putBoolean("support_tapped", v).apply()
 
     /** The name of the settings section last open, reopened next time unless a permission is missing. */
     var settingsSection: String?

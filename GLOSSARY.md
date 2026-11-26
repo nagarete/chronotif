@@ -110,3 +110,11 @@ _Avoid_: Telemetry, Analytics, Tracking
 **Feedback**:
 A message a user writes and sends on purpose, from the app or the website, to the maintainer privately. It is never public; the maintainer files an issue from it when it needs work. It is not Usage data: nothing is sent until the user taps Send.
 _Avoid_: Bug report, Issue (an issue is public and lives on GitHub)
+
+**Support**:
+Paying the maintainer by choice, through Ko-fi, outside the app. It unlocks nothing and the app records nothing about it. Its place is the last section of Settings, which the Support sheet points to.
+_Avoid_: Donate, Tip, Premium, Pro (nothing is paid for)
+
+**Support sheet**:
+The sheet that now and then slides up over Settings, never over the Panel or the lock screen, asking whether Chronotif is worth supporting and leading to the Support section. Closing it costs nothing.
+_Avoid_: Donation popup, Nag, Toast

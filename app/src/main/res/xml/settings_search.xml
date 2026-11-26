@@ -129,4 +129,6 @@
 
     <!-- The form's fields aren't settings, so only the page itself is found. -->
     <section name="FEEDBACK" keywords="@string/settings_keywords_feedback" />
+
+    <section name="SUPPORT" keywords="@string/settings_keywords_support" />
 </settings>
