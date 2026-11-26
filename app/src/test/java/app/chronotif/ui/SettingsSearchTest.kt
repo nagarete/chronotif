@@ -125,7 +125,7 @@ class SettingsSearchTest {
             shadowOf(android.os.Looper.getMainLooper()).idle()
             val rows = all(root).filter { it.tag is Int }.toMutableList()
             if (section == "SEARCH") {
-                for (step in listOf(R.string.search_find_contacts, R.string.search_calls, R.string.search_currency_rates, R.string.search_find_calendar)) {
+                for (step in listOf(R.string.search_find_contacts, R.string.search_calls, R.string.search_currency_rates, R.string.search_find_calendar, R.string.search_find_files)) {
                     rows.remove(rows.first { it.tag == step })
                 }
             }

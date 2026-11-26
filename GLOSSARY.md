@@ -92,8 +92,12 @@ The Handle action that turns the display off from whatever is on screen, ending 
 _Avoid_: Lock, screen off
 
 **Search**:
-Opened by pulling down at the top of the Panel or the lock-screen view, or from Chronotif's handle, tile, widget or app shortcut. It finds and opens apps, contacts and calendar events, answers quick math and currency, and hands anything else to the web. It never searches notifications.
+Opened by pulling down at the top of the Panel or the lock-screen view, or from Chronotif's handle, tile, widget or app shortcut. It finds and opens apps, contacts, calendar events and Files, answers quick math and currency, and hands anything else to the web or to an app's own search (the Play Store, Maps, Spotify, YouTube Music). It never searches notifications.
 _Avoid_: Spotlight, App search
+
+**Files**:
+What Search finds on the phone's storage by name: music, videos and photos, and documents too where Chronotif is allowed every file. Off until turned on in *Settings → Search*.
+_Avoid_: Media search, Documents
 
 **Stable**:
 A tested release of Chronotif, tagged `vX.Y.Z`, and the update channel that receives only those. The default channel.

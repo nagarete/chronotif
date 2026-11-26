@@ -205,10 +205,10 @@ class SearchActivityTest {
     }
 
     /** An app in the launcher, as LauncherApps lists it. */
-    private fun launcherApp(label: String) {
+    private fun launcherApp(label: String, pkg: String = "test.${label.lowercase().replace(' ', '.')}") {
         val user = android.os.Process.myUserHandle()
         val info = android.content.pm.ActivityInfo().apply {
-            packageName = "test.${label.lowercase().replace(' ', '.')}"
+            packageName = pkg
             name = "$packageName.Main"
             nonLocalizedLabel = label
             applicationInfo = android.content.pm.ApplicationInfo()
@@ -266,5 +266,56 @@ class SearchActivityTest {
         val shown = shownFor("100 usd to idr")
         assertTrue("$shown", "1,650,000 IDR" in shown)
         assertTrue("$shown", "100.00 USD =" in shown)
+    }
+
+    /** Opens Search, types [query], waits for [ready] to show, and taps the deepest clickable view showing [row]. */
+    private fun tapRow(query: String, ready: String, row: String = ready): android.content.Intent? {
+        val controller = Robolectric.buildActivity(SearchActivity::class.java, SearchActivity.intent(context)).setup()
+        try {
+            shadowOf(Looper.getMainLooper()).idle()
+            val search = overlays(controller.get().window.decorView as ViewGroup).single()
+            typeInto(search, query)
+            idleUntil { ready in texts(search) }
+            val target = generateSequence(listOf<android.view.View>(search)) { level ->
+                level.flatMap { v -> if (v is ViewGroup) (0 until v.childCount).map(v::getChildAt) else emptyList() }.ifEmpty { null }
+            }.flatten().last { v -> v.hasOnClickListeners() && row in texts(v) }
+            target.performClick()
+            shadowOf(Looper.getMainLooper()).idle()
+            return shadowOf(controller.get()).nextStartedActivity ?: shadowOf(context as Application).nextStartedActivity
+        } finally {
+            controller.destroy()
+        }
+    }
+
+    @Test fun aTypedTimerStartsInTheClockAppWithoutOpeningIt() {
+        val started = tapRow("timer 10 min", "Tap to start")!!
+        assertEquals(android.provider.AlarmClock.ACTION_SET_TIMER, started.action)
+        assertEquals(600, started.getIntExtra(android.provider.AlarmClock.EXTRA_LENGTH, 0))
+        assertTrue(started.getBooleanExtra(android.provider.AlarmClock.EXTRA_SKIP_UI, false))
+    }
+
+    @Test fun aTypedAlarmIsSetForTheMorningUnlessItSaysPm() {
+        val started = tapRow("alarm 6:30 pm", "Alarm")!!
+        assertEquals(android.provider.AlarmClock.ACTION_SET_ALARM, started.action)
+        assertEquals(18, started.getIntExtra(android.provider.AlarmClock.EXTRA_HOUR, -1))
+        assertEquals(30, started.getIntExtra(android.provider.AlarmClock.EXTRA_MINUTES, -1))
+    }
+
+    @Test fun aNumberNoContactHasCanStillBeCalled() {
+        val shown = shownFor("0812 3456 7890")
+        assertTrue("$shown", "Not in your contacts" in shown)
+        assertTrue("Not a sum: $shown", shown.none { it.startsWith("= ") })
+        val started = tapRow("0812 3456 7890", "Not in your contacts")!!
+        assertEquals("Call from Search is off: the dialer opens", android.content.Intent.ACTION_DIAL, started.action)
+        assertEquals("081234567890", started.data!!.schemeSpecificPart)
+    }
+
+    @Test fun anInstalledStoreGetsARowUnderTheWeb() {
+        assertTrue(shownFor("chess").none { it.startsWith("Search com.android.vending") })
+        launcherApp("Play Store", pkg = "com.android.vending")
+        // Robolectric names an app by its package.
+        val started = tapRow("chess", "Search com.android.vending")!!
+        assertEquals("com.android.vending", started.`package`)
+        assertEquals("market://search?q=chess&c=apps", started.dataString)
     }
 }

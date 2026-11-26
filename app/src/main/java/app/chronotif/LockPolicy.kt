@@ -52,7 +52,7 @@ object LockPolicy {
 
     /**
      * Whether the lock screen hides private content in general: our setting, or the system's
-     * with a secure lock. Search keeps contacts and events back behind an unlock then.
+     * with a secure lock. Search keeps contacts, events and Files back behind an unlock then.
      */
     fun hidesContent(context: Context): Boolean {
         if (Prefs.lockHideContent) return true

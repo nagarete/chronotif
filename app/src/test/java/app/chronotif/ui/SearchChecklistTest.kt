@@ -68,13 +68,13 @@ class SearchChecklistTest {
         onRequestPermissionsResult(asked.requestCode, asked.requestedPermissions, intArrayOf(PackageManager.PERMISSION_GRANTED))
     }
 
-    @Test fun `a new install has four steps left, and the tile never counts`() {
+    @Test fun `a new install has five steps left, and the tile never counts`() {
         assertTrue("Currency rates are on for new installs", SearchSetup.done(context, Step.CURRENCY))
-        assertEquals(4, SearchSetup.left(context))
+        assertEquals(5, SearchSetup.left(context))
         assertEquals(Step.CONTACTS, SearchSetup.next(context))
 
         SearchSetup.skip(Step.CONTACTS)
-        assertEquals(3, SearchSetup.left(context))
+        assertEquals(4, SearchSetup.left(context))
         assertEquals(Step.CALLS, SearchSetup.next(context))
 
         Prefs.searchCalendar = true
@@ -84,6 +84,7 @@ class SearchChecklistTest {
 
         shadowOf(AppWidgetManager.getInstance(context)).createWidget(SearchWidget::class.java, R.layout.search_widget)
         assertTrue(SearchSetup.done(context, Step.WIDGET))
+        SearchSetup.skip(Step.FILES)
         assertEquals("Only Call from Search is left", 1, SearchSetup.left(context))
         assertFalse(SearchSetup.handled(context, Step.TILE))
 
@@ -95,11 +96,11 @@ class SearchChecklistTest {
     @Test fun `the Search page opens with the checklist, and Not now puts a step off`() {
         val a = openSearch()
         val left = { n: Int -> a.resources.getQuantityString(R.plurals.setup_steps_left, n, n) }
-        assertTrue(texts(a.root()).contains(left(4)))
+        assertTrue(texts(a.root()).contains(left(5)))
         assertTrue(texts(a.root()).contains(a.getString(R.string.search_setup_next, a.getString(R.string.search_find_contacts))))
 
         a.tap(a.getString(R.string.not_now))
-        assertTrue(texts(a.root()).contains(left(3)))
+        assertTrue(texts(a.root()).contains(left(4)))
         assertTrue(texts(a.root()).contains(a.getString(R.string.search_setup_next, a.getString(R.string.search_calls))))
         assertTrue(texts(a.root()).contains(a.getString(R.string.search_setup_skipped)))
     }
@@ -109,7 +110,7 @@ class SearchChecklistTest {
         a.tap(a.getString(R.string.allow))
         a.grantLast(Manifest.permission.READ_CONTACTS)
         assertTrue(Prefs.searchContacts)
-        val left = a.resources.getQuantityString(R.plurals.setup_steps_left, 3, 3)
+        val left = a.resources.getQuantityString(R.plurals.setup_steps_left, 4, 4)
         assertTrue(texts(a.root()).contains(left))
         assertTrue(texts(a.root()).contains(a.getString(R.string.search_setup_on)))
         // The switch below follows: its row is the one whose title isn't inside the checklist.
@@ -125,6 +126,17 @@ class SearchChecklistTest {
         assertTrue(Prefs.searchCalls)
         assertTrue(sw.isChecked)
         assertTrue(SearchSetup.done(a, Step.CALLS))
+    }
+
+    @Test fun `Find files opens Android's All files access page, and isn't done until it's allowed`() {
+        val a = openSearch()
+        assertTrue("This build finds documents", app.chronotif.Files.allFilesBuild(a))
+        val sw = all(a.root()).filterIsInstance<M3Switch>().first { rowTitle(it) == a.getString(R.string.search_find_files) }
+        generateSequence(sw.parent as View) { it.parent as? View }.first { it.isClickable }.performClick()
+        val opened = shadowOf(a).nextStartedActivity
+        assertEquals(android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, opened.action)
+        assertTrue(Prefs.searchFiles)
+        assertFalse("Not done until Android allows it", SearchSetup.done(a, Step.FILES))
     }
 
     @Test fun `with the old opt-in, Turn on switches currency rates on`() {

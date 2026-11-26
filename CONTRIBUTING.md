@@ -39,7 +39,7 @@ translations and accessibility improvements are always welcome.
   does (ADR 0013): replies and buttons that work in the background run while locked, unless the
   app asks for an unlock, and anything that opens an app asks to unlock first. When the lock
   screen hides sensitive content, redacted cards offer no reply or buttons and Search holds
-  contacts and events back.
+  contacts, events and Files back.
 
 ## Getting started
 

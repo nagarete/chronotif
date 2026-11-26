@@ -27,7 +27,11 @@ import android.window.OnBackInvokedCallback
 import android.window.OnBackInvokedDispatcher
 import app.chronotif.CalendarEvent
 import app.chronotif.Contact
+import app.chronotif.ClockActions
 import app.chronotif.ExchangeRates
+import app.chronotif.Files
+import app.chronotif.FoundFile
+import app.chronotif.Handoff
 import app.chronotif.Launchables
 import app.chronotif.Launchable
 import app.chronotif.PersonalData
@@ -36,18 +40,22 @@ import app.chronotif.Prefs
 import app.chronotif.SettingsPages
 import app.chronotif.core.Answer
 import app.chronotif.core.AppMatch
+import app.chronotif.core.ClockCommand
 import app.chronotif.core.Money
 import app.chronotif.core.Numbers
 import app.chronotif.core.PersonalMatch
+import app.chronotif.core.TypedNumber
 import app.chronotif.core.Usage
 import app.chronotif.core.WebQuery
 
 /**
- * Search (ADR 0008), laid over the panel, the lock-screen view or its own window. Before typing:
- * the apps that notified most recently. Typing: an answer (math, units, time in a place), apps,
- * contacts, Settings pages, calendar events and, last, the web. It never searches notifications.
- * Opening anything goes through [NotifList.Host.guarded], so on the lock screen it unlocks first;
- * copying an answer doesn't. Contacts and events show while locked, unless the lock screen hides content.
+ * Search (ADR 0008, ADR 0023), laid over the panel, the lock-screen view or its own window. Before
+ * typing: the apps that notified most recently. Typing: an answer (math, units, time in a place,
+ * a timer or alarm), apps, contacts or a typed number, Settings pages, calendar events, Files and,
+ * last, the web with the hand-off rows. It never searches notifications. Opening anything goes
+ * through [NotifList.Host.guarded], so on the lock screen it unlocks first; copying an answer and
+ * setting a timer or alarm don't. Contacts, events and Files show while locked, unless the lock
+ * screen hides content.
  */
 @SuppressLint("ViewConstructor")
 class SearchOverlay private constructor(
@@ -80,7 +88,7 @@ class SearchOverlay private constructor(
     private val suggestionsBlock = LinearLayout(context)
     private val suggestionsRow = LinearLayout(context)
     private val resultsScroll = ScrollView(context)
-    /** Answer, apps, contacts, Settings pages, events and the web row, each its own card, in that order. */
+    /** Answer, apps, contacts, Settings pages, events, Files and the web rows, each its own card, in that order. */
     private val results = LinearLayout(context)
     private val numbers = Numbers(context.resources.configuration.locales[0])
     private val spacer = View(context)
@@ -97,6 +105,8 @@ class SearchOverlay private constructor(
     private var shown: Found? = null
     /** "Show more" was tapped for this query's contacts. */
     private var allContacts = false
+    /** "Show more" was tapped for this query's Files. */
+    private var allFiles = false
     /** Apps showing for this query; "Show more" adds [AppMatch.MORE]. */
     private var appsShown = AppMatch.SHOWN
     private var shownQuery = ""
@@ -115,6 +125,7 @@ class SearchOverlay private constructor(
         val people: List<Contact>,
         val pages: List<SettingsPages.Page>,
         val events: List<CalendarEvent>,
+        val files: List<FoundFile>,
         val hidePersonal: Boolean,
     )
 
@@ -192,11 +203,14 @@ class SearchOverlay private constructor(
                 override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
                 override fun afterTextChanged(s: Editable?) = refresh()
             })
-            // Go opens the top app, or goes to the web when no app matches.
+            // Go sets a typed timer or alarm, else opens the top app, or goes to the web when no app matches.
             setOnEditorActionListener { _, id, _ ->
                 if (id != EditorInfo.IME_ACTION_GO) return@setOnEditorActionListener false
                 val q = text.toString()
-                if (AppMatch.fold(q).isNotEmpty()) {
+                val clock = (Answer.of(q, numbers) as? Answer.Clock)?.command
+                if (clock != null) {
+                    setClock(clock)
+                } else if (AppMatch.fold(q).isNotEmpty()) {
                     val top = shown?.takeIf { it.query == q }?.apps?.firstOrNull()
                         ?: AppMatch.search(apps, q) { it.label }.firstOrNull()
                     top?.let(::open) ?: openWeb(q)
@@ -281,8 +295,9 @@ class SearchOverlay private constructor(
         val folded = AppMatch.fold(query)
         val matched = AppMatch.rank(appKeys, folded) { it.key }.map { it.app }
         if (ask != asked) return null
-        // While locked, contacts and events show unless the lock screen hides content.
-        val hidePersonal = locked(c) && app.chronotif.LockPolicy.hidesContent(c) && (PersonalData.contactsOn(c) || PersonalData.calendarOn(c))
+        // While locked, contacts, events and Files show unless the lock screen hides content.
+        val hidePersonal = locked(c) && app.chronotif.LockPolicy.hidesContent(c) &&
+            (PersonalData.contactsOn(c) || PersonalData.calendarOn(c) || Files.on(c))
         val people = if (hidePersonal) emptyList()
         else PersonalMatch.rankContacts(contactKeys, query, { it.key }, { it.digits }).map { it.contact }
         if (ask != asked) return null
@@ -290,7 +305,10 @@ class SearchOverlay private constructor(
         val upcoming = if (hidePersonal) emptyList()
         else PersonalMatch.rankEvents(eventKeys, query, System.currentTimeMillis(), { it.event.id }, { it.key },
             { it.event.begin }, { it.event.end }).map { it.event }
-        return Found(query, matched, people, pages, upcoming, hidePersonal)
+        if (ask != asked) return null
+        // Asked of Android's file index for each query: it can hold tens of thousands of files, too many to keep.
+        val files = if (hidePersonal) emptyList() else Files.search(c, query)
+        return Found(query, matched, people, pages, upcoming, files, hidePersonal)
     }
 
     /** Lays out what [find] matched, under the answer and over the web row. */
@@ -302,12 +320,17 @@ class SearchOverlay private constructor(
         spacer.visibility = GONE
         if (query != shownQuery) {
             allContacts = false
+            allFiles = false
             appsShown = AppMatch.SHOWN
         }
         shownQuery = query
         results.removeAllViews()
         Answer.of(query, numbers)?.let { a ->
-            val card = if (a is Answer.Currency) currencyCard(a.query) else answerCard(a)
+            val card = when (a) {
+                is Answer.Currency -> currencyCard(a.query)
+                is Answer.Clock -> clockCard(a.command)
+                else -> answerCard(a)
+            }
             card?.let {
                 results.addView(it, cardLp())
                 app.chronotif.Tutorial.notice(app.chronotif.TutorialSource.Event.ANSWER_SHOWN)
@@ -327,10 +350,20 @@ class SearchOverlay private constructor(
                 listOfNotNull(if (visible.size < people.size && !allContacts) showMoreRow(people.size - visible.size) { allContacts = true } else null)
             results.addView(card(R.string.search_contacts, rows), cardLp())
         }
+        // A number no contact has can still be called or messaged.
+        val typed = TypedNumber.of(query)
+        if (typed != null && people.isEmpty()) results.addView(card(null, listOf(numberRow(typed))), cardLp())
         if (found.pages.isNotEmpty()) results.addView(card(R.string.search_settings, found.pages.map(::settingsRow)), cardLp())
         if (found.events.isNotEmpty()) results.addView(card(R.string.search_calendar, found.events.map(::eventRow)), cardLp())
+        val files = found.files
+        if (files.isNotEmpty()) {
+            val visible = if (allFiles) files else files.take(Files.SHOWN)
+            val rows = visible.map(::fileRow) +
+                listOfNotNull(if (visible.size < files.size) showMoreRow(files.size - visible.size) { allFiles = true } else null)
+            results.addView(card(R.string.search_files, rows), cardLp())
+        }
         if (found.hidePersonal) results.addView(card(null, listOf(unlockRow())), cardLp())
-        results.addView(card(null, listOf(webRow(query))), cardLp())
+        results.addView(card(null, listOf(webRow(query)) + handoffRows(query)), cardLp())
         resultsScroll.scrollTo(0, 0)
     }
 
@@ -374,6 +407,7 @@ class SearchOverlay private constructor(
                 Triple(time, listOf(a.place.name, day, timeDifference(Answer.minutesAhead(here, now.offset.totalSeconds))).joinToString(" · "), time)
             }
             is Answer.Currency -> return currencyCard(a.query)
+            is Answer.Clock -> return clockCard(a.command)
         }
         return resultCard(small, big, context.getString(R.string.search_tap_to_copy)) { copy(copy) }
     }
@@ -434,6 +468,55 @@ class SearchOverlay private constructor(
             Prefs.currencyRates = true
             if (host.keepsSearchAfterUnlock) refresh() else SearchActivity.open(host.context, query)
         }
+    }
+
+    /**
+     * A typed timer or alarm (ADR 0023): what it will set, which only a tap or Go does. Setting it
+     * opens nothing, so it works on the lock screen without unlocking.
+     */
+    private fun clockCard(command: ClockCommand): View = when (command) {
+        is ClockCommand.Timer -> resultCard(context.getString(R.string.search_timer), duration(command.seconds),
+            context.getString(R.string.search_timer_note)) { setClock(command) }
+        is ClockCommand.Alarm -> resultCard(context.getString(R.string.search_alarm), alarmTime(command),
+            context.getString(if (ClockActions.isToday(command.hour, command.minute)) R.string.search_alarm_today else R.string.search_alarm_tomorrow)) {
+            setClock(command)
+        }
+    }
+
+    private fun alarmTime(a: ClockCommand.Alarm): String {
+        val at = java.util.Calendar.getInstance().apply {
+            set(java.util.Calendar.HOUR_OF_DAY, a.hour)
+            set(java.util.Calendar.MINUTE, a.minute)
+        }
+        return android.text.format.DateFormat.getTimeFormat(context).format(at.time)
+    }
+
+    private fun duration(seconds: Int): String {
+        val h = seconds / 3600
+        val m = seconds % 3600 / 60
+        val s = seconds % 60
+        return listOfNotNull(
+            if (h > 0) context.getString(R.string.search_hours, h) else null,
+            if (m > 0) context.getString(R.string.search_minutes, m) else null,
+            if (s > 0) context.getString(R.string.search_seconds, s) else null,
+        ).joinToString(" ")
+    }
+
+    /** Sets [command] in the clock app and closes Search, saying what was set; the Tutorial only says what would be. */
+    private fun setClock(command: ClockCommand) {
+        hideKeyboard()
+        if (app.chronotif.Tutorial.holdsLaunch(context, context.getString(R.string.tutorial_clock))) return
+        if (!ClockActions.set(host.context, command)) {
+            android.widget.Toast.makeText(context, R.string.search_clock_none, android.widget.Toast.LENGTH_SHORT).show()
+            return
+        }
+        val said = when (command) {
+            is ClockCommand.Timer -> context.getString(R.string.search_timer_started, duration(command.seconds))
+            is ClockCommand.Alarm -> context.getString(R.string.search_alarm_set, alarmTime(command))
+        }
+        android.widget.Toast.makeText(context, said, android.widget.Toast.LENGTH_SHORT).show()
+        app.chronotif.UsageData.count(Usage.Count.SEARCH_CLOCK)
+        close()
     }
 
     private fun timeDifference(minutes: Int): String {
@@ -553,6 +636,124 @@ class SearchOverlay private constructor(
         }
     }
 
+    /** A typed number that no contact has: call, message, and WhatsApp when it's installed. */
+    private fun numberRow(number: String): View = LinearLayout(context).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        background = Ui.pressable(0, 0f, pal.ripple)
+        setPadding(dp(14), dp(8), dp(6), dp(8))
+        addView(ImageView(context).apply {
+            setImageResource(R.drawable.ic_call)
+            imageTintList = ColorStateList.valueOf(pal.textSecondary)
+            scaleType = ImageView.ScaleType.CENTER
+        }, LinearLayout.LayoutParams(dp(40), dp(40)).apply { marginEnd = dp(14) })
+        val shown = android.telephony.PhoneNumberUtils.formatNumber(number, numbers.locale.country.ifEmpty { "US" }) ?: number
+        addView(LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(Ui.text(context, 16f, pal.text, lines = 1).apply { text = shown })
+            addView(Ui.text(context, 13f, pal.textSecondary, lines = 1).apply { setText(R.string.search_number) })
+        }, LinearLayout.LayoutParams(0, -2, 1f))
+        val whatsApp = PersonalData.whatsAppPackages.firstNotNullOfOrNull { pkg -> apps.firstOrNull { it.mine && it.component.packageName == pkg } }
+        if (whatsApp != null) {
+            addView(ImageView(context).apply {
+                scaleType = ImageView.ScaleType.CENTER_INSIDE
+                setPadding(dp(11), dp(11), dp(11), dp(11))
+                background = Ui.pressable(0, dp(22).toFloat(), pal.ripple)
+                contentDescription = context.getString(R.string.search_message_on, shown, whatsApp.label)
+                Launchables.icon(context, whatsApp) { setImageDrawable(RoundedIcon(it)) }
+                setOnClickListener {
+                    launchIf(Usage.Count.SEARCH_NUMBER, whatsApp.label) {
+                        PersonalData.whatsAppNumber(host.context, number, whatsApp.component.packageName)
+                    }
+                }
+            }, LinearLayout.LayoutParams(dp(44), dp(44)))
+        }
+        addView(numberButton(R.drawable.ic_message, context.getString(R.string.search_message, shown)) {
+            PersonalData.messageNumber(host.context, number)
+        })
+        addView(numberButton(R.drawable.ic_call, context.getString(R.string.search_call, shown)) {
+            PersonalData.callNumber(host.context, number)
+        })
+        setOnClickListener { launchIf(Usage.Count.SEARCH_NUMBER, contactApp) { PersonalData.callNumber(host.context, number) } }
+    }
+
+    private fun numberButton(icon: Int, label: String, action: () -> Boolean): View = ImageView(context).apply {
+        setImageResource(icon)
+        imageTintList = ColorStateList.valueOf(pal.accent)
+        scaleType = ImageView.ScaleType.CENTER
+        background = Ui.pressable(0, dp(22).toFloat(), pal.ripple)
+        contentDescription = label
+        layoutParams = LinearLayout.LayoutParams(dp(44), dp(44))
+        setOnClickListener { launchIf(Usage.Count.SEARCH_NUMBER, contactApp, action) }
+    }
+
+    /**
+     * A file: a thumbnail for photos, videos and songs, filled in once loaded, else its kind's icon;
+     * a song's artist and album, or the folder, and when it last changed.
+     */
+    private fun fileRow(f: FoundFile): View = LinearLayout(context).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        background = Ui.pressable(0, 0f, pal.ripple)
+        setPadding(dp(14), dp(8), dp(14), dp(8))
+        val icon = ImageView(context).apply {
+            setImageResource(when (f.kind) {
+                FoundFile.Kind.IMAGE -> R.drawable.ic_image
+                FoundFile.Kind.VIDEO -> R.drawable.ic_movie
+                FoundFile.Kind.AUDIO -> R.drawable.ic_music
+                FoundFile.Kind.DOCUMENT -> R.drawable.ic_file
+            })
+            imageTintList = ColorStateList.valueOf(pal.textSecondary)
+            scaleType = ImageView.ScaleType.CENTER
+            background = Ui.rounded(pal.chip, dp(10).toFloat())
+            Ui.clipRounded(this, dp(10).toFloat())
+        }
+        Files.thumbnail(context, f, dp(40)) {
+            icon.imageTintList = null
+            icon.scaleType = ImageView.ScaleType.CENTER_CROP
+            icon.setImageDrawable(it)
+        }
+        addView(icon, LinearLayout.LayoutParams(dp(40), dp(40)).apply { marginEnd = dp(14) })
+        val music = if (f.kind == FoundFile.Kind.AUDIO) listOfNotNull(f.artist, f.album).joinToString(" · ").ifEmpty { null } else null
+        val changed = android.text.format.DateUtils.formatDateTime(context, f.modified * 1000,
+            android.text.format.DateUtils.FORMAT_SHOW_DATE or android.text.format.DateUtils.FORMAT_ABBREV_ALL or
+                (if (sameYear(f.modified * 1000)) 0 else android.text.format.DateUtils.FORMAT_SHOW_YEAR))
+        addView(LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(Ui.text(context, 16f, pal.text, lines = 1).apply {
+                text = if (f.kind == FoundFile.Kind.AUDIO) f.title ?: f.name else f.name
+                ellipsize = android.text.TextUtils.TruncateAt.MIDDLE
+            })
+            addView(Ui.text(context, 13f, pal.textSecondary, lines = 1).apply {
+                text = listOfNotNull(music ?: f.folder, changed).joinToString(" · ")
+            })
+        }, LinearLayout.LayoutParams(0, -2, 1f))
+        setOnClickListener {
+            launchIf(Usage.Count.SEARCH_FILE, f.name) {
+                Files.open(host.context, f).also { opened ->
+                    if (!opened) android.widget.Toast.makeText(context, R.string.search_file_no_app, android.widget.Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    /** Under the web row: the same query in the Play Store, Maps, Spotify and YouTube Music, for those installed. */
+    private fun handoffRows(query: String): List<View> = Handoff.entries.mapNotNull { h ->
+        val app = apps.firstOrNull { it.mine && it.component.packageName == h.pkg } ?: return@mapNotNull null
+        LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            background = Ui.pressable(0, 0f, pal.ripple)
+            setPadding(dp(14), dp(8), dp(14), dp(8))
+            val icon = ImageView(context)
+            Launchables.icon(context, app) { icon.setImageDrawable(RoundedIcon(it)) }
+            addView(icon, LinearLayout.LayoutParams(dp(40), dp(40)).apply { marginEnd = dp(14) })
+            addView(Ui.text(context, 16f, pal.text, lines = 1).apply { text = context.getString(R.string.search_in_app, app.label) },
+                LinearLayout.LayoutParams(0, -2, 1f))
+            setOnClickListener { launchIf(Usage.Count.SEARCH_HANDOFF, app.label) { h.open(host.context, query) } }
+        }
+    }
+
     private fun eventRow(e: CalendarEvent): View {
         val flags = android.text.format.DateUtils.FORMAT_SHOW_DATE or android.text.format.DateUtils.FORMAT_SHOW_WEEKDAY or
             android.text.format.DateUtils.FORMAT_ABBREV_ALL or
@@ -574,7 +775,7 @@ class SearchOverlay private constructor(
     }
 
     /**
-     * Shown instead of contacts and events while the lock screen hides content. After unlocking, Search shows everything:
+     * Shown instead of contacts, events and Files while the lock screen hides content. After unlocking, Search shows everything:
      * in its own window right away, or reopened when the lock-screen view closes on unlock.
      */
     private fun unlockRow(): View = iconRow(R.drawable.ic_lock, context.getString(R.string.search_unlock_for_more)) {
@@ -610,7 +811,7 @@ class SearchOverlay private constructor(
         }
     }
 
-    /** The last row: an address opens directly, anything else is searched with the chosen engine. */
+    /** The web row, over the hand-off rows: an address opens directly, anything else is searched with the chosen engine. */
     private fun webRow(query: String): View = LinearLayout(context).apply {
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL

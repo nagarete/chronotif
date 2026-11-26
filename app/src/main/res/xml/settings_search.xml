@@ -108,6 +108,7 @@
             <setting title="@string/search_calls" summary="@string/search_calls_desc" />
             <setting title="@string/search_currency_rates" summary="@string/search_currency_rates_desc" />
             <setting title="@string/search_find_calendar" summary="@string/search_find_calendar_desc" />
+            <setting title="@string/search_find_files" summary="@string/search_find_files_desc" keywords="@string/settings_keywords_search_find_files" />
         </group>
         <group heading="@string/search_can_do">
             <setting title="@string/search_can_apps" summary="@string/search_can_apps_desc" />
@@ -117,8 +118,12 @@
             <setting title="@string/search_can_currency" summary="@string/search_can_currency_desc" />
             <setting title="@string/search_can_contacts" summary="@string/search_can_contacts_desc" />
             <setting title="@string/search_can_calendar" summary="@string/search_can_calendar_desc" />
+            <setting title="@string/search_can_files" summary="@string/search_can_files_desc" />
+            <setting title="@string/search_can_clock" summary="@string/search_can_clock_desc" />
+            <setting title="@string/search_can_number" summary="@string/search_can_number_desc" />
             <setting title="@string/search_can_settings" summary="@string/search_can_settings_desc" />
             <setting title="@string/search_can_web" summary="@string/search_can_web_desc" />
+            <setting title="@string/search_can_handoff" summary="@string/search_can_handoff_desc" keywords="@string/settings_keywords_search_can_handoff" />
         </group>
     </section>
 
