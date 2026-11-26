@@ -8,13 +8,23 @@ import org.junit.Test
 
 class HandleGestureTest {
     @Test
-    fun theDefaultsAreWhatTheHandleDidBeforeGesturesCouldBePicked() {
-        assertEquals(HandleAction.PANEL, HandleGesture.TAP.default)
+    fun aNewInstallTapsForSearchSwipesDownForThePanelAndHoldsToSleep() {
+        assertEquals(HandleAction.SEARCH, HandleGesture.TAP.default)
         assertEquals(HandleAction.PANEL, HandleGesture.SWIPE_DOWN.default)
-        assertEquals(HandleAction.PANEL, HandleGesture.SWIPE_INWARD.default)
-        assertEquals(HandleAction.SEARCH, HandleGesture.HOLD.default)
+        assertEquals(HandleAction.SEARCH, HandleGesture.SWIPE_INWARD.default)
+        assertEquals(HandleAction.SLEEP, HandleGesture.HOLD.default)
         assertEquals(HandleAction.NONE, HandleGesture.DOUBLE_TAP.default)
         assertEquals(HandleAction.NONE, HandleGesture.SWIPE_UP.default)
+    }
+
+    @Test
+    fun anOlderInstallKeepsWhatTheHandleDidBeforeGesturesCouldBePicked() {
+        assertEquals(HandleAction.PANEL, HandleGesture.TAP.before)
+        assertEquals(HandleAction.PANEL, HandleGesture.SWIPE_DOWN.before)
+        assertEquals(HandleAction.PANEL, HandleGesture.SWIPE_INWARD.before)
+        assertEquals(HandleAction.SEARCH, HandleGesture.HOLD.before)
+        assertEquals(HandleAction.NONE, HandleGesture.DOUBLE_TAP.before)
+        assertEquals(HandleAction.NONE, HandleGesture.SWIPE_UP.before)
     }
 
     @Test

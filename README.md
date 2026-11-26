@@ -92,7 +92,7 @@ it. On the lock screen, notifications move to Earlier after you unlock. A new in
 message makes its conversation new again, even if the app updates its notification silently.
 A timestamp refresh or progress update doesn't.
 
-Tap the edge handle or the Quick Settings tile to open the panel, or turn on the optional
+Swipe down on the edge handle or tap the Quick Settings tile to open the panel, or turn on the optional
 status-bar swipe to open it from the top of the screen. Tap a notification
 to open its app, swipe sideways to dismiss it, or expand it for details and actions.
 Reply inline when the app supports it.

@@ -7,15 +7,16 @@ import kotlin.math.abs
 /**
  * A way to touch the edge handle that the user can give a [HandleAction] (ADR 0022). [key] is what's
  * saved and what Usage data sends, so it never changes. Holding and then dragging moves the handle
- * and isn't one of these.
+ * and isn't one of these. [default] is a new install's (ADR 0024); [before] is what an install from
+ * before 0.3.3 keeps.
  */
-enum class HandleGesture(val key: String, val default: HandleAction) {
-    TAP("tap", HandleAction.PANEL),
-    DOUBLE_TAP("double_tap", HandleAction.NONE),
-    HOLD("hold", HandleAction.SEARCH),
-    SWIPE_DOWN("swipe_down", HandleAction.PANEL),
-    SWIPE_UP("swipe_up", HandleAction.NONE),
-    SWIPE_INWARD("swipe_inward", HandleAction.PANEL);
+enum class HandleGesture(val key: String, val default: HandleAction, val before: HandleAction) {
+    TAP("tap", HandleAction.SEARCH, HandleAction.PANEL),
+    DOUBLE_TAP("double_tap", HandleAction.NONE, HandleAction.NONE),
+    HOLD("hold", HandleAction.SLEEP, HandleAction.SEARCH),
+    SWIPE_DOWN("swipe_down", HandleAction.PANEL, HandleAction.PANEL),
+    SWIPE_UP("swipe_up", HandleAction.NONE, HandleAction.NONE),
+    SWIPE_INWARD("swipe_inward", HandleAction.SEARCH, HandleAction.PANEL);
 
     companion object {
         /**

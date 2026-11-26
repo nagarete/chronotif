@@ -1,5 +1,7 @@
 # Each edge-handle gesture does what the user picks
 
+Superseded in part by [ADR 0024](0024-the-edge-handle-taps-for-search-and-holds-to-sleep.md): new installs tap for Search, swipe down for the Panel and hold to sleep.
+
 The edge handle had a fixed map: tap, swipe down or swipe inward opened the Panel, and holding opened Search. People wanted more from it, such as turning the screen off from any app, as AssistiveTouch can on iOS. No single map suits everyone, so each Handle gesture (Tap, Double-tap, Hold, Swipe down, Swipe up, Swipe inward) now does the Handle action the user picks: the Panel, Search, Sleep, any Lock-screen shortcut action, or None. The defaults are the old map, so nobody's handle changes until they pick.
 
 Moving the handle stays fixed as hold, then drag. If dragging could be assigned like the others, a swipe given to it would be lost to every other action, and the handle has no room for a second way to move. Letting go of a hold without dragging runs Hold's action.

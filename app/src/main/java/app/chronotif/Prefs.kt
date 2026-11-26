@@ -44,7 +44,10 @@ object Prefs {
         notifiedMemo = null
         if (notifiedDirty) main.removeCallbacks(notifiedWrite)
         notifiedDirty = false
-        keepOldDefaults(context)
+        // Asked before either writes its marker, which would make a new install look old.
+        val old = existingInstall(context)
+        keepOldDefaults(old)
+        keepOldGestures(old)
         // Starts the Support sheet's quiet first week from the first run of a version that has it.
         if (!sp.contains(SUPPORT_SINCE)) sp.edit().putLong(SUPPORT_SINCE, System.currentTimeMillis()).apply()
     }
@@ -55,16 +58,10 @@ object Prefs {
      * first start after the update writes the old default into each of these it never set. A new
      * install, with nothing saved yet, gets the new ones. Runs once.
      */
-    private fun keepOldDefaults(context: Context) {
+    private fun keepOldDefaults(old: Boolean) {
         if (sp.getBoolean(DEFAULTS_SETTLED, false)) return
-        val info = try {
-            context.packageManager.getPackageInfo(context.packageName, 0)
-        } catch (_: android.content.pm.PackageManager.NameNotFoundException) {
-            null
-        }
-        val updated = info != null && info.firstInstallTime != info.lastUpdateTime
         val edit = sp.edit()
-        if (updated || sp.all.isNotEmpty()) {
+        if (old) {
             if (!sp.contains("lock_mode")) edit.putInt("lock_mode", LOCK_WHEN_NEW)
             if (!sp.contains("currency_rates")) edit.putBoolean("currency_rates", false)
         }
@@ -72,6 +69,34 @@ object Prefs {
     }
 
     private const val DEFAULTS_SETTLED = "defaults_0_2_7"
+
+    /** Updated from an older version, or with settings already saved (a restored backup, say). */
+    private fun existingInstall(context: Context): Boolean {
+        val info = try {
+            context.packageManager.getPackageInfo(context.packageName, 0)
+        } catch (_: android.content.pm.PackageManager.NameNotFoundException) {
+            null
+        }
+        return (info != null && info.firstInstallTime != info.lastUpdateTime) || sp.all.isNotEmpty()
+    }
+
+    /**
+     * The edge handle's defaults changed in 0.3.3 (ADR 0024): tap and swipe inward open Search and
+     * hold is Sleep. An install from before keeps the map it had, written into each gesture it
+     * never set, so nobody's handle changes under their finger. Runs once.
+     */
+    private fun keepOldGestures(old: Boolean) {
+        if (sp.getBoolean(GESTURES_SETTLED, false)) return
+        val edit = sp.edit()
+        if (old) {
+            for (g in app.chronotif.core.HandleGesture.entries) {
+                if (!sp.contains("handle_gesture_${g.key}")) edit.putString("handle_gesture_${g.key}", g.before.key)
+            }
+        }
+        edit.putBoolean(GESTURES_SETTLED, true).apply()
+    }
+
+    private const val GESTURES_SETTLED = "defaults_0_3_3"
 
     /** Wall-clock time up to which the user has seen notifications. */
     val lastCheck: Long get() = sp.getLong("last_check", 0L)
@@ -200,7 +225,7 @@ object Prefs {
         get() = sp.getInt("handle_look", LOOK_FROSTED)
         set(v) = sp.edit().putInt("handle_look", v).apply()
 
-    /** What each Handle gesture does (ADR 0022); unset, what it did before the gestures could be picked. */
+    /** What each Handle gesture does (ADR 0022); unset, a new install's default (ADR 0024). */
     fun handleAction(g: app.chronotif.core.HandleGesture): app.chronotif.core.HandleAction =
         app.chronotif.core.HandleAction.of(sp.getString("handle_gesture_${g.key}", null), g.default)
 
