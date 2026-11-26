@@ -23,7 +23,7 @@ android {
         minSdk = 30
         targetSdk = 36
         // This is the next stable version. CI adds the nightly suffix and build number.
-        versionName = "0.3.1"
+        versionName = "0.3.2"
         val baseCode = versionName!!.split('.').map(String::toInt).fold(0) { acc, p -> acc * 100 + p }
         versionCode = baseCode * 10000 + (nightlyBuild ?: 9999)
         if (nightlyBuild != null) versionName = "$versionName-nightly.$nightlyBuild"
