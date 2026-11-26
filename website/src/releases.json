@@ -1,14 +1,15 @@
 {
-  "next": {
-    "version": "0.3.2",
-    "headline": "A place to support Chronotif, if you'd like to.",
-    "notes": [
-      "Settings has a new Support section at the bottom, if you'd like to support Chronotif on Ko-fi. It's optional and doesn't unlock anything.",
-      "Pick what each edge handle gesture does under Settings → Edge handle → Gestures: tap, double-tap, hold, and swipe down, up or inward. Open the Panel or Search, turn on the flashlight, open the camera, the QR scanner or an app, toggle Do Not Disturb, or Sleep, which turns the screen off from any app. Nothing changes until you pick.",
-      "The edge handle has a new shape, Button: a rounded square with a ring, sitting just inside the screen edge. Pick it under Settings → Edge handle → Shape."
-    ]
-  },
   "stable": [
+    {
+      "version": "0.3.2",
+      "date": "2026-11-26",
+      "headline": "Pick what each edge handle gesture does, including Sleep.",
+      "notes": [
+        "Settings has a new Support section at the bottom, if you'd like to support Chronotif on Ko-fi. It's optional and doesn't unlock anything.",
+        "Pick what each edge handle gesture does under Settings → Edge handle → Gestures: tap, double-tap, hold, and swipe down, up or inward. Open the Panel or Search, turn on the flashlight, open the camera, the QR scanner or an app, toggle Do Not Disturb, or Sleep, which turns the screen off from any app. Nothing changes until you pick.",
+        "The edge handle has a new shape, Button: a rounded square with a ring, sitting just inside the screen edge. Pick it under Settings → Edge handle → Shape."
+      ]
+    },
     {
       "version": "0.3.1",
       "date": "2026-11-26",
