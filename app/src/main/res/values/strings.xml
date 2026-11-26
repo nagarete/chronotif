@@ -206,6 +206,16 @@
     <string name="feedback_too_many">Too many messages from this network. Try again in a minute.</string>
     <string name="feedback_failed">Couldn\'t send right now. Try again later, or email feedback@chronotif.com.</string>
     <string name="feedback_github">Prefer GitHub? Open an issue</string>
+
+    <!-- Support -->
+    <string name="setup_support">Support</string>
+    <string name="settings_keywords_support">support donate donation tip ko-fi kofi coffee sponsor pay money developer</string>
+    <string name="support_body">Chronotif is free, with no ads and nothing locked. If it\'s made your notifications easier, you can support its development. It helps make Chronotif better.</string>
+    <string name="support_kofi">Support on Ko-fi</string>
+    <string name="support_note">Opens Ko-fi in your browser. Supporting is optional and doesn\'t unlock anything.</string>
+    <string name="support_ask_title">Enjoying Chronotif?</string>
+    <string name="support_ask_later">Not now</string>
+    <string name="support_ask_go">Support</string>
     <string name="style_count_short">With count</string>
     <string name="perm_listener">Notification access</string>
     <string name="perm_listener_desc">Read, open, dismiss and act on notifications.</string>

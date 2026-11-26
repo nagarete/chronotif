@@ -1,4 +1,11 @@
 {
+  "next": {
+    "version": "0.3.2",
+    "headline": "A place to support Chronotif, if you'd like to.",
+    "notes": [
+      "Settings has a new Support section at the bottom, if you'd like to support Chronotif on Ko-fi. It's optional and doesn't unlock anything."
+    ]
+  },
   "stable": [
     {
       "version": "0.3.1",

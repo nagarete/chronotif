@@ -27,6 +27,7 @@ import android.util.TypedValue
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewGroup
 import android.view.WindowInsets
 import android.widget.FrameLayout
 import android.widget.ImageView
@@ -47,6 +48,7 @@ import app.chronotif.StatusBarSwipe
 import app.chronotif.Updater
 import app.chronotif.UsageData
 import app.chronotif.core.SettingMatch
+import app.chronotif.core.SupportAsk
 import kotlin.math.abs
 
 /**
@@ -73,6 +75,7 @@ class SetupActivity : Activity() {
         UPDATES(R.string.setup_updates, R.drawable.ic_section_updates),
         ABOUT(R.string.setup_about, R.drawable.ic_section_about),
         FEEDBACK(R.string.setup_feedback, R.drawable.ic_section_feedback),
+        SUPPORT(R.string.setup_support, R.drawable.ic_section_support),
     }
 
     /** The open section's page content. */
@@ -105,6 +108,8 @@ class SetupActivity : Activity() {
         /** Every field Usage data sends, for people using the app. */
         const val USAGE_DATA_DOC = "https://github.com/nagarete/chronotif/blob/main/docs/usage-data.md"
         const val NEW_ISSUE = "https://github.com/nagarete/chronotif/issues/new/choose"
+        // The Play build leaves this link and the Support sheet out (ADR 0021).
+        const val KOFI = "https://ko-fi.com/nagarete"
     }
 
     private var settled = false
@@ -201,6 +206,10 @@ class SetupActivity : Activity() {
         show(current)
         renderDrawer()
         applyExpanded(animate = false)
+        // A fresh open only: not a rotation or the theme's recreate, not mid-setup or mid-Tutorial.
+        if (savedInstanceState == null && !missingPermission() && Tutorial.run == null &&
+            SupportAsk.due(System.currentTimeMillis(), Prefs.supportSince, Prefs.supportShown, Prefs.supportTapped)
+        ) askSupport(root)
     }
 
     /** The Updates page follows the updater only while Settings is in front, so a download never holds its views. */
@@ -243,13 +252,14 @@ class SetupActivity : Activity() {
         updateBack()
     }
 
-    private fun backCloses() = searching || (!wide && expanded)
+    private fun backCloses() = supportSheet != null || searching || (!wide && expanded)
 
     /** Back stays in settings: it closes something, or it's the first of the two that leave. */
     private fun backStays() = backCloses() || !leaveArmed
 
     private fun back() {
         when {
+            supportSheet != null -> closeSupportSheet()
             searching -> closeSearch()
             !wide && expanded -> expand(false)
             else -> armLeave()
@@ -399,7 +409,7 @@ class SetupActivity : Activity() {
         val groups = listOf(
             null to listOf(Section.GENERAL, Section.TUTORIAL, Section.TIPS),
             R.string.settings_group_features to listOf(Section.PANEL, Section.HANDLE, Section.SWIPE, Section.LOCK, Section.SEARCH),
-            R.string.settings_group_app to listOf(Section.UPDATES, Section.ABOUT, Section.FEEDBACK),
+            R.string.settings_group_app to listOf(Section.UPDATES, Section.ABOUT, Section.FEEDBACK, Section.SUPPORT),
         )
         for ((title, sections) in groups) {
             if (title != null) {
@@ -523,6 +533,7 @@ class SetupActivity : Activity() {
             Section.UPDATES -> updates()
             Section.ABOUT -> about()
             Section.FEEDBACK -> FeedbackForm(this, c) { open(Intent(Intent.ACTION_VIEW, Uri.parse(NEW_ISSUE))) }.build(body)
+            Section.SUPPORT -> support()
         }
     }
 
@@ -1021,6 +1032,84 @@ class SetupActivity : Activity() {
             item(R.string.usage_data_whats_sent, getString(R.string.usage_data_whats_sent_desc)) { openWhatsSent() }
         }
         footnote(getString(R.string.version, BuildConfig.VERSION_NAME))
+    }
+
+    private fun support() {
+        group {
+            item(null, getString(R.string.support_body), content = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                addView(button(getString(R.string.support_kofi), filled = true) {
+                    Prefs.supportTapped = true
+                    if (!tryOpen(Intent(Intent.ACTION_VIEW, Uri.parse(KOFI)))) {
+                        android.widget.Toast.makeText(this@SetupActivity, R.string.link_open_failed, android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                }, Ui.lp(-2))
+            })
+        }
+        footnote(getString(R.string.support_note))
+    }
+
+    // --- Support sheet ---
+
+    private var supportSheet: View? = null
+
+    /**
+     * Asks, over Settings only, whether Chronotif is worth supporting. Support leads to its
+     * section; Not now, Back or a tap beside it just close it. Either way it counts as shown.
+     */
+    private fun askSupport(root: FrameLayout) {
+        Prefs.supportShown = System.currentTimeMillis()
+        val card = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(24), dp(24), dp(24), dp(16))
+            background = Ui.rounded(c.high, dp(28).toFloat())
+            // Taps on the card stay on it rather than closing the sheet.
+            isClickable = true
+            addView(text(getString(R.string.support_ask_title), 22f, weight = 500))
+            addView(text(getString(R.string.support_body), 14f, secondary = true), gap(12))
+            addView(LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.END or Gravity.CENTER_VERTICAL
+                addView(button(getString(R.string.support_ask_later), filled = false) { closeSupportSheet() }, Ui.lp(-2))
+                addView(button(getString(R.string.support_ask_go), filled = true) {
+                    Prefs.supportTapped = true
+                    closeSupportSheet()
+                    select(Section.SUPPORT)
+                }, Ui.lp(-2).apply { marginStart = dp(8) })
+            }, gap(20))
+        }
+        val sheet = FrameLayout(this).apply {
+            setBackgroundColor(0x52000000)
+            isClickable = true
+            setOnClickListener { closeSupportSheet() }
+            addView(card, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM).apply {
+                val side = if (wide) maxOf(dp(16), (resources.displayMetrics.widthPixels - dp(560)) / 2) else dp(12)
+                setMargins(side, 0, side, dp(12))
+            })
+            setOnApplyWindowInsetsListener { v, insets ->
+                val bars = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())
+                v.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+                insets
+            }
+        }
+        root.addView(sheet, FrameLayout.LayoutParams(-1, -1))
+        sheet.requestApplyInsets()
+        supportSheet = sheet
+        updateBack()
+        sheet.alpha = 0f
+        card.translationY = dp(48).toFloat()
+        sheet.animate().alpha(1f).setDuration(180).start()
+        card.animate().translationY(0f).setDuration(260)
+            .setInterpolator(android.view.animation.DecelerateInterpolator(2f)).start()
+    }
+
+    private fun closeSupportSheet() {
+        val sheet = supportSheet ?: return
+        supportSheet = null
+        updateBack()
+        sheet.animate().alpha(0f).setDuration(150).withEndAction {
+            (sheet.parent as? ViewGroup)?.removeView(sheet)
+        }.start()
     }
 
     /** The panel header's clock and date. Changes show the next time the panel opens. */
