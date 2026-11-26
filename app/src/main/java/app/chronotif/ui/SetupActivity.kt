@@ -471,6 +471,7 @@ class SetupActivity : Activity() {
         R.string.shape_tab to Prefs.SHAPE_TAB,
         R.string.shape_circle to Prefs.SHAPE_CIRCLE,
         R.string.shape_line to Prefs.SHAPE_LINE,
+        R.string.shape_button to Prefs.SHAPE_BUTTON,
     )
 
     private val engines = listOf(R.string.search_engine_google, R.string.search_engine_duckduckgo,

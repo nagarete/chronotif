@@ -17,6 +17,8 @@ object Prefs {
     const val SHAPE_CIRCLE = 3
     /** A thin line in a wider, unseen touch area. */
     const val SHAPE_LINE = 4
+    /** A rounded square with a ring inside, sitting whole just inside the edge. */
+    const val SHAPE_BUTTON = 5
     const val COLOUR_GREY = 0
     const val COLOUR_WHITE = 1
     const val COLOUR_BLACK = 2

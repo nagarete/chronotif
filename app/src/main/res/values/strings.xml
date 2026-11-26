@@ -345,6 +345,7 @@
     <string name="shape_tab">Tab</string>
     <string name="shape_circle">Circle</string>
     <string name="shape_line">Thin line</string>
+    <string name="shape_button">Button</string>
     <string name="handle_fill">Style</string>
     <string name="fill_frosted">Subtle</string>
     <string name="fill_solid">Bold</string>

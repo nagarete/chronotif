@@ -71,8 +71,15 @@ class EdgeHandle(service: Context) {
             Prefs.SHAPE_HALF_LARGE to (36 to 72),
             Prefs.SHAPE_CIRCLE to (44 to 44),
             Prefs.SHAPE_LINE to (24 to 110),
+            Prefs.SHAPE_BUTTON to (50 to 50),
         )
-        private const val CIRCLE_GAP_DP = 2
+
+        /** How far a shape that sits whole on the screen keeps from the edge, in dp. */
+        private fun gap(shape: Int) = when (shape) {
+            Prefs.SHAPE_CIRCLE -> 2
+            Prefs.SHAPE_BUTTON -> 4
+            else -> 0
+        }
 
         /** Width and height in dp of a handle of [shape]. */
         fun size(shape: Int): Pair<Int, Int> = SIZES[shape] ?: SIZES.getValue(Prefs.SHAPE_HALF_SMALL)
@@ -110,7 +117,7 @@ class EdgeHandle(service: Context) {
             return FrameLayout(context).apply {
                 addView(View(context).apply { setBackgroundColor(0x40808080) },
                     FrameLayout.LayoutParams(context.dp(2), -1, Gravity.END))
-                val gap = if (shape == Prefs.SHAPE_CIRCLE) context.dp(CIRCLE_GAP_DP) else 0
+                val gap = context.dp(gap(shape))
                 addView(handle, FrameLayout.LayoutParams(context.dp(w), context.dp(h), Gravity.END or Gravity.CENTER_VERTICAL).apply {
                     marginEnd = context.dp(2) + gap
                 })
@@ -179,7 +186,7 @@ class EdgeHandle(service: Context) {
         params.width = ctx.dp(w)
         params.height = ctx.dp(h)
         params.gravity = Gravity.TOP or if (Prefs.handleRight) Gravity.RIGHT else Gravity.LEFT
-        params.x = if (Prefs.handleShape == Prefs.SHAPE_CIRCLE) ctx.dp(CIRCLE_GAP_DP) else 0
+        params.x = ctx.dp(gap(Prefs.handleShape))
         params.y = ((screenH - params.height) * Prefs.handleY.coerceIn(0f, 1f)).toInt()
     }
 
@@ -295,6 +302,7 @@ class EdgeHandle(service: Context) {
             when (shape) {
                 Prefs.SHAPE_LINE -> drawLine(canvas)
                 Prefs.SHAPE_TAB -> drawTab(canvas)
+                Prefs.SHAPE_BUTTON -> drawButton(canvas)
                 else -> drawRing(canvas)
             }
         }
@@ -329,6 +337,31 @@ class EdgeHandle(service: Context) {
             val gw = context.dp(if (on) 6 else 5).toFloat()
             val gh = h * 0.5f
             canvas.drawRoundRect(cx - gw / 2, cy - gh / 2, cx + gw / 2, cy + gh / 2, gw / 2, gw / 2, fill)
+        }
+
+        /**
+         * A rounded square, darker than what's behind it (lighter when the handle's colour is
+         * dark), with a ring and a dot in the handle's colour: lit while anything is New, the bold
+         * style more opaque. Subtle with count puts the number inside the ring instead of the dot.
+         */
+        private fun drawButton(canvas: Canvas) {
+            val solid = look == Prefs.LOOK_SOLID
+            val w = width.toFloat()
+            val c = w / 2f
+            val dark = Color.luminance(tint(hue, 255)) < 0.2f
+            fill.color = tint(if (dark) 0xF2F2F7 else 0x1C1C1E, if (solid) 0xE0 else 0x8C)
+            val corner = w * 0.28f
+            tab.set(0f, 0f, w, height.toFloat())
+            canvas.drawRoundRect(tab, corner, corner, fill)
+            line.strokeWidth = context.dp(if (solid) 3 else 2).toFloat()
+            line.color = tint(hue, if (on) 255 else 0xB3)
+            canvas.drawCircle(c, c, w * 0.3f, line)
+            if (look == Prefs.LOOK_COUNT && newCount > 0) {
+                drawCount(canvas, c, c, tint(hue, 255))
+                return
+            }
+            fill.color = tint(hue, if (on) 255 else 0xD9)
+            canvas.drawCircle(c, c, w * 0.17f, fill)
         }
 
         /** A slim line, lit while anything is New. */
