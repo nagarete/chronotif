@@ -19,27 +19,28 @@ import android.view.Gravity
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.ViewConfiguration
-import app.chronotif.ui.SearchActivity
 import android.view.View
 import android.view.WindowInsets
 import android.view.WindowManager
 import android.widget.FrameLayout
-import app.chronotif.ui.Panel
+import app.chronotif.core.HandleAction
+import app.chronotif.core.HandleGesture
 import app.chronotif.ui.Ui
 import app.chronotif.ui.dp
 import kotlin.math.abs
 
 /**
  * An always-available handle on the screen edge, in the shape and style the user picks (a half
- * circle outline by default). Tap it, or swipe down or inward on it, to open the panel; hold it to open
- * Search. Hold it and drag to move it: it snaps to the nearer side at the height it's let go.
+ * circle outline by default). Each Handle gesture runs the action the user set for it (ADR 0022):
+ * by default a tap or a swipe down or inward opens the panel, and a hold opens Search. Hold it and
+ * drag to move it: it snaps to the nearer side at the height it's let go.
  * What's drawn spans the area that takes touches, so it's easy to hit and never catches a touch
  * where nothing shows, except the thin line, which sits in a wider touch area. It lights up
  * while anything is NEW, in the accent colour unless another (or none) is picked.
  *
  * It steps aside while a fullscreen app hides the status bar (the keyboard can't be followed: Android
  * tells only the app being typed in), and asks Android to keep the Back gesture off it. MIUI/HyperOS keep their own Back strip on the lower
- * part of the edges regardless, which takes inward swipes there; taps and downward swipes still
+ * part of the edges regardless, which takes inward swipes there; taps and up or down swipes still
  * reach the tab. Idle cost is one small window with no timers.
  */
 class EdgeHandle(service: Context) {
@@ -70,8 +71,15 @@ class EdgeHandle(service: Context) {
             Prefs.SHAPE_HALF_LARGE to (36 to 72),
             Prefs.SHAPE_CIRCLE to (44 to 44),
             Prefs.SHAPE_LINE to (24 to 110),
+            Prefs.SHAPE_BUTTON to (50 to 50),
         )
-        private const val CIRCLE_GAP_DP = 2
+
+        /** How far a shape that sits whole on the screen keeps from the edge, in dp. */
+        private fun gap(shape: Int) = when (shape) {
+            Prefs.SHAPE_CIRCLE -> 2
+            Prefs.SHAPE_BUTTON -> 4
+            else -> 0
+        }
 
         /** Width and height in dp of a handle of [shape]. */
         fun size(shape: Int): Pair<Int, Int> = SIZES[shape] ?: SIZES.getValue(Prefs.SHAPE_HALF_SMALL)
@@ -109,7 +117,7 @@ class EdgeHandle(service: Context) {
             return FrameLayout(context).apply {
                 addView(View(context).apply { setBackgroundColor(0x40808080) },
                     FrameLayout.LayoutParams(context.dp(2), -1, Gravity.END))
-                val gap = if (shape == Prefs.SHAPE_CIRCLE) context.dp(CIRCLE_GAP_DP) else 0
+                val gap = context.dp(gap(shape))
                 addView(handle, FrameLayout.LayoutParams(context.dp(w), context.dp(h), Gravity.END or Gravity.CENTER_VERTICAL).apply {
                     marginEnd = context.dp(2) + gap
                 })
@@ -178,7 +186,7 @@ class EdgeHandle(service: Context) {
         params.width = ctx.dp(w)
         params.height = ctx.dp(h)
         params.gravity = Gravity.TOP or if (Prefs.handleRight) Gravity.RIGHT else Gravity.LEFT
-        params.x = if (Prefs.handleShape == Prefs.SHAPE_CIRCLE) ctx.dp(CIRCLE_GAP_DP) else 0
+        params.x = ctx.dp(gap(Prefs.handleShape))
         params.y = ((screenH - params.height) * Prefs.handleY.coerceIn(0f, 1f)).toInt()
     }
 
@@ -266,7 +274,7 @@ class EdgeHandle(service: Context) {
         private val trigger = context.dp(22).toFloat()
         private val tab = RectF()
         private val slop = ViewConfiguration.get(context).scaledTouchSlop.toFloat()
-        /** Held past the long-press time: lifting opens Search, dragging moves the handle. */
+        /** Held past the long-press time: lifting runs the Hold action, dragging moves the handle. */
         private var held = false
         private var dragging = false
         private var downX = 0f
@@ -294,6 +302,7 @@ class EdgeHandle(service: Context) {
             when (shape) {
                 Prefs.SHAPE_LINE -> drawLine(canvas)
                 Prefs.SHAPE_TAB -> drawTab(canvas)
+                Prefs.SHAPE_BUTTON -> drawButton(canvas)
                 else -> drawRing(canvas)
             }
         }
@@ -328,6 +337,31 @@ class EdgeHandle(service: Context) {
             val gw = context.dp(if (on) 6 else 5).toFloat()
             val gh = h * 0.5f
             canvas.drawRoundRect(cx - gw / 2, cy - gh / 2, cx + gw / 2, cy + gh / 2, gw / 2, gw / 2, fill)
+        }
+
+        /**
+         * A rounded square, darker than what's behind it (lighter when the handle's colour is
+         * dark), with a ring and a dot in the handle's colour: lit while anything is New, the bold
+         * style more opaque. Subtle with count puts the number inside the ring instead of the dot.
+         */
+        private fun drawButton(canvas: Canvas) {
+            val solid = look == Prefs.LOOK_SOLID
+            val w = width.toFloat()
+            val c = w / 2f
+            val dark = Color.luminance(tint(hue, 255)) < 0.2f
+            fill.color = tint(if (dark) 0xF2F2F7 else 0x1C1C1E, if (solid) 0xE0 else 0x8C)
+            val corner = w * 0.28f
+            tab.set(0f, 0f, w, height.toFloat())
+            canvas.drawRoundRect(tab, corner, corner, fill)
+            line.strokeWidth = context.dp(if (solid) 3 else 2).toFloat()
+            line.color = tint(hue, if (on) 255 else 0xB3)
+            canvas.drawCircle(c, c, w * 0.3f, line)
+            if (look == Prefs.LOOK_COUNT && newCount > 0) {
+                drawCount(canvas, c, c, tint(hue, 255))
+                return
+            }
+            fill.color = tint(hue, if (on) 255 else 0xD9)
+            canvas.drawCircle(c, c, w * 0.17f, fill)
         }
 
         /** A slim line, lit while anything is New. */
@@ -386,6 +420,12 @@ class EdgeHandle(service: Context) {
                     fired = false
                     held = false
                     dragging = false
+                    // A tap waiting to see whether a second follows: this touch may be that second one.
+                    secondTap = tapPending
+                    if (tapPending) {
+                        removeCallbacks(singleTap)
+                        tapPending = false
+                    }
                     postDelayed(longPress, ViewConfiguration.getLongPressTimeout().toLong())
                 }
                 MotionEvent.ACTION_MOVE -> when {
@@ -395,17 +435,20 @@ class EdgeHandle(service: Context) {
                     }
                     !fired -> {
                         val dx = e.rawX - downX
-                        val inward = if (right) -dx else dx
-                        if (e.rawY - downY > trigger || inward > trigger) open()
-                        else if (abs(dx) > trigger || abs(e.rawY - downY) > trigger) removeCallbacks(longPress)
+                        val dy = e.rawY - downY
+                        if (abs(dx) >= trigger || abs(dy) >= trigger) {
+                            removeCallbacks(longPress)
+                            fired = true
+                            HandleGesture.swipe(dx, dy, right, trigger)?.let(::fire)
+                        }
                     }
                 }
                 MotionEvent.ACTION_UP -> {
                     removeCallbacks(longPress)
                     when {
                         dragging -> onDrop(e.rawX, e.rawY)
-                        held -> runCatching { SearchActivity.open(context) }
-                        !fired && abs(e.rawX - downX) < trigger && abs(e.rawY - downY) < trigger -> open()
+                        held -> fire(HandleGesture.HOLD, buzzed = true)
+                        !fired -> tap()
                     }
                 }
                 MotionEvent.ACTION_CANCEL -> {
@@ -416,9 +459,35 @@ class EdgeHandle(service: Context) {
             return true
         }
 
+        /** A tap's [singleTap] is posted, waiting for a second tap. */
+        private var tapPending = false
+        /** This touch came while a tap waited for a second one. */
+        private var secondTap = false
+
+        private val singleTap = Runnable {
+            tapPending = false
+            fire(HandleGesture.TAP)
+        }
+
         /**
-         * Held: the buzz says it can be moved now. Let go without moving and Search opens
-         * (ADR 0008); drag and the handle follows.
+         * A tap acts at once, unless Double-tap has an action: then it waits Android's double-tap
+         * timeout to see whether a second tap follows (ADR 0022).
+         */
+        private fun tap() {
+            when {
+                secondTap -> fire(HandleGesture.DOUBLE_TAP)
+                Prefs.handleAction(HandleGesture.DOUBLE_TAP) == HandleAction.NONE -> fire(HandleGesture.TAP)
+                else -> {
+                    tapPending = true
+                    postDelayed(singleTap, ViewConfiguration.getDoubleTapTimeout().toLong())
+                }
+            }
+            secondTap = false
+        }
+
+        /**
+         * Held: the buzz says it can be moved now. Let go without moving and the Hold action runs;
+         * drag and the handle follows.
          */
         private val longPress = Runnable {
             if (fired) return@Runnable
@@ -427,11 +496,11 @@ class EdgeHandle(service: Context) {
             performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
         }
 
-        private fun open() {
-            removeCallbacks(longPress)
-            fired = true
-            performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
-            runCatching { Panel.open(context) }
+        /** Runs [g]'s action, with a click unless it has none or the hold already buzzed. */
+        private fun fire(g: HandleGesture, buzzed: Boolean = false) {
+            if (Prefs.handleAction(g) == HandleAction.NONE) return
+            if (!buzzed) performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+            HandleActions.run(context, g)
         }
     }
 }

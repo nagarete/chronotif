@@ -30,22 +30,24 @@ import app.chronotif.Launchable
 import app.chronotif.Launchables
 import app.chronotif.R
 import app.chronotif.core.AppMatch
+import app.chronotif.core.HandleAction
 import app.chronotif.core.LockShortcut
 
 /**
- * What a Lock-screen shortcut slot is set to, picked on one bottom sheet: the built-in actions as
- * tiles with their icons, then every app with its icon, searchable. Picking either closes it.
- * [onPick] gets the kind, and for [LockShortcut.APP] the app.
+ * What a Lock-screen shortcut slot or a Handle gesture is set to, picked on one bottom sheet: the
+ * built-in actions as tiles with their icons, then every app with its icon, searchable. Picking
+ * either closes it. [onPick] gets the action, and for [HandleAction.APP] the app. A Lock-screen
+ * shortcut's choices are the [HandleAction]s with the same keys.
  */
 internal class ShortcutPicker(
     private val activity: Activity,
     private val c: M3,
     title: String,
-    choices: List<LockShortcut>,
-    private val current: LockShortcut,
+    choices: List<HandleAction>,
+    private val current: HandleAction,
     private val currentApp: String?,
     lens: Boolean,
-    private val onPick: (LockShortcut, Launchable?) -> Unit,
+    private val onPick: (HandleAction, Launchable?) -> Unit,
 ) {
     private val dialog = Dialog(activity)
     private val actions: View
@@ -77,7 +79,7 @@ internal class ShortcutPicker(
     }
 
     init {
-        actions = tiles(choices.filter { it != LockShortcut.APP }, lens)
+        actions = tiles(choices.filter { it != HandleAction.APP }, lens)
         search = EditText(activity).apply {
             background = null
             hint = activity.getString(R.string.lock_shortcut_search_apps)
@@ -105,7 +107,7 @@ internal class ShortcutPicker(
             clipToPadding = false
             setPadding(0, 0, 0, dp(12))
             adapter = rows
-            setOnItemClickListener { _, _, i, _ -> pick(LockShortcut.APP, shown[i]) }
+            setOnItemClickListener { _, _, i, _ -> pick(HandleAction.APP, shown[i]) }
         }
 
         val sheet = LinearLayout(activity).apply {
@@ -177,7 +179,7 @@ internal class ShortcutPicker(
         dialog.setOnDismissListener { hideKeyboard() }
 
         Launchables.load(activity) { all ->
-            val picked = if (current == LockShortcut.APP) Launchables.find(activity, currentApp) else null
+            val picked = if (current == HandleAction.APP) Launchables.find(activity, currentApp) else null
             // The app this slot opens now, then the ones that notified lately, then the rest.
             val first = listOfNotNull(picked?.let { p -> all.firstOrNull { same(it, p) } }) +
                 Launchables.suggestions(all).filter { s -> picked == null || !same(s, picked) }
@@ -191,9 +193,9 @@ internal class ShortcutPicker(
     private fun same(a: Launchable, b: Launchable) = a.component == b.component && a.user == b.user
 
     private fun isCurrent(a: Launchable): Boolean =
-        current == LockShortcut.APP && currentApp == Launchables.key(activity, a)
+        current == HandleAction.APP && currentApp == Launchables.key(activity, a)
 
-    private fun pick(kind: LockShortcut, app: Launchable?) {
+    private fun pick(kind: HandleAction, app: Launchable?) {
         dialog.dismiss()
         onPick(kind, app)
     }
@@ -249,7 +251,7 @@ internal class ShortcutPicker(
     }
 
     /** The built-in actions, three to a row, the one set now filled. */
-    private fun tiles(kinds: List<LockShortcut>, lens: Boolean): View {
+    private fun tiles(kinds: List<HandleAction>, lens: Boolean): View {
         val grid = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL }
         kinds.chunked(3).forEachIndexed { r, chunk ->
             val row = LinearLayout(activity).apply { orientation = LinearLayout.HORIZONTAL }
@@ -264,7 +266,7 @@ internal class ShortcutPicker(
         return grid
     }
 
-    private fun tile(kind: LockShortcut, lens: Boolean): View {
+    private fun tile(kind: HandleAction, lens: Boolean): View {
         val on = kind == current
         val fg = if (on) c.onPrimaryContainer else c.text
         return LinearLayout(activity).apply {
@@ -278,11 +280,11 @@ internal class ShortcutPicker(
                 imageTintList = ColorStateList.valueOf(fg)
                 scaleType = ImageView.ScaleType.FIT_CENTER
             }, LinearLayout.LayoutParams(dp(24), dp(24)))
-            addView(text(activity.getString(LockShortcuts.label(kind)), 13f, weight = 500, color = fg).apply {
+            addView(text(activity.getString(label(kind)), 13f, weight = 500, color = fg).apply {
                 gravity = Gravity.CENTER
                 maxLines = 2
             }, Ui.lp().apply { topMargin = dp(8) })
-            if (kind == LockShortcut.QR_SCANNER && !lens) {
+            if (kind == HandleAction.QR_SCANNER && !lens) {
                 addView(text(activity.getString(R.string.qr_tile_needs_lens), 11f, color = c.textSecondary).apply {
                     gravity = Gravity.CENTER
                 }, Ui.lp().apply { topMargin = dp(2) })
@@ -326,12 +328,26 @@ internal class ShortcutPicker(
     }
 
     companion object {
-        fun icon(kind: LockShortcut): Int? = when (kind) {
-            LockShortcut.NONE, LockShortcut.APP -> null
-            LockShortcut.FLASHLIGHT -> R.drawable.ic_flashlight
-            LockShortcut.CAMERA -> R.drawable.ic_camera
-            LockShortcut.QR_SCANNER -> R.drawable.ic_qr
-            LockShortcut.DO_NOT_DISTURB -> R.drawable.ic_dnd
+        fun icon(kind: HandleAction): Int? = when (kind) {
+            HandleAction.NONE, HandleAction.APP -> null
+            HandleAction.PANEL -> R.drawable.ic_section_panel
+            HandleAction.SEARCH -> R.drawable.ic_search
+            HandleAction.SLEEP -> R.drawable.ic_sleep
+            HandleAction.FLASHLIGHT -> R.drawable.ic_flashlight
+            HandleAction.CAMERA -> R.drawable.ic_camera
+            HandleAction.QR_SCANNER -> R.drawable.ic_qr
+            HandleAction.DO_NOT_DISTURB -> R.drawable.ic_dnd
         }
+
+        fun icon(kind: LockShortcut): Int? = icon(action(kind))
+
+        fun label(kind: HandleAction): Int = when (kind) {
+            HandleAction.PANEL -> R.string.handle_action_panel
+            HandleAction.SEARCH -> R.string.handle_action_search
+            HandleAction.SLEEP -> R.string.handle_action_sleep
+            else -> LockShortcuts.label(kind.shortcut ?: LockShortcut.NONE)
+        }
+
+        fun action(kind: LockShortcut): HandleAction = HandleAction.of(kind.key, HandleAction.NONE)
     }
 }

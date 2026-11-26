@@ -76,8 +76,20 @@ Opening the panel by swiping down on, or tapping, the notification side of the s
 _Avoid_: Top swipe, top-edge gesture
 
 **Edge handle**:
-A small handle on the side of the screen, in a shape and style the user picks, that works without the accessibility service. Tapping it or swiping down on it opens the Panel, and holding it opens Search. Unless the user turns it off, it is tinted while anything is New.
+A small handle on the side of the screen, in a shape and style the user picks, that works without the accessibility service. Each Handle gesture does the Handle action the user set for it; holding it and dragging moves it. Unless the user turns it off, it is tinted while anything is New.
 _Avoid_: Edge bar, sidebar, handle strip
+
+**Handle gesture**:
+One of the ways to touch the edge handle that the user can give an action: tap, double-tap, hold, swipe down, swipe up or swipe inward.
+_Avoid_: Trigger, binding, shortcut
+
+**Handle action**:
+What a Handle gesture does: open the Panel or Search, Sleep, one of the Lock-screen shortcut's actions, or nothing.
+_Avoid_: Shortcut, command, binding
+
+**Sleep**:
+The Handle action that turns the display off from whatever is on screen, ending the Wake session. Whether the phone then locks is the phone's own setting. Like the display timing out, it is not a check.
+_Avoid_: Lock, screen off
 
 **Search**:
 Opened by pulling down at the top of the Panel or the lock-screen view, or from Chronotif's handle, tile, widget or app shortcut. It finds and opens apps, contacts and calendar events, answers quick math and currency, and hands anything else to the web. It never searches notifications.
