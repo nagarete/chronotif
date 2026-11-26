@@ -34,7 +34,13 @@ enum class Handoff(val pkg: String) {
 
     /** Opens the app's search for [query]; false when the app took none of the ways in. */
     fun open(context: Context, query: String): Boolean = intents(query).any { intent ->
-        runCatching { context.startActivity(intent) }.isSuccess
+        val home = if (this == YOUTUBE_MUSIC) context.packageManager.getLaunchIntentForPackage(pkg) else null
+        // YouTube Music drops a search it gets from cold and only opens, so it starts first and
+        // the search lands on top of it, as Contacts opens a WhatsApp chat.
+        runCatching {
+            if (home != null) context.startActivities(arrayOf(home.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), intent))
+            else context.startActivity(intent)
+        }.isSuccess
     }
 
     private fun view(uri: String) = Intent(Intent.ACTION_VIEW, Uri.parse(uri))
