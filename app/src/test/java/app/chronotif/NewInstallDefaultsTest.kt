@@ -15,7 +15,7 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
-/** New installs get 0.2.7's defaults; an install from before keeps the ones it had (ADR 0015). */
+/** New installs get 0.2.7's and 0.3.3's defaults; an install from before keeps the ones it had (ADR 0015, ADR 0024). */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], application = Application::class)
 class NewInstallDefaultsTest {
@@ -39,6 +39,29 @@ class NewInstallDefaultsTest {
         Prefs.init(context)
         assertEquals(Prefs.LOCK_ALWAYS, Prefs.lockMode)
         assertTrue(Prefs.currencyRates)
+    }
+
+    @Test
+    fun aNewInstallTapsTheHandleForSearchAndHoldsItToSleep() {
+        Prefs.init(context)
+        assertEquals(app.chronotif.core.HandleAction.SEARCH, Prefs.handleAction(app.chronotif.core.HandleGesture.TAP))
+        assertEquals(app.chronotif.core.HandleAction.SLEEP, Prefs.handleAction(app.chronotif.core.HandleGesture.HOLD))
+        assertEquals(app.chronotif.core.HandleAction.PANEL, Prefs.handleAction(app.chronotif.core.HandleGesture.SWIPE_DOWN))
+        assertEquals(app.chronotif.core.HandleAction.SEARCH, Prefs.handleAction(app.chronotif.core.HandleGesture.SWIPE_INWARD))
+        // A second start, now with settings saved, doesn't take it for an old install.
+        Prefs.init(context)
+        assertEquals(app.chronotif.core.HandleAction.SEARCH, Prefs.handleAction(app.chronotif.core.HandleGesture.TAP))
+        assertEquals("And keeps 0.2.7's defaults too", Prefs.LOCK_ALWAYS, Prefs.lockMode)
+    }
+
+    @Test
+    fun anUpdatedInstallKeepsItsHandleGesturesExceptThoseItPicked() {
+        updatedFromAnOlderVersion()
+        saved.edit().putString("handle_gesture_hold", "sleep").commit()
+        Prefs.init(context)
+        assertEquals(app.chronotif.core.HandleAction.PANEL, Prefs.handleAction(app.chronotif.core.HandleGesture.TAP))
+        assertEquals(app.chronotif.core.HandleAction.PANEL, Prefs.handleAction(app.chronotif.core.HandleGesture.SWIPE_INWARD))
+        assertEquals("Its own pick stays", app.chronotif.core.HandleAction.SLEEP, Prefs.handleAction(app.chronotif.core.HandleGesture.HOLD))
     }
 
     @Test

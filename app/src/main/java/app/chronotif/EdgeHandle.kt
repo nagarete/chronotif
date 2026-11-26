@@ -32,7 +32,8 @@ import kotlin.math.abs
 /**
  * An always-available handle on the screen edge, in the shape and style the user picks (a half
  * circle outline by default). Each Handle gesture runs the action the user set for it (ADR 0022):
- * by default a tap or a swipe down or inward opens the panel, and a hold opens Search. Hold it and
+ * on a new install a tap or a swipe inward opens Search, a swipe down the panel, and a hold is
+ * Sleep (ADR 0024). Hold it and
  * drag to move it: it snaps to the nearer side at the height it's let go.
  * What's drawn spans the area that takes touches, so it's easy to hit and never catches a touch
  * where nothing shows, except the thin line, which sits in a wider touch area. It lights up
