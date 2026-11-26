@@ -148,6 +148,23 @@ class TutorialTest {
     }
 
     @Test
+    fun theHandleStepsNameTheGestureThatIsSet() {
+        val open = Tutorial.steps(Tutorial.Part.NOTIFICATIONS).first()
+        val search = Tutorial.steps(Tutorial.Part.SEARCH)[1]
+        assertTrue(open.body(context).startsWith(context.getString(R.string.handle_do_tap)))
+        assertTrue(search.body(context).contains(context.getString(R.string.handle_do_hold)))
+
+        Prefs.setHandleAction(app.chronotif.core.HandleGesture.TAP, app.chronotif.core.HandleAction.SEARCH, null)
+        Prefs.setHandleAction(app.chronotif.core.HandleGesture.HOLD, app.chronotif.core.HandleAction.SLEEP, null)
+        assertTrue(open.body(context).startsWith(context.getString(R.string.handle_do_swipe_down)))
+        assertTrue(search.body(context).contains(context.getString(R.string.handle_do_tap)))
+
+        app.chronotif.core.HandleGesture.entries.forEach { Prefs.setHandleAction(it, app.chronotif.core.HandleAction.NONE, null) }
+        assertEquals(context.getString(R.string.tutorial_open_none), open.body(context))
+        assertTrue("a way to Gestures", open.extras.any { it.label == R.string.tutorial_gestures && it.available(context) })
+    }
+
+    @Test
     fun aPartContinuesWhereItWasLeft() {
         Tutorial.start(context, part)
         Tutorial.next(context)

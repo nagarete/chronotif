@@ -19,27 +19,28 @@ import android.view.Gravity
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.ViewConfiguration
-import app.chronotif.ui.SearchActivity
 import android.view.View
 import android.view.WindowInsets
 import android.view.WindowManager
 import android.widget.FrameLayout
-import app.chronotif.ui.Panel
+import app.chronotif.core.HandleAction
+import app.chronotif.core.HandleGesture
 import app.chronotif.ui.Ui
 import app.chronotif.ui.dp
 import kotlin.math.abs
 
 /**
  * An always-available handle on the screen edge, in the shape and style the user picks (a half
- * circle outline by default). Tap it, or swipe down or inward on it, to open the panel; hold it to open
- * Search. Hold it and drag to move it: it snaps to the nearer side at the height it's let go.
+ * circle outline by default). Each Handle gesture runs the action the user set for it (ADR 0022):
+ * by default a tap or a swipe down or inward opens the panel, and a hold opens Search. Hold it and
+ * drag to move it: it snaps to the nearer side at the height it's let go.
  * What's drawn spans the area that takes touches, so it's easy to hit and never catches a touch
  * where nothing shows, except the thin line, which sits in a wider touch area. It lights up
  * while anything is NEW, in the accent colour unless another (or none) is picked.
  *
  * It steps aside while a fullscreen app hides the status bar (the keyboard can't be followed: Android
  * tells only the app being typed in), and asks Android to keep the Back gesture off it. MIUI/HyperOS keep their own Back strip on the lower
- * part of the edges regardless, which takes inward swipes there; taps and downward swipes still
+ * part of the edges regardless, which takes inward swipes there; taps and up or down swipes still
  * reach the tab. Idle cost is one small window with no timers.
  */
 class EdgeHandle(service: Context) {
@@ -266,7 +267,7 @@ class EdgeHandle(service: Context) {
         private val trigger = context.dp(22).toFloat()
         private val tab = RectF()
         private val slop = ViewConfiguration.get(context).scaledTouchSlop.toFloat()
-        /** Held past the long-press time: lifting opens Search, dragging moves the handle. */
+        /** Held past the long-press time: lifting runs the Hold action, dragging moves the handle. */
         private var held = false
         private var dragging = false
         private var downX = 0f
@@ -386,6 +387,12 @@ class EdgeHandle(service: Context) {
                     fired = false
                     held = false
                     dragging = false
+                    // A tap waiting to see whether a second follows: this touch may be that second one.
+                    secondTap = tapPending
+                    if (tapPending) {
+                        removeCallbacks(singleTap)
+                        tapPending = false
+                    }
                     postDelayed(longPress, ViewConfiguration.getLongPressTimeout().toLong())
                 }
                 MotionEvent.ACTION_MOVE -> when {
@@ -395,17 +402,20 @@ class EdgeHandle(service: Context) {
                     }
                     !fired -> {
                         val dx = e.rawX - downX
-                        val inward = if (right) -dx else dx
-                        if (e.rawY - downY > trigger || inward > trigger) open()
-                        else if (abs(dx) > trigger || abs(e.rawY - downY) > trigger) removeCallbacks(longPress)
+                        val dy = e.rawY - downY
+                        if (abs(dx) >= trigger || abs(dy) >= trigger) {
+                            removeCallbacks(longPress)
+                            fired = true
+                            HandleGesture.swipe(dx, dy, right, trigger)?.let(::fire)
+                        }
                     }
                 }
                 MotionEvent.ACTION_UP -> {
                     removeCallbacks(longPress)
                     when {
                         dragging -> onDrop(e.rawX, e.rawY)
-                        held -> runCatching { SearchActivity.open(context) }
-                        !fired && abs(e.rawX - downX) < trigger && abs(e.rawY - downY) < trigger -> open()
+                        held -> fire(HandleGesture.HOLD, buzzed = true)
+                        !fired -> tap()
                     }
                 }
                 MotionEvent.ACTION_CANCEL -> {
@@ -416,9 +426,35 @@ class EdgeHandle(service: Context) {
             return true
         }
 
+        /** A tap's [singleTap] is posted, waiting for a second tap. */
+        private var tapPending = false
+        /** This touch came while a tap waited for a second one. */
+        private var secondTap = false
+
+        private val singleTap = Runnable {
+            tapPending = false
+            fire(HandleGesture.TAP)
+        }
+
         /**
-         * Held: the buzz says it can be moved now. Let go without moving and Search opens
-         * (ADR 0008); drag and the handle follows.
+         * A tap acts at once, unless Double-tap has an action: then it waits Android's double-tap
+         * timeout to see whether a second tap follows (ADR 0022).
+         */
+        private fun tap() {
+            when {
+                secondTap -> fire(HandleGesture.DOUBLE_TAP)
+                Prefs.handleAction(HandleGesture.DOUBLE_TAP) == HandleAction.NONE -> fire(HandleGesture.TAP)
+                else -> {
+                    tapPending = true
+                    postDelayed(singleTap, ViewConfiguration.getDoubleTapTimeout().toLong())
+                }
+            }
+            secondTap = false
+        }
+
+        /**
+         * Held: the buzz says it can be moved now. Let go without moving and the Hold action runs;
+         * drag and the handle follows.
          */
         private val longPress = Runnable {
             if (fired) return@Runnable
@@ -427,11 +463,11 @@ class EdgeHandle(service: Context) {
             performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
         }
 
-        private fun open() {
-            removeCallbacks(longPress)
-            fired = true
-            performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
-            runCatching { Panel.open(context) }
+        /** Runs [g]'s action, with a click unless it has none or the hold already buzzed. */
+        private fun fire(g: HandleGesture, buzzed: Boolean = false) {
+            if (Prefs.handleAction(g) == HandleAction.NONE) return
+            if (!buzzed) performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+            HandleActions.run(context, g)
         }
     }
 }

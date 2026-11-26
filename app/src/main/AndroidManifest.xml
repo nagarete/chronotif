@@ -77,6 +77,16 @@
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode" />
 
         <activity
+            android:name=".ui.SleepActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:noHistory="true"
+            android:taskAffinity="${applicationId}.sleep"
+            android:theme="@style/Theme.Chronotif.Sleep"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode" />
+
+        <activity
             android:name=".ui.LockActivity"
             android:excludeFromRecents="true"
             android:exported="false"

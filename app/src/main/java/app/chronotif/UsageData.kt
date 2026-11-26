@@ -10,6 +10,7 @@ import android.os.Build
 import android.os.Process
 import android.provider.Settings
 import android.util.Log
+import app.chronotif.core.HandleGesture
 import app.chronotif.core.Usage
 import java.net.HttpURLConnection
 import java.net.URL
@@ -380,6 +381,8 @@ object UsageData {
         "set_handle_new_colour" to Prefs.handleNewColour,
         "set_handle_look" to Prefs.handleLook,
         "set_handle_hide_landscape" to Prefs.handleHideLandscape,
+        // What each edge-handle gesture does, as an action key; never which app.
+        *HandleGesture.entries.map { "set_handle_${it.key}" to Prefs.handleAction(it).key }.toTypedArray(),
         "set_lock_mode" to Prefs.lockMode,
         "set_lock_hide_content" to Prefs.lockHideContent,
         "set_lock_double_tap" to Prefs.lockDoubleTapSleep,

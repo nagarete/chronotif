@@ -7,6 +7,8 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import app.chronotif.TutorialSource.Event
+import app.chronotif.core.HandleAction
+import app.chronotif.core.HandleGesture
 import app.chronotif.ui.Panel
 
 /**
@@ -242,11 +244,36 @@ object Tutorial {
         ) {}
     }
 
+    /** The first edge-handle gesture set to [action], which a step names, or null when none is. */
+    private fun handleGesture(action: HandleAction): HandleGesture? =
+        HandleGesture.entries.firstOrNull { Prefs.handleAction(it) == action }
+
+    /** "Tap the edge handle" and the like, for a step's text. */
+    private fun doing(g: HandleGesture) = when (g) {
+        HandleGesture.TAP -> R.string.handle_do_tap
+        HandleGesture.DOUBLE_TAP -> R.string.handle_do_double_tap
+        HandleGesture.HOLD -> R.string.handle_do_hold
+        HandleGesture.SWIPE_DOWN -> R.string.handle_do_swipe_down
+        HandleGesture.SWIPE_UP -> R.string.handle_do_swipe_up
+        HandleGesture.SWIPE_INWARD -> R.string.handle_do_swipe_inward
+    }
+
+    /** Settings → Edge handle, offered by a step while no gesture does its [action]. */
+    private fun gestures(action: HandleAction) = Extra(R.string.tutorial_gestures, null, { handleGesture(action) == null }) { ctx ->
+        Prefs.settingsSection = "HANDLE"
+        ctx.startActivity(android.content.Intent(ctx, app.chronotif.ui.SetupActivity::class.java)
+            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+    }
+
     private val notificationSteps = listOf(
         Step(R.string.tutorial_open_title, { ctx ->
-            ctx.getString(if (Prefs.statusSwipeEnabled && StatusBarSwipe.isEnabled(ctx)) R.string.tutorial_open_body_swipe
-            else R.string.tutorial_open_body)
-        }, { _, e -> e == Event.PANEL_OPENED }, extras = listOf(panelTile)),
+            val swipe = Prefs.statusSwipeEnabled && StatusBarSwipe.isEnabled(ctx)
+            val gesture = handleGesture(HandleAction.PANEL)
+            when {
+                gesture == null -> ctx.getString(if (swipe) R.string.tutorial_open_none_swipe else R.string.tutorial_open_none)
+                else -> ctx.getString(if (swipe) R.string.tutorial_open_body_swipe else R.string.tutorial_open_body, ctx.getString(doing(gesture)))
+            }
+        }, { _, e -> e == Event.PANEL_OPENED }, extras = listOf(panelTile, gestures(HandleAction.PANEL))),
         Step(R.string.tutorial_check_title, { it.getString(R.string.tutorial_check_body) },
             { r, e -> e == Event.PANEL_OPENED && r.checked }),
         Step(R.string.tutorial_stack_title, { it.getString(R.string.tutorial_stack_body) },
@@ -263,7 +290,10 @@ object Tutorial {
 
     private val searchSteps = listOf(
         Step(R.string.tutorial_pull_title, { it.getString(R.string.tutorial_pull_body) }, { _, e -> e == Event.SEARCH }),
-        Step(R.string.tutorial_hold_title, { it.getString(R.string.tutorial_hold_body) }, { _, e -> e == Event.SEARCH_ELSEWHERE }),
+        Step(R.string.tutorial_hold_title, { ctx ->
+            handleGesture(HandleAction.SEARCH)?.let { ctx.getString(R.string.tutorial_hold_body, ctx.getString(doing(it))) }
+                ?: ctx.getString(R.string.tutorial_hold_none)
+        }, { _, e -> e == Event.SEARCH_ELSEWHERE }, extras = listOf(gestures(HandleAction.SEARCH))),
         Step(R.string.tutorial_answer_title, { it.getString(R.string.tutorial_answer_body) }, { _, e -> e == Event.ANSWER_SHOWN }),
         Step(R.string.tutorial_app_title, { it.getString(R.string.tutorial_app_body) }, { _, e -> e == Event.APP_TAPPED }),
         Step(R.string.tutorial_home_title, { it.getString(R.string.tutorial_home_body) },

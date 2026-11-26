@@ -9,14 +9,11 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.content.pm.ApplicationInfo
-import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.hardware.camera2.CameraManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
-import android.provider.MediaStore
 import android.view.View
 import android.widget.ImageView
 import android.widget.Toast
@@ -301,29 +298,9 @@ internal class LockShortcuts(
         })
     }
 
-    /**
-     * The phone's camera, in its secure mode while locked: it opens over the lock screen and shows
-     * only what it takes. With several camera apps and none set as the default, Android would show
-     * its chooser, which can't work over the lock screen; the phone's own camera opens instead, as
-     * from the stock lock screen.
-     */
     private fun camera() {
         val locked = activity.getSystemService(KeyguardManager::class.java).isKeyguardLocked
-        val action = if (locked) MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA_SECURE else MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA
-        val intent = Intent(action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        val pm = activity.packageManager
-        val all = pm.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY)
-        val default = pm.resolveActivity(intent, PackageManager.MATCH_DEFAULT_ONLY)?.activityInfo
-        val pick = all.firstOrNull { it.activityInfo.packageName == default?.packageName && it.activityInfo.name == default.name }
-            ?: all.firstOrNull { it.activityInfo.applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM != 0 }
-            ?: all.firstOrNull()
-        if (pick != null) intent.setClassName(pick.activityInfo.packageName, pick.activityInfo.name)
-        // MIUI Camera stays over the lock screen only when told it came from there, as its own
-        // lock screen tells it; without these it opens and the lock screen returns over it.
-        if (locked) intent.putExtra("ShowCameraWhenLocked", true).putExtra("StartActivityWhenLocked", true)
-            .putExtra("com.android.systemui.camera_launch_source", "lockscreen_affordance")
-        val started = runCatching { activity.startActivity(intent) }.isSuccess
-        if (!started) say(R.string.lock_shortcut_no_camera)
+        if (!app.chronotif.Camera.open(activity, locked)) say(R.string.lock_shortcut_no_camera)
     }
 
     private fun say(text: Int) = Toast.makeText(activity, text, Toast.LENGTH_SHORT).show()

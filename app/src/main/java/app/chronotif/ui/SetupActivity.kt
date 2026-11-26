@@ -765,6 +765,11 @@ class SetupActivity : Activity() {
                 applyHandle()
             }
         }
+        // What each Handle gesture does (ADR 0022).
+        group(R.string.handle_gestures) {
+            app.chronotif.core.HandleGesture.entries.forEach { gestureRow(it) }
+        }
+        footnote(getString(R.string.handle_gestures_desc))
         group(R.string.handle_look) {
             segmented(R.string.handle_side, listOf(getString(R.string.side_left), getString(R.string.side_right)),
                 if (Prefs.handleRight) 1 else 0) {
@@ -902,33 +907,69 @@ class SetupActivity : Activity() {
         }
     }
 
-    /** One corner's row: what it's set to, with its icon, and a sheet to change it. */
-    private fun slot(title: Int, left: Boolean, lens: Boolean) {
-        val kind = if (left) Prefs.lockShortcutLeft else Prefs.lockShortcutRight
-        val appKey = if (left) Prefs.lockShortcutLeftApp else Prefs.lockShortcutRightApp
-        val slotApp = if (kind == app.chronotif.core.LockShortcut.APP) app.chronotif.Launchables.find(this, appKey) else null
+    /** A Handle gesture's row: what it does, with its icon, and a sheet to change it. */
+    private fun gestureRow(g: app.chronotif.core.HandleGesture) {
+        val action = Prefs.handleAction(g)
+        val appKey = Prefs.handleActionApp(g)
+        val lens = app.chronotif.GoogleLens.installed(this)
+        // Tap waits to tell one tap from two only while Double-tap does something.
+        val desc = if (g == app.chronotif.core.HandleGesture.DOUBLE_TAP && action != app.chronotif.core.HandleAction.NONE)
+            getString(R.string.handle_double_tap_wait) else null
+        item(gestureTitle(g), desc, trailing = actionValue(action, appKey), onClick = {
+            ShortcutPicker(this, c, getString(gestureTitle(g)), app.chronotif.core.HandleAction.entries, action, appKey, lens) { picked, chosen ->
+                if (picked == app.chronotif.core.HandleAction.QR_SCANNER && !lens) {
+                    showLensMissing(this, unlockFirst = { it() })
+                    return@ShortcutPicker
+                }
+                Prefs.setHandleAction(g, picked, chosen?.let { app.chronotif.Launchables.key(this, it) })
+                reshow()
+            }.show()
+        })
+    }
+
+    private fun gestureTitle(g: app.chronotif.core.HandleGesture) = when (g) {
+        app.chronotif.core.HandleGesture.TAP -> R.string.handle_gesture_tap
+        app.chronotif.core.HandleGesture.DOUBLE_TAP -> R.string.handle_gesture_double_tap
+        app.chronotif.core.HandleGesture.HOLD -> R.string.handle_gesture_hold
+        app.chronotif.core.HandleGesture.SWIPE_DOWN -> R.string.handle_gesture_swipe_down
+        app.chronotif.core.HandleGesture.SWIPE_UP -> R.string.handle_gesture_swipe_up
+        app.chronotif.core.HandleGesture.SWIPE_INWARD -> R.string.handle_gesture_swipe_inward
+    }
+
+    /** What a gesture or corner is set to, for its row: the action's name and icon, or the app's. */
+    private fun actionValue(action: app.chronotif.core.HandleAction, appKey: String?): View {
+        val chosen = if (action == app.chronotif.core.HandleAction.APP) app.chronotif.Launchables.find(this, appKey) else null
         val now = when {
-            kind != app.chronotif.core.LockShortcut.APP -> getString(LockShortcuts.label(kind))
-            else -> slotApp?.label ?: getString(R.string.lock_shortcut_app_missing)
+            action != app.chronotif.core.HandleAction.APP -> getString(ShortcutPicker.label(action))
+            else -> chosen?.label ?: getString(R.string.lock_shortcut_app_missing)
         }
-        val value = LinearLayout(this).apply {
+        return LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             val icon = ImageView(context)
-            val res = ShortcutPicker.icon(kind)
+            val res = ShortcutPicker.icon(action)
             if (res != null) {
                 icon.setImageResource(res)
                 icon.imageTintList = ColorStateList.valueOf(c.textSecondary)
                 icon.setPadding(dp(2), dp(2), dp(2), dp(2))
-            } else if (slotApp != null) {
-                app.chronotif.Launchables.icon(context, slotApp) { icon.setImageDrawable(RoundedIcon(it)) }
+            } else if (chosen != null) {
+                app.chronotif.Launchables.icon(context, chosen) { icon.setImageDrawable(RoundedIcon(it)) }
             }
-            if (res != null || slotApp != null) addView(icon, LinearLayout.LayoutParams(dp(24), dp(24)).apply { marginEnd = dp(8) })
+            if (res != null || chosen != null) addView(icon, LinearLayout.LayoutParams(dp(24), dp(24)).apply { marginEnd = dp(8) })
             addView(text(now, 14f, secondary = true).apply { maxLines = 1 })
         }
+    }
+
+    /** One corner's row: what it's set to, with its icon, and a sheet to change it. */
+    private fun slot(title: Int, left: Boolean, lens: Boolean) {
+        val kind = if (left) Prefs.lockShortcutLeft else Prefs.lockShortcutRight
+        val appKey = if (left) Prefs.lockShortcutLeftApp else Prefs.lockShortcutRightApp
+        val value = actionValue(ShortcutPicker.action(kind), appKey)
         item(title, trailing = value, onClick = {
             val other = if (left) Prefs.lockShortcutRight else Prefs.lockShortcutLeft
-            ShortcutPicker(this, c, getString(title), app.chronotif.core.LockShortcut.choicesBeside(other), kind, appKey, lens) { picked, chosen ->
+            ShortcutPicker(this, c, getString(title), app.chronotif.core.LockShortcut.choicesBeside(other).map(ShortcutPicker::action),
+                ShortcutPicker.action(kind), appKey, lens) { action, chosen ->
+                val picked = app.chronotif.core.LockShortcut.of(action.key, app.chronotif.core.LockShortcut.NONE)
                 when {
                     picked == app.chronotif.core.LockShortcut.QR_SCANNER && !lens -> showLensMissing(this, unlockFirst = { it() })
                     chosen != null -> setSlot(left, picked, app.chronotif.Launchables.key(this, chosen))

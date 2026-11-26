@@ -30,6 +30,10 @@ object Usage {
         SEARCH_SETTING("search_setting"),
         SEARCH_WEB("search_web"),
         DOUBLE_TAP_SLEEP("double_tap_sleep"),
+        /** Sleep from an edge-handle gesture. */
+        HANDLE_SLEEP("handle_sleep"),
+        /** A Lock-screen shortcut's action from an edge-handle gesture; never which one or which app. */
+        HANDLE_SHORTCUT("handle_shortcut"),
         /** Lock-screen shortcuts used, by what they're set to; never which app. */
         SHORTCUT_FLASHLIGHT("shortcut_flashlight"),
         SHORTCUT_CAMERA("shortcut_camera"),

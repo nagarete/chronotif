@@ -54,6 +54,14 @@
 
     <section name="HANDLE">
         <setting title="@string/handle_enabled" summary="@string/handle_enabled_desc" keywords="@string/settings_keywords_handle_enabled" />
+        <group heading="@string/handle_gestures">
+            <setting title="@string/handle_gesture_tap" keywords="@string/settings_keywords_handle_gesture" />
+            <setting title="@string/handle_gesture_double_tap" keywords="@string/settings_keywords_handle_gesture" />
+            <setting title="@string/handle_gesture_hold" keywords="@string/settings_keywords_handle_gesture" />
+            <setting title="@string/handle_gesture_swipe_down" keywords="@string/settings_keywords_handle_gesture" />
+            <setting title="@string/handle_gesture_swipe_up" keywords="@string/settings_keywords_handle_gesture" />
+            <setting title="@string/handle_gesture_swipe_inward" keywords="@string/settings_keywords_handle_gesture" />
+        </group>
         <group heading="@string/handle_look">
             <setting title="@string/handle_side" />
             <setting title="@string/handle_shape" />

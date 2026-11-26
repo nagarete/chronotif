@@ -198,6 +198,17 @@ object Prefs {
         get() = sp.getInt("handle_look", LOOK_FROSTED)
         set(v) = sp.edit().putInt("handle_look", v).apply()
 
+    /** What each Handle gesture does (ADR 0022); unset, what it did before the gestures could be picked. */
+    fun handleAction(g: app.chronotif.core.HandleGesture): app.chronotif.core.HandleAction =
+        app.chronotif.core.HandleAction.of(sp.getString("handle_gesture_${g.key}", null), g.default)
+
+    /** The app a gesture set to An app opens, as [Launchables.key]; never sent anywhere. */
+    fun handleActionApp(g: app.chronotif.core.HandleGesture): String? = sp.getString("handle_gesture_${g.key}_app", null)
+
+    fun setHandleAction(g: app.chronotif.core.HandleGesture, action: app.chronotif.core.HandleAction, appKey: String?) {
+        sp.edit().putString("handle_gesture_${g.key}", action.key).putString("handle_gesture_${g.key}_app", appKey).apply()
+    }
+
     var handleHideLandscape: Boolean
         get() = sp.getBoolean("handle_hide_landscape", true)
         set(v) = sp.edit().putBoolean("handle_hide_landscape", v).apply()

@@ -5,12 +5,15 @@ package app.chronotif
 import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ApplicationInfo
+import android.content.pm.PackageManager
 import android.hardware.camera2.CameraAccessException
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
+import android.provider.MediaStore
 import android.provider.Settings
 
-/** The flashlight, for its Lock-screen shortcut: the back camera's torch, as the system tile uses. */
+/** The flashlight, for its Lock-screen shortcut and Handle action: the back camera's torch, as the system tile uses. */
 object Torch {
     /** The camera whose torch is the flashlight, or null on a phone without one. */
     fun cameraId(context: Context): String? {
@@ -37,7 +40,7 @@ object Torch {
 }
 
 /**
- * Do Not Disturb, for its Lock-screen shortcut. Android lets an app with Do Not Disturb access turn
+ * Do Not Disturb, for its Lock-screen shortcut and Handle action. Android lets an app with Do Not Disturb access turn
  * it on: only priority interruptions get through, with no end time.
  *
  * From Android 15, an app that targets it can't change the phone's own Do Not Disturb. Its calls
@@ -94,4 +97,30 @@ object QuietMode {
 object Haptics {
     fun on(context: Context): Boolean =
         android.provider.Settings.System.getInt(context.contentResolver, android.provider.Settings.System.HAPTIC_FEEDBACK_ENABLED, 1) != 0
+}
+
+/** The camera, for its Lock-screen shortcut and Handle action. */
+object Camera {
+    /**
+     * Opens the phone's camera, in its secure mode while [locked]: it opens over the lock screen and
+     * shows only what it takes. With several camera apps and none set as the default, Android would
+     * show its chooser, which can't work over the lock screen; the phone's own camera opens instead,
+     * as from the stock lock screen. False when no camera would start.
+     */
+    fun open(context: Context, locked: Boolean): Boolean {
+        val action = if (locked) MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA_SECURE else MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA
+        val intent = Intent(action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val pm = context.packageManager
+        val all = pm.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY)
+        val default = pm.resolveActivity(intent, PackageManager.MATCH_DEFAULT_ONLY)?.activityInfo
+        val pick = all.firstOrNull { it.activityInfo.packageName == default?.packageName && it.activityInfo.name == default.name }
+            ?: all.firstOrNull { it.activityInfo.applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM != 0 }
+            ?: all.firstOrNull()
+        if (pick != null) intent.setClassName(pick.activityInfo.packageName, pick.activityInfo.name)
+        // MIUI Camera stays over the lock screen only when told it came from there, as its own
+        // lock screen tells it; without these it opens and the lock screen returns over it.
+        if (locked) intent.putExtra("ShowCameraWhenLocked", true).putExtra("StartActivityWhenLocked", true)
+            .putExtra("com.android.systemui.camera_launch_source", "lockscreen_affordance")
+        return runCatching { context.startActivity(intent) }.isSuccess
+    }
 }
