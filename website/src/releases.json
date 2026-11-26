@@ -1,12 +1,12 @@
 {
   "next": {
     "version": "0.3.3",
-    "headline": "Search finds your files, sets timers and alarms, and hands off to the Play Store, Maps, Spotify and YouTube Music.",
+    "headline": "Search finds your files, sets timers and alarms, and hands off to the Play Store, Maps, YouTube, Spotify and YouTube Music.",
     "notes": [
       "Search finds files by name: documents and downloads, photos, videos, and songs by title, artist or album, newest first. Turn on Find files under Settings → Search and allow All files access. Files are looked up on the phone and never kept.",
       "Type timer 10 min or alarm 6:30 in Search and tap the card: the clock app sets it without opening, even on the lock screen. Indonesian works too: timer 5 menit, alarm jam 7 malam.",
       "Type a phone number that isn't in your contacts to call it, text it or open it in WhatsApp.",
-      "Under the web row, search the Play Store, Maps, Spotify or YouTube Music for what you typed, if they're installed."
+      "Under the web row, search the Play Store, Maps, YouTube, Spotify or YouTube Music for what you typed, if they're installed."
     ]
   },
   "stable": [

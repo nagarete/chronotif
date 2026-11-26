@@ -737,7 +737,7 @@ class SearchOverlay private constructor(
         }
     }
 
-    /** Under the web row: the same query in the Play Store, Maps, Spotify and YouTube Music, for those installed. */
+    /** Under the web row: the same query in the Play Store, Maps, YouTube, Spotify and YouTube Music, for those installed. */
     private fun handoffRows(query: String): List<View> = Handoff.entries.mapNotNull { h ->
         val app = apps.firstOrNull { it.mine && it.component.packageName == h.pkg } ?: return@mapNotNull null
         LinearLayout(context).apply {

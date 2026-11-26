@@ -8,12 +8,13 @@ import android.content.Intent
 import android.net.Uri
 
 /**
- * The rows under Search's web row (ADR 0023): the same query handed to an app's own search. A
+ * The rows under Search's web row (ADR 0023), in this order: the same query handed to an app's own search. A
  * row shows only while its app is installed, and Chronotif sends nothing itself.
  */
 enum class Handoff(val pkg: String) {
     PLAY_STORE("com.android.vending"),
     MAPS("com.google.android.apps.maps"),
+    YOUTUBE("com.google.android.youtube"),
     SPOTIFY("com.spotify.music"),
     YOUTUBE_MUSIC("com.google.android.apps.youtube.music");
 
@@ -24,6 +25,10 @@ enum class Handoff(val pkg: String) {
             PLAY_STORE -> listOf(view("market://search?q=$q&c=apps"))
             MAPS -> listOf(view("geo:0,0?q=$q"))
             // Spotify's documented search link.
+            YOUTUBE -> listOf(
+                Intent(Intent.ACTION_SEARCH).putExtra(SearchManager.QUERY, query.trim()),
+                view("https://www.youtube.com/results?search_query=$q"),
+            )
             SPOTIFY -> listOf(view("spotify:search:$q"))
             YOUTUBE_MUSIC -> listOf(
                 Intent(Intent.ACTION_SEARCH).putExtra(SearchManager.QUERY, query.trim()),
@@ -34,9 +39,9 @@ enum class Handoff(val pkg: String) {
 
     /** Opens the app's search for [query]; false when the app took none of the ways in. */
     fun open(context: Context, query: String): Boolean = intents(query).any { intent ->
-        val home = if (this == YOUTUBE_MUSIC) context.packageManager.getLaunchIntentForPackage(pkg) else null
+        val home = if (this == YOUTUBE_MUSIC || this == YOUTUBE) context.packageManager.getLaunchIntentForPackage(pkg) else null
         // YouTube Music drops a search it gets from cold and only opens, so it starts first and
-        // the search lands on top of it, as Contacts opens a WhatsApp chat.
+        // the search lands on top of it, as Contacts opens a WhatsApp chat. YouTube is started the same way.
         runCatching {
             if (home != null) context.startActivities(arrayOf(home.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), intent))
             else context.startActivity(intent)

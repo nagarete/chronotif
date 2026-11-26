@@ -30,7 +30,7 @@ object Usage {
         SEARCH_SETTING("search_setting"),
         SEARCH_WEB("search_web"),
         SEARCH_FILE("search_file"),
-        /** A hand-off row: the Play Store, Maps, Spotify or YouTube Music, never which. */
+        /** A hand-off row: the Play Store, Maps, YouTube, Spotify or YouTube Music, never which. */
         SEARCH_HANDOFF("search_handoff"),
         /** A typed phone number called or messaged. */
         SEARCH_NUMBER("search_number"),

@@ -407,7 +407,7 @@
     <string name="search_can_number">Phone numbers</string>
     <string name="search_can_number_desc">Type a number that isn\'t saved to call it, text it or open it in WhatsApp.</string>
     <string name="search_can_handoff">Other apps\' search</string>
-    <string name="search_can_handoff_desc">Under the web row, search the Play Store, Maps, Spotify or YouTube Music for what you typed, if they\'re installed.</string>
+    <string name="search_can_handoff_desc">Under the web row, search the Play Store, Maps, YouTube, Spotify or YouTube Music for what you typed, if they\'re installed.</string>
     <string name="search_can_web">The web</string>
     <string name="search_can_web_desc">Anything else opens in your browser with the engine below.</string>
     <string name="search_can_private">Search never looks through your notifications, and nothing you type leaves the phone unless you tap the web row or hand it to another app. Tapping an answer copies it.</string>
@@ -462,7 +462,7 @@
     <string name="search_find_calendar_desc">Search lists matching events from the past month to a year ahead. Events are read only on this phone. They show while it\'s locked, unless the lock screen hides sensitive content.</string>
     <string name="search_find_files">Find files</string>
     <string name="settings_keywords_search_find_files">documents pdf downloads photos videos music songs storage all files access</string>
-    <string name="settings_keywords_search_can_handoff">play store maps spotify youtube music</string>
+    <string name="settings_keywords_search_can_handoff">play store maps youtube spotify music</string>
     <string name="search_find_files_desc">Search lists matching files by name: documents, downloads, photos, videos and music, newest first. Chronotif needs All files access to see documents. Files are looked up only on this phone and never kept. They show while it\'s locked, unless the lock screen hides sensitive content.</string>
     <string name="search_find_files_media_desc">Search lists matching photos, videos and music by name, newest first. This version of Chronotif can\'t see documents. Files are looked up only on this phone and never kept. They show while it\'s locked, unless the lock screen hides sensitive content.</string>
     <string name="search_setup_files_desc">Find documents, downloads, photos and music by name.</string>
