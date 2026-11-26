@@ -348,6 +348,11 @@ object Prefs {
         get() = sp.getBoolean("search_calendar", false)
         set(v) = sp.edit().putBoolean("search_calendar", v).apply()
 
+    /** Search finds Files. Off until turned on, which asks for All files access or the media permissions (ADR 0023). */
+    var searchFiles: Boolean
+        get() = sp.getBoolean("search_files", false)
+        set(v) = sp.edit().putBoolean("search_files", v).apply()
+
     /** The Tutorial part and step the user left at, as "PART:step", or null. */
     var tutorialPlace: String?
         get() = sp.getString("tutorial_place", null)

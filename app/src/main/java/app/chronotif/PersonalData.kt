@@ -258,6 +258,30 @@ object PersonalData {
         }.isSuccess || start(context, open)
     }
 
+    // --- A typed number (ADR 0023), which needs no permission to read.
+
+    /** As a contact's call button: a phone call with *Call from Search* on, otherwise the dialer. */
+    fun callNumber(context: Context, number: String) = start(context,
+        Intent(if (callsOn(context)) Intent.ACTION_CALL else Intent.ACTION_DIAL, Uri.fromParts("tel", number, null)))
+
+    fun messageNumber(context: Context, number: String) = start(context,
+        Intent(Intent.ACTION_SENDTO, Uri.fromParts("smsto", number, null)))
+
+    /**
+     * WhatsApp's chat link wants the international form, so a number typed without its country
+     * code gets the phone's, as the dialer would read it.
+     */
+    fun whatsAppNumber(context: Context, number: String, app: String): Boolean {
+        val international = phoneCountries(context).firstNotNullOfOrNull {
+            android.telephony.PhoneNumberUtils.formatNumberToE164(number, it.uppercase())
+        } ?: number.takeIf { it.startsWith('+') } ?: return false
+        return start(context,
+            Intent(Intent.ACTION_VIEW, Uri.parse("https://api.whatsapp.com/send?phone=${international.trimStart('+')}")).setPackage(app))
+    }
+
+    /** WhatsApp first, then WhatsApp Business: which one a typed number opens in. */
+    val whatsAppPackages get() = WHATSAPP_APPS
+
     fun openEvent(context: Context, event: CalendarEvent) = start(context,
         Intent(Intent.ACTION_VIEW, ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, event.id))
             .putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, event.begin)

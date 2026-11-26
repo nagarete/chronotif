@@ -1011,6 +1011,7 @@ class SetupActivity : Activity() {
             }
             permissionToggle(R.string.search_find_calendar, R.string.search_find_calendar_desc,
                 android.Manifest.permission.READ_CALENDAR, { Prefs.searchCalendar }) { Prefs.searchCalendar = it }
+            filesToggle()
         }
         // The settings first; what Search can do is reference, below them.
         group(R.string.search_can_do) {
@@ -1022,8 +1023,12 @@ class SetupActivity : Activity() {
                 R.string.search_can_currency to R.string.search_can_currency_desc,
                 R.string.search_can_contacts to R.string.search_can_contacts_desc,
                 R.string.search_can_calendar to R.string.search_can_calendar_desc,
+                R.string.search_can_files to R.string.search_can_files_desc,
+                R.string.search_can_clock to R.string.search_can_clock_desc,
+                R.string.search_can_number to R.string.search_can_number_desc,
                 R.string.search_can_settings to R.string.search_can_settings_desc,
                 R.string.search_can_web to R.string.search_can_web_desc,
+                R.string.search_can_handoff to R.string.search_can_handoff_desc,
             ).forEach { (title, desc) -> item(title, getString(desc)) }
         }
         footnote(getString(R.string.search_can_private))
@@ -1528,6 +1533,7 @@ class SetupActivity : Activity() {
             R.string.search_calls -> onOff(Prefs.searchCalls && granted(android.Manifest.permission.CALL_PHONE))
             R.string.search_currency_rates -> onOff(Prefs.currencyRates)
             R.string.search_find_calendar -> onOff(Prefs.searchCalendar && granted(android.Manifest.permission.READ_CALENDAR))
+            R.string.search_find_files -> onOff(app.chronotif.Files.on(this))
             R.string.update_channel_label -> getString(if (Prefs.nightlyUpdates) R.string.update_nightly else R.string.update_stable)
             R.string.update_auto -> onOff(Prefs.autoUpdate)
             R.string.usage_data -> onOff(Prefs.usageData)
@@ -1789,6 +1795,9 @@ class SetupActivity : Activity() {
             })
             searchStep(SearchSetup.Step.CALENDAR, R.string.search_setup_calendar_desc, R.string.allow,
                 permissionRequest(android.Manifest.permission.READ_CALENDAR) { Prefs.searchCalendar = it })
+            searchStep(SearchSetup.Step.FILES,
+                if (app.chronotif.Files.allFilesBuild(this)) R.string.search_setup_files_desc else R.string.search_setup_files_media_desc,
+                R.string.allow, askFiles)
             searchStep(SearchSetup.Step.WIDGET, R.string.search_setup_widget_desc, R.string.add, ::addSearchWidget,
                 hint = { getString(R.string.search_setup_widget_manual).takeUnless { canPinWidget() } })
             searchStep(SearchSetup.Step.TILE, R.string.search_setup_tile_desc, R.string.add, ::addSearchTile,
@@ -1909,10 +1918,44 @@ class SetupActivity : Activity() {
         }
     }
 
+    /**
+     * Turns on Files (ADR 0023). All files access isn't a permission Android asks about: it's a
+     * page in Android's settings, so the switch is set first and shows on once the user is back
+     * with it allowed. A build without it asks for the media permissions instead.
+     */
+    private val askFiles: () -> Unit by lazy {
+        val media = app.chronotif.Files.mediaPermissions(this)
+        val code = REQUEST_SEARCH_PERMISSION + pendingPermission.size
+        pendingPermission[code] = { granted -> Prefs.searchFiles = granted || app.chronotif.Files.allowed(this) }
+        val ask: () -> Unit = {
+            when {
+                app.chronotif.Files.allowed(this) -> {
+                    Prefs.searchFiles = true
+                    refreshAll()
+                }
+                app.chronotif.Files.allFilesBuild(this) -> {
+                    Prefs.searchFiles = true
+                    android.widget.Toast.makeText(this, R.string.search_files_page, android.widget.Toast.LENGTH_LONG).show()
+                    open(app.chronotif.Files.allFilesPage(this))
+                }
+                media.isNotEmpty() -> requestPermissions(media, code)
+            }
+        }
+        ask
+    }
+
+    private fun filesToggle() {
+        val desc = if (app.chronotif.Files.allFilesBuild(this)) R.string.search_find_files_desc else R.string.search_find_files_media_desc
+        toggle(R.string.search_find_files, desc, { app.chronotif.Files.on(this) }) { on ->
+            if (!on) Prefs.searchFiles = false else askFiles()
+        }
+    }
+
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         val answer = pendingPermission[requestCode] ?: return
-        val granted = grantResults.firstOrNull() == android.content.pm.PackageManager.PERMISSION_GRANTED
+        // Files asks for photos, videos and music at once; any one of them is enough.
+        val granted = grantResults.any { it == android.content.pm.PackageManager.PERMISSION_GRANTED }
         answer(granted)
         refreshAll()
         if (!granted && permissions.firstOrNull()?.let(::shouldShowRequestPermissionRationale) == false) {

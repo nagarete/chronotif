@@ -2,20 +2,25 @@
 
 package app.chronotif.core
 
-/** Search's answer card (ADR 0008): at most one answer per query, checked in this order. */
+/** Search's answer card (ADR 0008, ADR 0023): at most one answer per query, checked in this order. */
 sealed interface Answer {
     data class Math(val value: Double) : Answer
     data class Converted(val conversion: Units.Conversion) : Answer
     data class Time(val place: WorldClock.Place) : Answer
     /** Converted once rates are at hand; see [app.chronotif.ExchangeRates]. */
     data class Currency(val query: app.chronotif.core.Money.Query) : Answer
+    /** A timer or alarm to set, which only a tap or Go does. */
+    data class Clock(val command: ClockCommand) : Answer
 
     companion object {
         fun of(query: String, numbers: Numbers): Answer? {
             if (query.isBlank()) return null
+            ClockCommand.parse(query)?.let { return Clock(it) }
             WorldClock.place(query)?.let { return Time(it) }
             Money.parse(query, numbers)?.let { return Currency(it) }
             Units.convert(query, numbers)?.let { return Converted(it) }
+            // "0812-3456-7890" is a phone number, not a sum.
+            if (TypedNumber.of(query) != null) return null
             Calc.evaluate(query, numbers)?.let { return Math(it) }
             return null
         }

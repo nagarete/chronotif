@@ -20,6 +20,8 @@ class Launchable(val label: String, internal val info: LauncherActivityInfo) {
     val user: UserHandle get() = info.user
     /** Same form as [Entry.appId], so suggestions can be matched to notifications. */
     val appId = "${info.componentName.packageName}|${info.user.hashCode()}"
+    /** In the profile Chronotif runs in, not a work profile or dual copy. */
+    val mine: Boolean get() = info.user == android.os.Process.myUserHandle()
 }
 
 /**

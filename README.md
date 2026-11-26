@@ -144,8 +144,10 @@ of your last check, and when each of the last few apps notified (for Search's
 suggestions, never what they said), and Usage data waiting to be sent, with backups disabled. The lock-screen view follows Android's
 notification privacy settings. Replies and buttons that work in the background run while locked,
 unless the app asks for an unlock; opening an app always asks to unlock first. If you turn them on
-for Search, contacts and calendar events are read on the device when you search and never stored.
-They show while locked unless the lock screen hides sensitive content. Calling
+for Search, contacts and calendar events are read on the device when you search and never stored,
+and files are looked up by name in Android's own index, using All files access (in the Play build,
+the photo, video and music permissions). They show while locked unless the lock screen hides
+sensitive content. Calling
 from Search, also off by default, uses the phone-call permission only when you tap a call button.
 
 The optional status-bar swipe uses an accessibility service to place a touch area over the left

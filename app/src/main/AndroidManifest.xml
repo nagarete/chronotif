@@ -30,6 +30,19 @@
          in Settings → Search is turned on, and read only on the phone. -->
     <uses-permission android:name="android.permission.READ_CONTACTS" />
     <uses-permission android:name="android.permission.READ_CALENDAR" />
+    <!-- Search's Files (ADR 0023), each asked for only when Find files is turned on in
+         Settings → Search, and read only on the phone. All files access lets it find documents;
+         the Play build removes it and asks for the media permissions instead. -->
+    <uses-permission
+        android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
+        tools:ignore="ScopedStorage" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
     <!-- Search's call buttons, only after "Call from Search" is turned on: WhatsApp starts a call
          only for an app holding this. Phones without telephony can still install Chronotif. -->
     <uses-permission android:name="android.permission.CALL_PHONE" />

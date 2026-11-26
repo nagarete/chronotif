@@ -29,6 +29,13 @@ object Usage {
         SEARCH_CALENDAR("search_calendar"),
         SEARCH_SETTING("search_setting"),
         SEARCH_WEB("search_web"),
+        SEARCH_FILE("search_file"),
+        /** A hand-off row: the Play Store, Maps, YouTube, Spotify or YouTube Music, never which. */
+        SEARCH_HANDOFF("search_handoff"),
+        /** A typed phone number called or messaged. */
+        SEARCH_NUMBER("search_number"),
+        /** A timer started or an alarm set from Search. */
+        SEARCH_CLOCK("search_clock"),
         DOUBLE_TAP_SLEEP("double_tap_sleep"),
         /** Sleep from an edge-handle gesture. */
         HANDLE_SLEEP("handle_sleep"),

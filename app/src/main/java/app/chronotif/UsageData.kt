@@ -401,6 +401,7 @@ object UsageData {
         "set_pull_down_search" to Prefs.pullDownSearch,
         "set_search_engine" to Prefs.searchEngine,
         "set_search_contacts" to Prefs.searchContacts,
+        "set_search_files" to Prefs.searchFiles,
         "set_search_calls" to Prefs.searchCalls,
         "set_search_calendar" to Prefs.searchCalendar,
         "set_currency_rates" to Prefs.currencyRates,

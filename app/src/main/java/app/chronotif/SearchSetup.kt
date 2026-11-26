@@ -21,6 +21,7 @@ object SearchSetup {
         CALLS,
         CURRENCY,
         CALENDAR,
+        FILES,
         WIDGET,
         TILE(counted = false),
     }
@@ -33,6 +34,7 @@ object SearchSetup {
         Step.CALLS -> Prefs.searchCalls && granted(ctx, Manifest.permission.CALL_PHONE)
         Step.CURRENCY -> Prefs.currencyRates
         Step.CALENDAR -> Prefs.searchCalendar && granted(ctx, Manifest.permission.READ_CALENDAR)
+        Step.FILES -> Files.on(ctx)
         Step.WIDGET -> widgetPlaced(ctx)
         Step.TILE -> Prefs.searchTileAdded
     }
@@ -67,6 +69,7 @@ object SearchSetup {
         Step.CALLS -> R.string.search_calls
         Step.CURRENCY -> R.string.search_currency_rates
         Step.CALENDAR -> R.string.search_find_calendar
+        Step.FILES -> R.string.search_find_files
         Step.WIDGET -> R.string.search_setup_widget
         Step.TILE -> R.string.search_setup_tile
     }
