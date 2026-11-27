@@ -7,7 +7,8 @@
       "Type timer 10 min or alarm 6:30 in Search and tap the card: the clock app sets it without opening, even on the lock screen. Indonesian works too: timer 5 menit, alarm jam 7 malam.",
       "Type a phone number that isn't in your contacts to call it, text it or open it in WhatsApp.",
       "Under the web row, search the Play Store, Maps, YouTube, Spotify or YouTube Music for what you typed, if they're installed.",
-      "New installs get a new edge handle setup: tap it or swipe inward for Search, swipe down for the panel, and hold it to turn the screen off. If you're updating, your handle works as before; pick the new setup under Settings → Edge handle → Gestures."
+      "New installs get a new edge handle setup: tap it or swipe inward for Search, swipe down for the panel, and hold it to turn the screen off. If you're updating, your handle works as before; pick the new setup under Settings → Edge handle → Gestures.",
+      "Chronotif now updates itself unless you turn that off, including if you never turned it on before: new versions download on Wi-Fi and install. Allow installs on the notice in Settings so Android doesn't ask each time, or switch it off under Settings → Updates. With it off, you get one notification per new version instead."
     ]
   },
   "stable": [

@@ -14,7 +14,10 @@ import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageInstaller
+import android.net.ConnectivityManager
+import android.os.BatteryManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -32,8 +35,9 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 
 /**
- * Opt-in self-update from GitHub Releases: it finds the newest release tag on github.com and
- * downloads the APK plus its `.sha256`.
+ * Auto-update from GitHub Releases (ADR 0025): it finds the newest release tag on github.com and
+ * downloads the APK plus its `.sha256`. On unless turned off. With it off, the daily check only
+ * posts Update available, once per build, and installing takes a tap.
  *
  * It reads github.com pages, not api.github.com, whose anonymous quota of 60 requests an hour is
  * shared by everyone behind the same IP address (ADR 0006). CI names the assets after the tag, so
@@ -47,12 +51,16 @@ object Updater {
     private const val REPO = "https://github.com/nagarete/chronotif"
     private const val MAX_APK_BYTES = 50L shl 20
     private const val JOB_ID = 1
-    /** Raised when the job's constraints change, so installs scheduled by an older version are rescheduled. */
-    private const val JOB_VERSION = 2
+    /** The one-off install that waits for Wi-Fi after a daily check found an update on mobile data. */
+    private const val INSTALL_JOB_ID = 2
+    /** Raised when the job's constraints change, so jobs scheduled by an older version are rescheduled. */
+    private const val JOB_VERSION = 3
     private const val KEY_JOB_VERSION = "version"
     private const val CHANNEL = "updates"
     private const val NOTIF_ID = 1
     const val EXTRA_VERSION = "version"
+    /** Opens Settings on Updates and installs the newest version, from Update available. */
+    const val ACTION_INSTALL = "app.chronotif.INSTALL_UPDATE"
 
     class Release(val version: String, val apkUrl: String, val sumUrl: String)
 
@@ -76,6 +84,10 @@ object Updater {
         CURRENT("current"),
         /** An automatic check passed over a version that failed to install before. */
         SKIPPED("skipped"),
+        /** Auto-update is off, so Update available was posted (or had been for this build). */
+        AVAILABLE("available"),
+        /** Auto-update is on, and the download waits for Wi-Fi and a battery that isn't low. */
+        WAITING("waiting"),
         /** Handed to Android's installer; one of the outcomes below follows. */
         INSTALLING("installing"),
         /** Android asks the user to confirm the install. */
@@ -102,8 +114,13 @@ object Updater {
         @Volatile var stopped = false
         @Volatile var connection: HttpURLConnection? = null
 
-        /** Throws [Stopped] once the job is stopped, or a daily check finds auto-update off. */
+        /** Throws [Stopped] once the job is stopped. */
         fun goOn() {
+            if (stopped) throw Stopped()
+        }
+
+        /** Throws [Stopped] once the job is stopped, or a daily check's download finds Auto-update off. */
+        fun goOnInstalling() {
             if (stopped || (!manual && !Prefs.autoUpdate)) throw Stopped()
         }
     }
@@ -139,22 +156,45 @@ object Updater {
 
     // --- Scheduling ---
 
-    /** Keeps the daily check scheduled iff auto-update is on. Cheap; called on every app start. */
+    /**
+     * Keeps the daily check scheduled, whether or not Auto-update is on: with it off, the check
+     * still posts Update available. Cheap; called on every app start.
+     */
     fun sync(context: Context) {
         val js = context.getSystemService(JobScheduler::class.java)
-        if (!Prefs.autoUpdate) return js.cancel(JOB_ID)
+        if (!Prefs.autoUpdate) js.cancel(INSTALL_JOB_ID)
         // A job an older version scheduled keeps its old constraints until it's replaced.
         if (js.getPendingJob(JOB_ID)?.extras?.getInt(KEY_JOB_VERSION) == JOB_VERSION) return
         val job = JobInfo.Builder(JOB_ID, ComponentName(context, UpdateJob::class.java))
             .setPeriodic(TimeUnit.DAYS.toMillis(1))
-            // Many people pay for mobile data, so the daily download waits for Wi-Fi or another
-            // unmetered network. "Check for updates" in Settings runs on any network.
-            .setRequiredNetworkType(JobInfo.NETWORK_TYPE_UNMETERED)
-            .setRequiresBatteryNotLow(true)
+            // The check reads a redirect or a small feed, so it runs on any network; only the
+            // APK's download waits for Wi-Fi (see [waitForWifi]).
+            .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
             .setExtras(PersistableBundle().apply { putInt(KEY_JOB_VERSION, JOB_VERSION) })
             .build()
         // Runs from App.onCreate: a scheduling failure must never stop the app from starting.
         runCatching { js.schedule(job) }
+    }
+
+    /**
+     * Many people pay for mobile data, so Auto-update's download waits for Wi-Fi or another
+     * unmetered network, with the battery not low, in a one-off job that runs the check again.
+     */
+    private fun waitForWifi(context: Context) {
+        val job = JobInfo.Builder(INSTALL_JOB_ID, ComponentName(context, UpdateJob::class.java))
+            .setRequiredNetworkType(JobInfo.NETWORK_TYPE_UNMETERED)
+            .setRequiresBatteryNotLow(true)
+            .build()
+        runCatching { context.getSystemService(JobScheduler::class.java).schedule(job) }
+    }
+
+    /** The download can start now: on an unmetered network with the battery not low. */
+    private fun canDownload(context: Context): Boolean {
+        val cm = context.getSystemService(ConnectivityManager::class.java)
+        if (cm.isActiveNetworkMetered) return false
+        // A sticky broadcast: registering for it with no receiver just reads the last one.
+        val battery = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        return battery?.getBooleanExtra(BatteryManager.EXTRA_BATTERY_LOW, false) != true
     }
 
     // --- Check / download / install ---
@@ -194,6 +234,16 @@ object Updater {
                     !manual && r.version == Prefs.updateFailedVersion -> {
                         outcome(Outcome.SKIPPED, manual = manual)
                         status(R.string.update_skipped, r.version)
+                    }
+                    !manual && !Prefs.autoUpdate -> {
+                        offer(app, r.version)
+                        outcome(Outcome.AVAILABLE, manual = manual)
+                        status(R.string.update_available_status, r.version)
+                    }
+                    !manual && !canDownload(app) -> {
+                        waitForWifi(app)
+                        outcome(Outcome.WAITING, manual = manual)
+                        status(R.string.update_waiting, r.version)
                     }
                     else -> {
                         status(R.string.update_downloading, r.version)
@@ -299,7 +349,7 @@ object Updater {
                 val buf = ByteArray(64 * 1024)
                 var total = 0L
                 while (true) {
-                    c.goOn()
+                    c.goOnInstalling()
                     val n = input.read(buf)
                     if (n < 0) break
                     total += n
@@ -336,7 +386,7 @@ object Updater {
                     session.fsync(out)
                 }
                 // Auto-update may have been turned off during the download.
-                c.goOn()
+                c.goOnInstalling()
             val result = Intent(context, UpdateReceiver::class.java)
                 .setAction(UpdateReceiver.ACTION_STATUS)
                 .putExtra(EXTRA_VERSION, version)
@@ -397,6 +447,31 @@ object Updater {
         return nm.getNotificationChannel(CHANNEL)?.importance != NotificationManager.IMPORTANCE_NONE
     }
 
+    /**
+     * Update available: a notice for [version], posted once per build, so swiping it away is
+     * enough. Its tap opens Settings, which installs it. Settings also offers it while it's newer.
+     */
+    internal fun offer(context: Context, version: String) {
+        Prefs.updateAvailable = version
+        // Blocked notifications don't use up the build's one notice: it shows once they're allowed.
+        if (Prefs.updateOffered == version || !canNotify(context)) return
+        Prefs.updateOffered = version
+        val tap = PendingIntent.getActivity(
+            context, 2,
+            Intent(context, SetupActivity::class.java).setAction(ACTION_INSTALL)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        notify(
+            context, context.getString(R.string.update_available_title, version),
+            context.getString(R.string.update_available_body), tap,
+        )
+    }
+
+    /** The version Update available offers, while it's newer than this one. */
+    val available: String?
+        get() = Prefs.updateAvailable?.takeIf { Version.isNewer(it, BuildConfig.VERSION_NAME) }
+
     fun notify(context: Context, title: String, text: String, tap: PendingIntent?) {
         val nm = context.getSystemService(NotificationManager::class.java)
         if (!nm.areNotificationsEnabled()) return
@@ -423,8 +498,8 @@ object Updater {
 }
 
 /**
- * The daily background check. Only scheduled while auto-update is on, and only runs on an
- * unmetered network with the battery not low.
+ * The daily background check, on any network, and the one-off run that downloads an update once
+ * Wi-Fi is back and the battery isn't low.
  */
 class UpdateJob : JobService() {
     // False when a check from Settings is already running: it does this job's work.

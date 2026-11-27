@@ -17,6 +17,7 @@
             <setting title="@string/perm_xiaomi" summary="@string/perm_xiaomi_desc" />
         </group>
         <setting title="@string/settings_theme" />
+        <setting title="@string/auto_update_notice_title" summary="@string/auto_update_notice_body" when="auto_update_notice" />
         <setting title="@string/usage_notice_title" summary="@string/usage_notice_body" when="usage_notice" />
     </section>
 
@@ -131,6 +132,7 @@
         <setting title="@string/update_channel_label" summary="@string/update_channel_desc" keywords="@string/settings_keywords_update_channel_label" />
         <setting title="@string/update_auto" summary="@string/update_auto_desc" keywords="@string/settings_keywords_update_auto" />
         <setting title="@string/perm_install" summary="@string/perm_install_desc" />
+        <setting title="@string/perm_update_notifications" summary="@string/perm_update_notifications_desc" />
     </section>
 
     <section name="ABOUT">

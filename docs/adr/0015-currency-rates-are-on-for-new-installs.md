@@ -1,5 +1,7 @@
 # Currency rates are on for new installs
 
+Superseded in part by ADR 0025: Auto-update is no longer opt-in.
+
 Supersedes in part ADR 0008, which made the currency download opt-in.
 
 The user wants people to meet the whole of Chronotif first and switch off what they don't like, the same reason the lock-screen view now shows whenever there are notifications on a new install. A currency question that stops to ask for a switch is the opposite of that, and the download sends nothing typed. So *Settings → Search → Currency rates* is on for new installs. Installs from before 0.2.7 keep it off unless turned on, because they were told it was opt-in. On its first start after the update, an older install writes the old default for each setting it never changed. An install that has never saved a setting and was never updated counts as new. The updater stays opt-in.

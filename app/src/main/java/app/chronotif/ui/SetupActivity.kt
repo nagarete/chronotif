@@ -200,8 +200,17 @@ class SetupActivity : Activity() {
             insets
         }
         setContentView(root)
-        current = if (missingPermission()) Section.GENERAL
-        else Section.entries.firstOrNull { it.name == Prefs.settingsSection } ?: Section.GENERAL
+        // Update available's tap: Updates, with the install under way.
+        val install = savedInstanceState == null && intent?.action == Updater.ACTION_INSTALL
+        current = when {
+            install -> Section.UPDATES
+            missingPermission() -> Section.GENERAL
+            else -> Section.entries.firstOrNull { it.name == Prefs.settingsSection } ?: Section.GENERAL
+        }
+        if (install) {
+            Updater.clearNotification(this)
+            Updater.run(this, manual = true)
+        }
         expanded = wide
         show(current)
         renderDrawer()
@@ -599,7 +608,38 @@ class SetupActivity : Activity() {
                 body.postDelayed({ recreate() }, 150)
             }
         }
+        autoUpdateNotice()
         usageNotice()
+    }
+
+    /**
+     * Says once that Auto-update is on (ADR 0025), with the switch a tap away, and asks for what
+     * lets updates install without waiting on a prompt: "Install unknown apps", and notifications
+     * for when Android still asks. Gone once answered.
+     */
+    private fun autoUpdateNotice() {
+        if (!Prefs.autoUpdate || Prefs.autoUpdateNoticed) return
+        group {
+            val content = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.END or Gravity.CENTER_VERTICAL
+                addView(button(getString(R.string.usage_notice_off), filled = false) {
+                    Prefs.autoUpdate = false
+                    Prefs.autoUpdateNoticed = true
+                    Updater.sync(this@SetupActivity)
+                    reshow()
+                }, Ui.lp(-2))
+                val canInstall = packageManager.canRequestPackageInstalls()
+                val answer = if (canInstall) R.string.usage_notice_ok else R.string.auto_update_notice_allow
+                addView(button(getString(answer), filled = true) {
+                    Prefs.autoUpdateNoticed = true
+                    if (Build.VERSION.SDK_INT >= 33) requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 0)
+                    if (!canInstall) open(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName")))
+                    reshow()
+                }, Ui.lp(-2).apply { marginStart = dp(8) })
+            }
+            item(R.string.auto_update_notice_title, getString(R.string.auto_update_notice_body), content = content)
+        }
     }
 
     /** Says once that Usage data is on (ADR 0016), with the switch a tap away. Gone once answered. */
@@ -1045,6 +1085,7 @@ class SetupActivity : Activity() {
         group {
             toggle(R.string.update_auto, R.string.update_auto_desc, { Prefs.autoUpdate }) {
                 Prefs.autoUpdate = it
+                Prefs.autoUpdateNoticed = true
                 Updater.sync(this)
                 if (it && Build.VERSION.SDK_INT >= 33) requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 0)
                 refreshers.forEach { r -> r() }
@@ -1054,6 +1095,12 @@ class SetupActivity : Activity() {
                 open(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName")))
             }
             refreshers += { install.visibility = if (Prefs.autoUpdate) View.VISIBLE else View.GONE }
+            // Without notifications, Update available and Android's install confirmations go unseen.
+            permission(R.string.perm_update_notifications, R.string.perm_update_notifications_desc,
+                granted = { Updater.canNotify(this) }) {
+                // Android's page for Chronotif's notifications covers both being blocked and the Updates channel being off.
+                open(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, packageName))
+            }
         }
         val updateStatus = text("", 13f, secondary = true).apply { visibility = View.GONE }
         val check = button(getString(R.string.update_check_now), filled = true) { Updater.run(this, manual = true) }
@@ -1062,6 +1109,7 @@ class SetupActivity : Activity() {
             val status = Updater.status
             updateStatus.text = status
             updateStatus.visibility = if (status == null) View.GONE else View.VISIBLE
+            check.text = Updater.available?.let { getString(R.string.update_install_now, it) } ?: getString(R.string.update_check_now)
             check.isEnabled = !Updater.busy
             check.alpha = if (Updater.busy) 0.6f else 1f
         }
@@ -1443,6 +1491,7 @@ class SetupActivity : Activity() {
             null -> true
             "xiaomi" -> isXiaomi
             "usage_notice" -> !Prefs.usageNoticed
+            "auto_update_notice" -> Prefs.autoUpdate && !Prefs.autoUpdateNoticed
             "haptics_off" -> !app.chronotif.Haptics.on(this)
             "lens_missing" -> !app.chronotif.GoogleLens.installed(this)
             else -> error("Unknown when in settings_search.xml")

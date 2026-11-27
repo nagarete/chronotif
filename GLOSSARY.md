@@ -107,6 +107,14 @@ _Avoid_: Production, latest
 A build of the next Stable while it is still being tested, and the update channel that receives those builds.
 _Avoid_: Beta, preview, dev build
 
+**Auto-update**:
+Chronotif installing new builds of its channel, Stable or Nightly, by itself. On unless turned off; the setting reads *Update automatically*.
+_Avoid_: Self-update, OTA, opt-in updater
+
+**Update available**:
+The notice that a newer build of the channel is out and installs with one tap, for installs with Auto-update off.
+_Avoid_: Update prompt, nag
+
 **Release notes**:
 The plain-language account of what a Stable changed for the people using it, plus one entry for the next Stable while it is in Nightly. Changes that don't reach the app, such as website or build work, are left out.
 _Avoid_: Changelog, What's Changed (GitHub's generated list of pull requests)

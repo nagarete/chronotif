@@ -6,7 +6,7 @@
          (ExchangeRates.kt) read the ECB's daily rates, and Usage data (UsageData.kt) sends what
          docs/usage-data.md lists. Nothing from a notification is ever sent. -->
     <uses-permission android:name="android.permission.INTERNET" />
-    <!-- Android 16 requires it for the update job's network constraint. -->
+    <!-- Android 16 requires it for the update jobs' network constraints; the updater also reads whether the network is metered. -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <!-- "Update ready" / "Updated" notifications. -->
