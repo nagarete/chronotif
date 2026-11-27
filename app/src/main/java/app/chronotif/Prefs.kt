@@ -447,10 +447,21 @@ object Prefs {
     /** Enough to fill the row when some of them can't be launched (uninstalled, no launcher entry). */
     private const val LAST_NOTIFIED_KEPT = 16
 
-    /** Opt-in: check GitHub Releases daily and install newer versions. */
+    /**
+     * Auto-update (ADR 0025): on unless turned off, including installs from before it was, which
+     * never stored a choice. Someone who turned it off keeps it off.
+     */
     var autoUpdate: Boolean
-        get() = sp.getBoolean("auto_update", false)
+        get() = sp.getBoolean("auto_update", true)
         set(v) = sp.edit().putBoolean("auto_update", v).apply()
+
+    /**
+     * The notice that Auto-update is on has been answered. Someone who already chose, on or off,
+     * has nothing to be told.
+     */
+    var autoUpdateNoticed: Boolean
+        get() = sp.getBoolean("auto_update_noticed", sp.contains("auto_update"))
+        set(v) = sp.edit().putBoolean("auto_update_noticed", v).apply()
 
     /** Nightly APKs opt into nightly updates on first install; existing choices persist. */
     var nightlyUpdates: Boolean
@@ -546,6 +557,16 @@ object Prefs {
     var updateFailedVersion: String?
         get() = sp.getString("update_failed_version", null)
         set(v) = sp.edit().putString("update_failed_version", v).apply()
+
+    /** The newest version a daily check found while Auto-update was off. */
+    var updateAvailable: String?
+        get() = sp.getString("update_available", null)
+        set(v) = sp.edit().putString("update_available", v).apply()
+
+    /** The version Update available last notified about; each build is notified once. */
+    var updateOffered: String?
+        get() = sp.getString("update_offered", null)
+        set(v) = sp.edit().putString("update_offered", v).apply()
 
     /** When the daily update job last started a check, in epoch ms; 0 if it never has. */
     var updateDailyAt: Long

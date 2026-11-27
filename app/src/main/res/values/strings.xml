@@ -576,7 +576,7 @@
     <string name="fingerprint_fit_done_body">The lock screen now keeps clear of your sensor.</string>
 
     <string name="setup_privacy">Privacy</string>
-    <string name="privacy_body">No accounts. Notifications never leave this device. Stored on it: the time of your last check, when the last few apps notified (never what they said), these settings, and Usage data waiting to be sent. Chronotif goes online for four things: the update check, off until you turn it on; Search\'s currency rates, downloaded from the European Central Bank when you type a currency; Usage data, which you can turn off here; and Feedback, only when you send it.</string>
+    <string name="privacy_body">No accounts. Notifications never leave this device. Stored on it: the time of your last check, when the last few apps notified (never what they said), these settings, and Usage data waiting to be sent. Chronotif goes online for four things: the update check, which you can turn off in Updates; Search\'s currency rates, downloaded from the European Central Bank when you type a currency; Usage data, which you can turn off here; and Feedback, only when you send it.</string>
     <string name="usage_data">Usage data</string>
     <string name="usage_data_desc">Send anonymous counts, Panel speeds, settings and crash reports, so Chronotif can be improved from how it\'s really used. Never anything from your notifications, contacts, calendar or Search. Turning it off sends one last note that it was turned off, then nothing.</string>
     <string name="usage_data_whats_sent">What\'s sent</string>
@@ -588,7 +588,17 @@
 
     <string name="setup_updates">Updates</string>
     <string name="update_auto">Update automatically</string>
-    <string name="update_auto_desc">Once a day, when you\'re on Wi-Fi and the battery isn\'t low, check GitHub Releases for a new version and install it. Android asks you to confirm unless “Install unknown apps” is allowed for Chronotif.</string>
+    <string name="update_auto_desc">Chronotif checks GitHub Releases once a day. With this on, it downloads a new version on Wi-Fi and installs it; with it off, it only tells you. Android asks you to confirm unless “Install unknown apps” is allowed for Chronotif.</string>
+    <string name="auto_update_notice_title">Chronotif updates itself</string>
+    <string name="auto_update_notice_body">New versions download on Wi-Fi and install by themselves. Allow installs so Android doesn\'t ask each time. Change it any time in Updates.</string>
+    <string name="auto_update_notice_allow">Allow installs</string>
+    <string name="perm_update_notifications">Update notifications</string>
+    <string name="perm_update_notifications_desc">Tell you when an update is out, or when Android needs you to confirm one.</string>
+    <string name="update_available_title">Chronotif %s is out</string>
+    <string name="update_available_body">Tap to install it.</string>
+    <string name="update_available_status">%s is available.</string>
+    <string name="update_waiting">%s will download on Wi-Fi.</string>
+    <string name="update_install_now">Install %s</string>
     <string name="perm_install">Install unknown apps</string>
     <string name="perm_install_desc">Lets updates install without asking each time (Android 12+).</string>
     <string name="update_check_now">Check for updates</string>

@@ -91,15 +91,19 @@ and nightlies from [the release list](https://github.com/nagarete/chronotif/rele
 v0.2.2 and older have no channel setting. Install a nightly APK once to opt into Nightly.
 Older updaters ignore nightly tags and continue to receive stable versions.
 
-Turn on *Settings → Updates → Update automatically* and Chronotif checks GitHub Releases once
-a day, when the phone is on Wi-Fi (or another network that isn't metered) and the battery isn't
-low, so it never spends paid mobile data. A download cut short by leaving Wi-Fi stops and tries
-again later. When there's a newer version it downloads the APK, checks it against the release's
-`.sha256` file and installs it:
+Chronotif checks GitHub Releases once a day, on any network; the check reads a few kilobytes.
+*Settings → Updates → Update automatically* is on unless you turn it off (ADR 0025). With it on,
+a newer version downloads when the phone is on Wi-Fi (or another network that isn't metered) and
+the battery isn't low, so it never spends paid mobile data. A download cut short by leaving Wi-Fi
+stops and tries again later. The APK is checked against the release's `.sha256` file and installed:
 
 - If **Install unknown apps** is allowed for Chronotif (Android 12+), the update installs
   silently and you get an "updated" notification.
-- Otherwise you get an "update available" notification. Tap it to confirm the install.
+- Otherwise a notification asks you to confirm the install.
+
+With it off, you get one **Update available** notification per new version instead, and tapping
+it installs that version. *Settings → Updates* warns when notifications are off, since then
+neither notification can reach you.
 
 *Check for updates* does the same thing on demand, on any network. The check reads the public release pages
 on github.com and sends nothing about you or your notifications. If GitHub is limiting
@@ -360,7 +364,7 @@ app/src/main/java/app/chronotif/
                         (core/FingerprintSpot.kt does the sums)
   Content.kt            extracting text/messages/pictures from notifications; app labels & icons
   Act.kt                open / dismiss / action / inline reply
-  Updater.kt            opt-in self-update from GitHub Releases (network code)
+  Updater.kt            Auto-update from GitHub Releases, on unless turned off (network code)
   ExchangeRates.kt      ECB daily rates for Search's currency, on by default (network code);
                         res/xml/network_security_config.xml trusts the ECB's root on older Androids
   UsageData.kt          Usage data sent to PostHog, on unless turned off (the third network code;

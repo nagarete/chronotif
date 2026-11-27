@@ -623,11 +623,11 @@
               </p>
             </li>
             <li>
-              <h3>Turn on updates <span class="optional">optional</span></h3>
+              <h3>Let updates install <span class="optional">optional</span></h3>
               <p>
-                In <em>Updates</em>, switch on <em>Update automatically</em>. If you also allow
-                <em>Install unknown apps</em> for Chronotif (Android 12+), updates install without
-                asking; otherwise a notification asks you to confirm each one.
+                Chronotif updates itself. Tap <em>Allow installs</em> on its notice in Settings to allow
+                <em>Install unknown apps</em> (Android 12+), and updates install without asking;
+                otherwise a notification asks you to confirm each one.
               </p>
             </li>
           </ol>
@@ -675,10 +675,12 @@
             <details>
               <summary>How do updates work?</summary>
               <p>
-                Turn on <em>Update automatically</em> and Chronotif checks GitHub Releases once a day,
-                on Wi-Fi and with the battery not low, so it never uses your mobile data. When there’s a newer version, it downloads the APK, verifies it against the release’s
-                <code>.sha256</code> file and installs it. <em>Check for updates</em> does the same on
-                demand, on any network, and you can always install a newer APK from Releases by hand. Android only
+                Chronotif checks GitHub Releases once a day. <em>Update automatically</em> is on unless
+                you turn it off: a newer version downloads on Wi-Fi with the battery not low, so it
+                never uses your mobile data, and is verified against the release’s
+                <code>.sha256</code> file and installed. With it off, you get one notification per new
+                version, and a tap installs it. <em>Check for updates</em> works on demand, on any
+                network, and you can always install a newer APK from Releases by hand. Android only
                 accepts an update signed with the same key as the installed app.
               </p>
               <p>

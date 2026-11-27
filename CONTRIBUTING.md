@@ -17,7 +17,7 @@ translations and accessibility improvements are always welcome.
   don't copy it.
 - **Local-first and private.** No accounts, and nothing from the user's notifications,
   contacts, calendar or Search ever leaves the device. There are four pieces of network code.
-  Two are download-only: the opt-in updater (`Updater.kt`), which reads public GitHub Releases, and
+  Two are download-only: the updater (`Updater.kt`, on unless turned off), which reads public GitHub Releases, and
   Search's currency rates (`ExchangeRates.kt`), on by default for new installs, which download the
   European Central Bank's public daily rates when a currency is typed (ADR 0008, ADR 0015).
   The third is Usage data (`UsageData.kt`, ADR 0016): anonymous counts, Panel speeds, settings and

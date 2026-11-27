@@ -117,8 +117,8 @@ Return to Chronotif and grant access again. On HyperOS, the switch is under
 **App info → Advanced settings**.
 
 See the [installation guide](docs/guide.md#install) for screenshots, Xiaomi permissions,
-and help with installation problems. You can enable optional updates in Chronotif's
-settings or install newer APKs from Releases yourself. Under **Updates**, choose **Stable**
+and help with installation problems. Chronotif updates itself from Releases unless you turn
+that off under **Updates**, and you can always install newer APKs from Releases yourself. Under **Updates**, choose **Stable**
 for published stable releases or **Nightly** for changes still being tested. Both use the same
 app and keep your settings. Switching back to Stable waits for a newer stable release.
 If your installed version has no channel setting, install a nightly APK once to opt in.
@@ -156,8 +156,8 @@ Settings tile. The service subscribes to no accessibility events and can't retri
 other apps' screen content; notification content comes separately through notification access.
 
 The app has no third-party dependencies and responds to system events without polling,
-a foreground service, or wakelocks. It goes online for four things. The GitHub updater, off by
-default, and Search's currency rates from the European Central Bank, on by default and switched off
+a foreground service, or wakelocks. It goes online for four things. The GitHub updater, on unless
+turned off under *Settings → Updates*, and Search's currency rates from the European Central Bank, on by default and switched off
 under *Settings → Search*, are download-only, and the rates download only when you type a currency.
 The third is Usage data, described above. The fourth is Feedback, sent only when you write a message
 under *Settings → Send feedback* and tap Send; see below.

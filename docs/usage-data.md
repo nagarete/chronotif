@@ -46,7 +46,7 @@ Sent once a day, the first time Chronotif starts or the Panel closes on a new da
 | Field | Example | Meaning |
 |---|---|---|
 | `update_daily_days` | `0` | Days since the daily update check last ran; `null` if it never has |
-| `update_outcome` | `confirm` | How the last check, or the install it started, ended: `current`, `skipped`, `installing`, `confirm` (waiting for you to confirm), `dismissed`, `installed`, `install_failed`, `rate_limited`, `http`, `checksum`, `stopped` (Android stopped the check, often because Wi-Fi went or the battery got low) or `error` |
+| `update_outcome` | `confirm` | How the last check, or the install it started, ended: `current`, `skipped`, `available` (Update available shown, Auto-update off), `waiting` (the download waits for Wi-Fi), `installing`, `confirm` (waiting for you to confirm), `dismissed`, `installed`, `install_failed`, `rate_limited`, `http`, `checksum`, `stopped` (Android stopped the check, often because Wi-Fi went or the battery got low) or `error` |
 | `update_outcome_code` | `404` | The HTTP status for `http`, or Android's install status for `install_failed` |
 | `update_outcome_manual` | `false` | Whether that check came from *Check for updates* in Settings |
 
