@@ -54,14 +54,22 @@ Please make sure tests and lint pass before opening a PR (CI runs the same check
 ## Making a change
 
 1. Open an issue first for anything bigger than a small fix, so we can agree on the approach.
-2. Fork, then create a branch from `main`.
-3. Keep PRs focused: one change per PR, matching the surrounding code style.
-4. Add or update unit tests when you change the attention model (`core/Attention.kt`).
-5. If the change affects behaviour you can see, say which device/Android version you tested on
+2. If the change alters behaviour, adds a setting or reverses an ADR, grill the design before
+   writing code with the `grill-with-docs` skill from
+   [mattpocock/skills](https://github.com/mattpocock/skills). It asks the questions a reviewer
+   would, and writes the `GLOSSARY.md` terms and ADRs as each decision is settled. In Claude Code:
+   `claude plugin install mattpocock-skills@claude-plugins-official`, then `/grill-with-docs`. Other
+   agents: `npx skills@latest add mattpocock/skills`. Put the decisions it settled in the PR's
+   *What and why*, with the glossary and ADR changes in the same PR. Typo and small bug fixes can
+   skip it.
+3. Fork, then create a branch from `main`.
+4. Keep PRs focused: one change per PR, matching the surrounding code style.
+5. Add or update unit tests when you change the attention model (`core/Attention.kt`).
+6. If the change affects behaviour you can see, say which device/Android version you tested on
    and include a screenshot or short recording.
-6. If people using the app will notice the change, add a line for it to the `next` entry in
+7. If people using the app will notice the change, add a line for it to the `next` entry in
    `website/src/releases.json`, in plain words.
-7. Open a pull request against `main` and fill in the template.
+8. Open a pull request against `main` and fill in the template.
 
 ## Reporting bugs
 

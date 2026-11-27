@@ -13,6 +13,10 @@ Each of these is changed together with the code it describes, in the same commit
 - **Release notes**: `website/src/releases.json`, rendered at chronotif.com/releases. A user-visible change adds a line to its `next` entry. The release steps are in `docs/guide.md`.
 - **Website demo**: `website/src/demo.js` mirrors `core/Attention.kt`, and `website/index.html` describes the same model. Update both when visible behaviour changes.
 
+## Grill the design first
+
+A change to behaviour, a new setting, or reversing an ADR starts with the `grill-with-docs` skill from [mattpocock/skills](https://github.com/mattpocock/skills), before any code. It settles the decisions with the person who asked and writes the `GLOSSARY.md` terms and ADRs as they're settled. The PR lists the decisions it settled. Typo and small bug fixes skip it.
+
 ## Build the known best way first
 
 Every change starts from the established best practice for that problem on Android, without being asked. Threading, memory, battery, start-up and frame time, and slow phones with long lists are requirements, even when the task and tests don't mention them. Never ship a simple version and wait for complaints. Example: icons and labels loaded on the main thread made the panel take seconds to open until #62 moved them off it, which is decade-old Android advice. When the best way costs something real (memory, complexity), say so and decide it with the user. When code you touch falls short, raise it instead of copying the pattern. See `CONTRIBUTING.md`.
