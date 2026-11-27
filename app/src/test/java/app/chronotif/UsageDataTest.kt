@@ -136,4 +136,19 @@ class UsageDataTest {
         assertEquals(3, sent.size)
         assertNull(Prefs.usageCounts)
     }
+
+    @Test
+    fun theDailyBatchSaysHowTheLastUpdateEnded() {
+        saved.edit().putLong("update_daily_at", System.currentTimeMillis() - 3 * 86_400_000L).commit()
+        Updater.outcome(Updater.Outcome.HTTP, 404, manual = false)
+        dayEnds()
+        UsageData.sendIfDue()
+        assertEquals(2, sent.size)
+        assertTrue(sent[1].contains("\"update_daily_days\":3"))
+        assertTrue(sent[1].contains("\"update_outcome\":\"http\""))
+        assertTrue(sent[1].contains("\"update_outcome_code\":404"))
+        assertTrue(sent[1].contains("\"update_outcome_manual\":false"))
+        assertTrue(sent[1].contains("\"perm_notifications\":"))
+        assertTrue(sent[1].contains("\"perm_install\":"))
+    }
 }

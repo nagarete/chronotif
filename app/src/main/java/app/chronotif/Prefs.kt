@@ -546,4 +546,23 @@ object Prefs {
     var updateFailedVersion: String?
         get() = sp.getString("update_failed_version", null)
         set(v) = sp.edit().putString("update_failed_version", v).apply()
+
+    /** When the daily update job last started a check, in epoch ms; 0 if it never has. */
+    var updateDailyAt: Long
+        get() = sp.getLong("update_daily_at", 0L)
+        set(v) = sp.edit().putLong("update_daily_at", v).apply()
+
+    /** How the last update check, or the install it started, ended: an [Updater.Outcome] key, or null before the first. */
+    val updateOutcome: String? get() = sp.getString("update_outcome", null)
+
+    /** The HTTP status or install status behind [updateOutcome], 0 when there's none. */
+    val updateOutcomeCode: Int get() = sp.getInt("update_outcome_code", 0)
+
+    /** [updateOutcome] came from "Check for updates" in Settings, not the daily job. */
+    val updateOutcomeManual: Boolean get() = sp.getBoolean("update_outcome_manual", false)
+
+    fun keepUpdateOutcome(outcome: String, code: Int, manual: Boolean) {
+        sp.edit().putString("update_outcome", outcome).putInt("update_outcome_code", code)
+            .putBoolean("update_outcome_manual", manual).apply()
+    }
 }
