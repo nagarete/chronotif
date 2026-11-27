@@ -408,10 +408,18 @@ object UsageData {
         "set_search_tile" to Prefs.searchTileAdded,
         "set_auto_update" to Prefs.autoUpdate,
         "set_nightly_updates" to Prefs.nightlyUpdates,
+        // How updating goes: whether the daily check runs at all, and how the last one ended.
+        "update_daily_days" to Prefs.updateDailyAt.takeIf { it > 0 }?.let { (System.currentTimeMillis() - it) / TimeUnit.DAYS.toMillis(1) },
+        "update_outcome" to Prefs.updateOutcome,
+        "update_outcome_code" to Prefs.updateOutcomeCode.takeIf { it != 0 },
+        "update_outcome_manual" to Prefs.updateOutcome?.let { Prefs.updateOutcomeManual },
         "set_settings_theme" to Prefs.settingsTheme,
         "tutorial_parts_done" to Prefs.tutorialDone.size,
         "perm_listener" to ListenerService.isEnabled(app),
         "perm_overlay" to Settings.canDrawOverlays(app),
         "perm_status_swipe" to (StatusBarSwipe.instance != null),
+        // Either one off makes an update wait for a confirmation nobody may see.
+        "perm_notifications" to Updater.canNotify(app),
+        "perm_install" to app.packageManager.canRequestPackageInstalls(),
     )
 }

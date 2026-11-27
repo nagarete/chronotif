@@ -62,6 +62,41 @@ object Updater {
     /** The daily check was stopped, or auto-update was turned off while it ran. */
     private class Stopped : IOException("stopped")
 
+    /** GitHub answered with an HTTP status other than the expected one. */
+    private class HttpFailure(val code: Int) : IOException("HTTP $code")
+
+    /** The APK didn't match its `.sha256`, or the checksum file was unreadable. */
+    private class BadChecksum(message: String) : IOException(message)
+
+    /**
+     * How a check, or the install it started, ended, kept for Usage data (`docs/usage-data.md`)
+     * so updates that never arrive can be told apart from ones nobody confirmed.
+     */
+    enum class Outcome(val key: String) {
+        CURRENT("current"),
+        /** An automatic check passed over a version that failed to install before. */
+        SKIPPED("skipped"),
+        /** Handed to Android's installer; one of the outcomes below follows. */
+        INSTALLING("installing"),
+        /** Android asks the user to confirm the install. */
+        CONFIRM("confirm"),
+        /** The user dismissed Android's confirmation. */
+        DISMISSED("dismissed"),
+        INSTALLED("installed"),
+        INSTALL_FAILED("install_failed"),
+        RATE_LIMITED("rate_limited"),
+        HTTP("http"),
+        CHECKSUM("checksum"),
+        /** Android stopped the daily check, most often because Wi-Fi went or the battery got low. */
+        STOPPED("stopped"),
+        /** No connection, a timeout, or any other failure. */
+        ERROR("error"),
+    }
+
+    /** Keeps [o] for Usage data; an install's result keeps the kind of check that started it. */
+    fun outcome(o: Outcome, code: Int = 0, manual: Boolean = Prefs.updateOutcomeManual) =
+        Prefs.keepUpdateOutcome(o.key, code, manual)
+
     /** One check. Android stops the daily job's check through [stopDaily]; a manual check runs on. */
     private class Check(val manual: Boolean) {
         @Volatile var stopped = false
@@ -135,6 +170,7 @@ object Updater {
         if (!running.compareAndSet(false, true)) return false
         val c = Check(manual)
         check = c
+        if (!manual) Prefs.updateDailyAt = System.currentTimeMillis()
         main.post(::changed)
         fun status(res: Int, vararg args: Any) {
             val text = app.getString(res, *args)
@@ -151,21 +187,37 @@ object Updater {
                 val r = latest(c)
                 c.goOn()
                 when {
-                    r == null || !Version.isNewer(r.version, BuildConfig.VERSION_NAME) ->
+                    r == null || !Version.isNewer(r.version, BuildConfig.VERSION_NAME) -> {
+                        outcome(Outcome.CURRENT, manual = manual)
                         status(R.string.update_none, BuildConfig.VERSION_NAME)
-                    !manual && r.version == Prefs.updateFailedVersion -> status(R.string.update_skipped, r.version)
+                    }
+                    !manual && r.version == Prefs.updateFailedVersion -> {
+                        outcome(Outcome.SKIPPED, manual = manual)
+                        status(R.string.update_skipped, r.version)
+                    }
                     else -> {
                         status(R.string.update_downloading, r.version)
                         val apk = download(app, r, c)
                         status(R.string.update_installing, r.version)
+                        // Kept before the commit: the installer's answer can arrive before commit returns.
+                        outcome(Outcome.INSTALLING, manual = manual)
                         install(app, apk, r.version, c)
                     }
                 }
             } catch (e: RateLimited) {
+                outcome(Outcome.RATE_LIMITED, manual = manual)
                 status(R.string.update_rate_limited)
             } catch (e: Exception) {
                 // A stopped check's connection was cut from another thread, so any error after a stop is the stop.
                 halted = e is Stopped || c.stopped
+                when {
+                    // Auto-update turned off mid-check isn't a failure worth keeping.
+                    halted && !c.stopped -> Unit
+                    halted -> outcome(Outcome.STOPPED, manual = manual)
+                    e is HttpFailure -> outcome(Outcome.HTTP, e.code, manual)
+                    e is BadChecksum -> outcome(Outcome.CHECKSUM, manual = manual)
+                    else -> outcome(Outcome.ERROR, manual = manual)
+                }
                 if (!halted) status(R.string.update_error, e.message ?: e.javaClass.simpleName)
             } finally {
                 check = null
@@ -238,7 +290,7 @@ object Updater {
 
     private fun download(context: Context, r: Release, c: Check): File {
         val expected = get(r.sumUrl, c) { it.readBytes().decodeToString() }
-            .let(Version::sha256Of) ?: throw IOException("bad checksum file")
+            .let(Version::sha256Of) ?: throw BadChecksum("bad checksum file")
         val dir = File(context.cacheDir, "updates").apply { deleteRecursively(); mkdirs() }
         val file = File(dir, "update.apk")
         val digest = MessageDigest.getInstance("SHA-256")
@@ -260,7 +312,7 @@ object Updater {
         val actual = digest.digest().joinToString("") { "%02x".format(it) }
         if (actual != expected) {
             file.delete()
-            throw IOException("checksum mismatch")
+            throw BadChecksum("checksum mismatch")
         }
         return file
     }
@@ -333,9 +385,17 @@ object Updater {
         }
     }
 
-    private fun failure(code: Int) = if (code == 403 || code == 429) RateLimited() else IOException("HTTP $code")
+    private fun failure(code: Int) = if (code == 403 || code == 429) RateLimited() else HttpFailure(code)
 
     // --- Notifications ---
+
+    /** Update notifications can show: Chronotif's notifications are allowed and its Updates channel isn't off. */
+    fun canNotify(context: Context): Boolean {
+        val nm = context.getSystemService(NotificationManager::class.java)
+        if (!nm.areNotificationsEnabled()) return false
+        // Before the first update notification the channel doesn't exist, and nothing has turned it off.
+        return nm.getNotificationChannel(CHANNEL)?.importance != NotificationManager.IMPORTANCE_NONE
+    }
 
     fun notify(context: Context, title: String, text: String, tap: PendingIntent?) {
         val nm = context.getSystemService(NotificationManager::class.java)
@@ -383,6 +443,10 @@ class UpdateReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == Intent.ACTION_MY_PACKAGE_REPLACED) {
             Prefs.updateFailedVersion = null
+            // Only an update counts: a reinstall over the same version also lands here.
+            if (Prefs.updateOutcome == Updater.Outcome.INSTALLING.key || Prefs.updateOutcome == Updater.Outcome.CONFIRM.key) {
+                Updater.outcome(Updater.Outcome.INSTALLED)
+            }
             Updater.sync(context)
             if (Prefs.autoUpdate) {
                 Updater.notify(
@@ -396,6 +460,7 @@ class UpdateReceiver : BroadcastReceiver() {
         val version = intent.getStringExtra(Updater.EXTRA_VERSION) ?: return
         when (val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)) {
             PackageInstaller.STATUS_PENDING_USER_ACTION -> {
+                Updater.outcome(Updater.Outcome.CONFIRM)
                 @Suppress("DEPRECATION")
                 val confirm = (if (Build.VERSION.SDK_INT >= 33) {
                     intent.getParcelableExtra(Intent.EXTRA_INTENT, Intent::class.java)
@@ -415,10 +480,14 @@ class UpdateReceiver : BroadcastReceiver() {
                     )
                 }
             }
-            PackageInstaller.STATUS_SUCCESS -> Updater.clearNotification(context)
+            PackageInstaller.STATUS_SUCCESS -> {
+                Updater.outcome(Updater.Outcome.INSTALLED)
+                Updater.clearNotification(context)
+            }
             // Dismissing the system prompt isn't a failure; the next daily check asks again.
-            PackageInstaller.STATUS_FAILURE_ABORTED -> Unit
+            PackageInstaller.STATUS_FAILURE_ABORTED -> Updater.outcome(Updater.Outcome.DISMISSED)
             else -> {
+                Updater.outcome(Updater.Outcome.INSTALL_FAILED, status)
                 Prefs.updateFailedVersion = version
                 val why = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE) ?: "status $status"
                 Updater.notify(
