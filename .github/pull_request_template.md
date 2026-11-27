@@ -1,6 +1,6 @@
 ## What and why
 
-<!-- What does this change, and why? Link the issue if there is one. -->
+<!-- What does this change, and why? Link the issue if there is one. For a behaviour change, list the decisions grill-with-docs settled. -->
 
 ## How I tested it
 
@@ -8,6 +8,7 @@
 
 ## Checklist
 
+- [ ] Designed with `grill-with-docs` (see CONTRIBUTING.md), with its glossary and ADR changes in this PR, or not needed: a typo or small bug fix
 - [ ] `./gradlew testDebugUnitTest lintDebug assembleDebug` passes
 - [ ] Uses the known best way on Android from the start (nothing slow on the main thread; checked with a long list on a slow phone if the panel or lock screen is touched)
 - [ ] No new network access (beyond the opt-in updater, Search's currency rates, Usage data and Feedback), background services, wakelocks or new dependencies added; any new Usage data field is listed in `docs/usage-data.md`
