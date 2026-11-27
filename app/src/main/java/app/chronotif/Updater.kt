@@ -52,7 +52,7 @@ object Updater {
     private const val MAX_APK_BYTES = 50L shl 20
     private const val JOB_ID = 1
     /** The one-off install that waits for Wi-Fi after a daily check found an update on mobile data. */
-    private const val INSTALL_JOB_ID = 2
+    const val INSTALL_JOB_ID = 2
     /** Raised when the job's constraints change, so jobs scheduled by an older version are rescheduled. */
     private const val JOB_VERSION = 3
     private const val KEY_JOB_VERSION = "version"
@@ -202,10 +202,11 @@ object Updater {
     /**
      * Checks for a newer release and, if there is one, downloads and installs it, on a background
      * thread. Progress goes to [status]. [manual] checks also retry a version that failed to
-     * install before. Returns false, without calling [done], when a check is already running.
+     * install before. A [wifiJob] run is the one-off job that waited for Wi-Fi, so it downloads
+     * at once. Returns false, without calling [done], when a check is already running.
      * [done] runs on the main thread unless the check was stopped.
      */
-    fun run(context: Context, manual: Boolean, done: () -> Unit = {}): Boolean {
+    fun run(context: Context, manual: Boolean, wifiJob: Boolean = false, done: () -> Unit = {}): Boolean {
         val app = context.applicationContext
         if (!running.compareAndSet(false, true)) return false
         val c = Check(manual)
@@ -240,7 +241,9 @@ object Updater {
                         outcome(Outcome.AVAILABLE, manual = manual)
                         status(R.string.update_available_status, r.version)
                     }
-                    !manual && !canDownload(app) -> {
+                    // The Wi-Fi job's constraints were checked by JobScheduler; asking again could
+                    // disagree (a VPN reads as metered) and reschedule it forever.
+                    !manual && !wifiJob && !canDownload(app) -> {
                         waitForWifi(app)
                         outcome(Outcome.WAITING, manual = manual)
                         status(R.string.update_waiting, r.version)
@@ -504,7 +507,7 @@ object Updater {
 class UpdateJob : JobService() {
     // False when a check from Settings is already running: it does this job's work.
     override fun onStartJob(params: JobParameters): Boolean =
-        Updater.run(this, manual = false, done = { jobFinished(params, false) })
+        Updater.run(this, manual = false, wifiJob = params.jobId == Updater.INSTALL_JOB_ID, done = { jobFinished(params, false) })
 
     // True: a download cut short by leaving Wi-Fi tries again when the constraints hold, not a day later.
     override fun onStopJob(params: JobParameters): Boolean {
